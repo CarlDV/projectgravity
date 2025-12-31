@@ -7,9 +7,6 @@ local UIS, Plrs, RS, WS, SG, TS, CAS =
 	game:GetService("TweenService"),
 	game:GetService("ContextActionService")
 local LP, Mus = Plrs.LocalPlayer, Plrs.LocalPlayer:GetMouse()
-if WS:FindFirstChild("SwirlVisuals") then
-	WS.SwirlVisuals:Destroy()
-end
 local CFG = {
 	MR = 2000,
 	BHS = Vector3.new(5, 5, 5),
@@ -18,14 +15,11 @@ local CFG = {
 	SS = 130,
 	AMF = math.huge,
 	EXT = { "NoAttract", "Character" },
-	MOB = false,
-	SM = "Ethereal",
+	SM = "Big Ring Things",
 	PT = 4,
-	CL = true,
-	SNT = true,
-	PL = 0.1,
-	TSP = 5,
-	ERC = 3,
+	PL = 0.8,
+	TSP = 50,
+	ERC = 2,
 	ERG = 100,
 	ERS = 10,
 	EHO = 5,
@@ -33,8 +27,7 @@ local CFG = {
 	ETS = 0.6,
 }
 local SYS, GUI = {}, {}
-local ENV =
-	{ bh = nil, cn = {}, ap = {}, on = false, mob = UIS.TouchEnabled, drg = false, dp = 0, fc = 0, pc = 0, sl = {} }
+local ENV = { bh = nil, cn = {}, ap = {}, on = false, drg = false, dp = 0, fc = 0, pc = 0 }
 local HLP = {}
 function HLP.N(t, x, d)
 	pcall(function()
@@ -139,40 +132,7 @@ function GUI.Sld(p, t, min, max, def, cb)
 		end
 	end)
 end
-function GUI.Tgl(p, t, def, cb)
-	local f = Instance.new("Frame", p)
-	f.BackgroundTransparency = 1
-	f.Size = UDim2.new(1, 0, 0, 28)
-	local l = Instance.new("TextLabel", f)
-	l.BackgroundTransparency = 1
-	l.Size = UDim2.new(0.8, 0, 1, 0)
-	l.Text = t
-	l.TextColor3 = Color3.fromRGB(220, 220, 220)
-	l.TextXAlignment = 0
-	l.Font = Enum.Font.GothamMedium
-	l.TextSize = 14
-	local s = Instance.new("TextButton", f)
-	s.Text = ""
-	s.AnchorPoint = Vector2.new(1, 0.5)
-	s.Position = UDim2.new(1, 0, 0.5, 0)
-	s.Size = UDim2.new(0, 44, 0, 24)
-	s.BackgroundColor3 = def and Color3.fromRGB(255, 105, 180) or Color3.fromRGB(50, 50, 55)
-	s.AutoButtonColor = false
-	Instance.new("UICorner", s).CornerRadius = UDim.new(1, 0)
-	local k = Instance.new("Frame", s)
-	k.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	k.Size = UDim2.new(0, 18, 0, 18)
-	k.Position = def and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
-	Instance.new("UICorner", k).CornerRadius = UDim.new(1, 0)
-	s.MouseButton1Click:Connect(function()
-		def = not def
-		local c = def and Color3.fromRGB(255, 105, 180) or Color3.fromRGB(50, 50, 55)
-		local tp = def and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
-		TS:Create(s, TweenInfo.new(0.2), { BackgroundColor3 = c }):Play()
-		TS:Create(k, TweenInfo.new(0.2, Enum.EasingStyle.Back), { Position = tp }):Play()
-		cb(def)
-	end)
-end
+
 function GUI.Stp()
 	if GUI.G then
 		GUI.G:Destroy()
@@ -212,7 +172,7 @@ function GUI.MW(sg)
 	t.BackgroundTransparency = 1
 	t.Position = UDim2.new(0, 15, 0, 0)
 	t.Size = UDim2.new(0.7, 0, 1, 0)
-	t.Text = "Gravity Engine"
+	t.Text = "GSettings >w<"
 	t.TextColor3 = Color3.fromRGB(240, 240, 255)
 	t.Font = Enum.Font.GothamBold
 	t.TextSize = 22
@@ -239,23 +199,7 @@ function GUI.MW(sg)
 	GUI.Sld(c, "Swirl Strength", 0, 1000, CFG.SS, function(v)
 		CFG.SS = v
 	end)
-	GUI.Sld(c, "Range", 1000, 100000, CFG.MR, function(v)
-		CFG.MR = v
-		if LP then
-			LP.MaximumSimulationRadius = v
-		end
-	end)
-	local sp1 = Instance.new("Frame", c)
-	sp1.BackgroundTransparency = 1
-	sp1.Size = UDim2.new(1, 0, 0, 10)
-	local dl = Instance.new("TextLabel", c)
-	dl.BackgroundTransparency = 1
-	dl.Size = UDim2.new(1, 0, 0, 20)
-	dl.Text = "Shape Mode"
-	dl.TextColor3 = Color3.fromRGB(180, 180, 190)
-	dl.Font = Enum.Font.GothamBold
-	dl.TextSize = 12
-	dl.TextXAlignment = 0
+
 	local db = Instance.new("TextButton", c)
 	db.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 	db.Size = UDim2.new(1, 0, 0, 36)
@@ -285,7 +229,7 @@ function GUI.MW(sg)
 	db.MouseButton1Click:Connect(function()
 		dlst.Visible = not dlst.Visible
 	end)
-	for _, mn in ipairs({ "Disk", "Ethereal" }) do
+	for _, mn in ipairs({ "Disk", "Big Ring Things" }) do
 		local ib = Instance.new("TextButton", dlst)
 		ib.Size = UDim2.new(1, -10, 0, 30)
 		ib.BackgroundTransparency = 1
@@ -300,30 +244,11 @@ function GUI.MW(sg)
 			dlst.Visible = false
 		end)
 	end
-	local sp2 = Instance.new("Frame", c)
-	sp2.BackgroundTransparency = 1
-	sp2.Size = UDim2.new(1, 0, 0, 15)
-	GUI.Tgl(c, "Claim Lock (Protect)", CFG.CL, function(v)
-		CFG.CL = v
-	end)
-	GUI.Tgl(c, "Sentinel Mode (Anti-Theft)", CFG.SNT, function(v)
-		CFG.SNT = v
-	end)
-	local sp3 = Instance.new("Frame", c)
-	sp3.BackgroundTransparency = 1
-	sp3.Size = UDim2.new(1, 0, 0, 15)
-	local pl = Instance.new("TextLabel", c)
-	pl.BackgroundTransparency = 1
-	pl.TextColor3 = Color3.fromRGB(180, 180, 190)
-	pl.Size = UDim2.new(1, 0, 0, 20)
-	pl.Text = "Physics Tweaks:"
-	pl.Font = Enum.Font.GothamBold
-	pl.TextSize = 12
-	pl.TextXAlignment = 0
+
 	GUI.Sld(c, "Tween Speed", 1, 50, CFG.TSP, function(v)
 		CFG.TSP = v
 	end)
-	GUI.Sld(c, "Ethereal Rings", 1, 20, CFG.ERC, function(v)
+	GUI.Sld(c, "Big ring things ring", 1, 20, CFG.ERC, function(v)
 		CFG.ERC = v
 	end)
 	GUI.Sld(c, "Ring Gap", 50, 300, CFG.ERG, function(v)
@@ -372,29 +297,7 @@ function GUI.MW(sg)
 		GUI.G:Destroy()
 	end)
 end
-function SYS.Net()
-	settings().Physics.AllowSleep = false
-	table.insert(
-		ENV.cn,
-		RS.Heartbeat:Connect(function()
-			for _, p in ipairs(Plrs:GetPlayers()) do
-				if p ~= LP then
-					p.MaximumSimulationRadius = 0
-					pcall(function()
-						sethiddenproperty(p, "SimulationRadius", 0)
-					end)
-				end
-			end
-			LP.MaximumSimulationRadius = CFG.MR
-			pcall(function()
-				setsimulationradius(CFG.MR)
-			end)
-			if CFG.SNT then
-				SYS.SNT()
-			end
-		end)
-	)
-end
+
 local function _Vel(p, center, d, mode, pull, swirl, t)
 	local wp, wc = p.Position, center
 	local tc = wc - wp
@@ -406,7 +309,7 @@ local function _Vel(p, center, d, mode, pull, swirl, t)
 	local rad = math.sqrt(tc.X ^ 2 + tc.Z ^ 2)
 	local vel = Vector3.zero
 	local t = t or time()
-	if mode == "Ethereal" then
+	if mode == "Big Ring Things" then
 		local rc = CFG.ERC or 2
 		if not d.rIdx or d.rMax ~= rc then
 			d.rIdx = math.random(1, rc)
@@ -495,25 +398,16 @@ local function _Upd()
 			end
 			local tc = c - p.Position
 			local dist = tc.Magnitude
-			if not CFG.CL and dist > CFG.MR then
+			if dist > CFG.MR then
 				continue
 			end
 			local rf = Vector3.zero
-			if CFG.CL then
-				if p.Position.Y < -50 then
-					p.CFrame = CFrame.new(c + Vector3.new(0, 50, 0))
-					p.AssemblyLinearVelocity = Vector3.zero
-				end
-				if dist > 500 then
-					rf = (c - p.Position).Unit * ((dist - 500) * 5)
-				end
-			end
 			if dist > 0.1 then
 				local tv = _Vel(p, c, d, CFG.SM, CFG.PS, CFG.SS, ft)
 				if not d.lVel then
 					d.lVel = Vector3.zero
 				end
-				local el = CFG.CL and 0.8 or CFG.PL
+				local el = CFG.PL
 				local sv = d.lVel:Lerp(tv + rf, el)
 				d.lVel = sv
 				d.lv.VectorVelocity = sv
@@ -540,73 +434,6 @@ local function _Drg()
 	local tp = r.Origin + (r.Direction * ENV.dp)
 	ENV.bh.Position = ENV.bh.Position:Lerp(tp, 0.25)
 	ENV.bh.AssemblyLinearVelocity = Vector3.zero
-end
-function SYS.SNT()
-	if not CFG.SNT then
-		return
-	end
-	local BS = 20
-	if not ENV.sl or #ENV.sl == 0 then
-		ENV.sl = {}
-		for p, d in pairs(ENV.ap) do
-			table.insert(ENV.sl, { p, d })
-		end
-	end
-	if not ENV.idx then
-		ENV.idx = 1
-	end
-	local bad = {
-		"BodyPosition",
-		"BodyGyro",
-		"BodyVelocity",
-		"BodyAngularVelocity",
-		"LinearVelocity",
-		"AlignPosition",
-		"AlignOrientation",
-		"VectorForce",
-		"Torque",
-	}
-	local chk = 0
-	local max = #ENV.sl
-	while chk < BS do
-		if ENV.idx > max then
-			ENV.idx = 1
-			ENV.sl = {}
-			for p, d in pairs(ENV.ap) do
-				table.insert(ENV.sl, { p, d })
-			end
-			max = #ENV.sl
-			if max == 0 then
-				break
-			end
-		end
-		local it = ENV.sl[ENV.idx]
-		local p = it[1]
-		local d = it[2]
-		ENV.idx = ENV.idx + 1
-		chk = chk + 1
-		if p and p.Parent then
-			for _, c in ipairs(p:GetChildren()) do
-				if table.find(bad, c.ClassName) then
-					local safe = false
-					if c == d.lv or c == d.att or c == d.av then
-						safe = true
-					end
-					if not safe then
-						pcall(function()
-							c:Destroy()
-						end)
-					end
-				end
-			end
-			if p.CanTouch then
-				p.CanTouch = false
-			end
-			if not p.Locked then
-				p.Locked = true
-			end
-		end
-	end
 end
 function SYS.Frc(p)
 	if HLP.Ex(p) or ENV.ap[p] then
@@ -645,6 +472,27 @@ function SYS.Rel(p)
 		ENV.pc = math.max(0, ENV.pc - 1)
 	end
 end
+
+function SYS.Net()
+	settings().Physics.AllowSleep = false
+	table.insert(
+		ENV.cn,
+		RS.Heartbeat:Connect(function()
+			for _, p in ipairs(Plrs:GetPlayers()) do
+				if p ~= LP then
+					p.MaximumSimulationRadius = 0
+					pcall(function()
+						sethiddenproperty(p, "SimulationRadius", 0)
+					end)
+				end
+			end
+			LP.MaximumSimulationRadius = CFG.MR
+			pcall(function()
+				setsimulationradius(CFG.MR)
+			end)
+		end)
+	)
+end
 function SYS.Spawn(pos)
 	if ENV.bh then
 		TS:Create(ENV.bh, TweenInfo.new(0.1), { Position = pos }):Play()
@@ -677,7 +525,7 @@ function SYS.Spawn(pos)
 		end)
 	)
 	ENV.on = true
-	HLP.N("Attr", "Spawned. Drag to move.", 3)
+	HLP.N("Attr", "Spawned! Drag to move :vv", 3)
 	GUI.Stp()
 end
 function SYS.Kill()
@@ -703,7 +551,7 @@ function SYS.Kill()
 	if GUI.G then
 		GUI.G:Destroy()
 	end
-	HLP.N("Attr", "Removed.", 2)
+	HLP.N("Attr", "Removed >_<", 2)
 end
 local INP = {}
 function INP.H(n, s, o)
@@ -742,8 +590,9 @@ function INP.Init()
 			end
 		end)
 	)
-	HLP.N("Ready", "Press 'E'.", 5)
+	HLP.N("Ready", "Press 'E' :3", 5)
 end
+
 SYS.Net()
 INP.Init()
 table.insert(ENV.cn, RS.Heartbeat:Connect(_Upd))
@@ -756,4 +605,4 @@ sc = RS.Heartbeat:Connect(function()
 end)
 table.insert(ENV.cn, sc)
 GUI.Stp()
-HLP.N("Gravity", "Loaded.", 3)
+HLP.N("Stat", "Loaded :3", 3)
