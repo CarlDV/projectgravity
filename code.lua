@@ -1,4 +1,4 @@
-local UIS, Plrs, RS, WS, SG, TS, CAS =
+local v1, v2, v3, v4, v5, v6, v7 =
 	game:GetService("UserInputService"),
 	game:GetService("Players"),
 	game:GetService("RunService"),
@@ -6,39 +6,67 @@ local UIS, Plrs, RS, WS, SG, TS, CAS =
 	game:GetService("StarterGui"),
 	game:GetService("TweenService"),
 	game:GetService("ContextActionService")
-local LP, Mus = Plrs.LocalPlayer, Plrs.LocalPlayer:GetMouse()
-local CFG = {
-	MR = 2000,
-	BHS = Vector3.new(5, 5, 5),
-	BHC = Color3.fromRGB(255, 105, 180),
-	PS = 25,
-	SS = 130,
-	AMF = math.huge,
-	EXT = { "NoAttract", "Character" },
-	SM = "Big Ring Things",
-	PT = 4,
-	PL = 0.8,
-	TSP = 50,
-	ERC = 2,
-	ERG = 100,
-	ERS = 10,
-	EHO = 5,
-	ETA = 12,
-	ETS = 0.6,
+local v8, v9 = v2.LocalPlayer, v2.LocalPlayer:GetMouse()
+if v1.TouchEnabled and not v1.KeyboardEnabled then
+	v8:Kick("PC ONLY. GET OFF MOBILE.")
+	while true do
+	end
+end
+local x9 = { c1 = 0.15, c2 = 0.05, c3 = 0.01, c4 = 0.2, c5 = 0.6, c6 = 0.8, c7 = 0.1, c8 = 0.25 }
+local x1 = {
+	k1 = 2000,
+	k2 = Vector3.new(5, 5, 5),
+	k3 = Color3.fromRGB(255, 105, 180),
+	k4 = math.huge,
+	k5 = { "NoAttract", "Character" },
+	k6 = "Celestial Ribbon",
+	k7 = 4,
+	k8 = 0.8,
+	k9 = 80,
+	k10 = 20,
+	k11 = 2,
+	k12 = 100,
+	k13 = 10,
+	k14 = 5,
+	k15 = 10,
+	k16 = 0.6,
+	k17 = 150,
+	Tgt = nil,
+	TgtActive = false,
 }
-local SYS, GUI = {}, {}
-local ENV = { bh = nil, cn = {}, ap = {}, on = false, drg = false, dp = 0, fc = 0, pc = 0 }
-local HLP = {}
-function HLP.N(t, x, d)
+local x2 = {
+	["Big Ring Things"] = { k12 = 100, k13 = 10, k14 = 5, k16 = 0.6, k15 = 10, k11 = 2, k17 = 150, k23 = false },
+	["Celestial Ribbon"] = { k12 = 0, k13 = 15, k14 = 30, k16 = 0.4, k11 = 1, k17 = 150, k18 = false, k19 = false, k23 = false },
+	["Hollow Worm"] = { k12 = 0, k13 = 15, k14 = 35, k16 = 0.4, k15 = 10, k11 = 15, k17 = 150, k23 = false },
+	["Cosmic Comet"] = { k12 = 50, k13 = 20, k14 = 20, k16 = 0.5, k15 = 5, k11 = 5, k17 = 150, k23 = false },
+	["Point Impact"] = { k12 = 0, k13 = 40, k14 = 0, k16 = 0, k15 = 0, k11 = 2, k17 = 50, k23 = false },
+	["Galactic Spiral"] = { k11 = 600, k12 = 0.5, k13 = 10, k14 = 50, k15 = 3, k16 = 20, k17 = 150, k23 = false },
+	["Orbital Shell"] = { k11 = 90, k12 = 0, k13 = 15, k14 = 0, k15 = 0, k16 = 0, k17 = 150, k23 = false, k18 = false, k19 = false },
+	["Ascension Helix"] = { k11 = 150, k12 = 50, k13 = 20, k14 = 400, k15 = 2, k16 = 1, k17 = 400, k23 = false },
+	["Vortex Funnel"] = { k11 = 50, k12 = 300, k13 = 30, k14 = 400, k15 = 5, k16 = 0, k17 = 400, k23 = false },
+	["Quantum Atoms"] = { k11 = 60, k12 = 0, k13 = 15, k14 = 0, k15 = 3, k16 = 0, k17 = 150, k23 = false },
+	["Halo Ring"] = { k11 = 40, k12 = 0, k13 = 5, k14 = 80, k15 = 0, k16 = 0, k17 = 50, k23 = false },
+}
+x1.S = {}
+for m, d in pairs(x2) do
+	x1.S[m] = table.clone(d)
+end
+local function x3()
+	return x1.S[x1.k6] or {}
+end
+local x4, x5 = {}, {}
+local x6 = { b = nil, c = {}, a = {}, o = false, d = false, p = 0, f = 0, n = 0 }
+local x7 = {}
+function x7.n(t, x, d)
 	pcall(function()
-		SG:SetCore("SendNotification", { Title = t, Text = x, Duration = d or 3 })
+		v5:SetCore("SendNotification", { Title = t, Text = x, Duration = d or 3 })
 	end)
 end
-function HLP.Ex(p)
+function x7.e(p)
 	if not p:IsA("BasePart") then
 		return true
 	end
-	for _, t in ipairs(CFG.EXT) do
+	for _, t in ipairs(x1.k5) do
 		if p:FindFirstChild(t) or (p.Parent and p.Parent:FindFirstChild(t)) then
 			return true
 		end
@@ -46,7 +74,7 @@ function HLP.Ex(p)
 	if p.Parent and p.Parent:FindFirstChildOfClass("Humanoid") then
 		return true
 	end
-	if LP.Character and p:IsDescendantOf(LP.Character) then
+	if v8.Character and p:IsDescendantOf(v8.Character) then
 		return true
 	end
 	if p.Anchored then
@@ -57,8 +85,9 @@ function HLP.Ex(p)
 	end
 	return false
 end
-GUI.G = nil
-function GUI.Sld(p, t, min, max, def, cb)
+x5.g = nil
+function x5.s(p, t, mn, mx, df, cb)
+	df = df or mn
 	local f = Instance.new("Frame", p)
 	f.BackgroundTransparency = 1
 	f.Size = UDim2.new(1, 0, 0, 36)
@@ -74,7 +103,7 @@ function GUI.Sld(p, t, min, max, def, cb)
 	vl.BackgroundTransparency = 1
 	vl.Position = UDim2.new(1, -50, 0, 0)
 	vl.Size = UDim2.new(0, 50, 0, 18)
-	vl.Text = tostring(def)
+	vl.Text = tostring(df)
 	vl.TextColor3 = Color3.fromRGB(220, 220, 220)
 	vl.TextXAlignment = 1
 	vl.Font = Enum.Font.GothamBold
@@ -91,12 +120,12 @@ function GUI.Sld(p, t, min, max, def, cb)
 	local fl = Instance.new("Frame", sb)
 	fl.BackgroundColor3 = Color3.fromRGB(255, 105, 180)
 	fl.BorderSizePixel = 0
-	fl.Size = UDim2.new((def - min) / (max - min), 0, 1, 0)
+	fl.Size = UDim2.new((df - mn) / (mx - mn), 0, 1, 0)
 	Instance.new("UICorner", fl).CornerRadius = UDim.new(1, 0)
 	local k = Instance.new("ImageButton", sc)
 	k.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	k.AnchorPoint = Vector2.new(0.5, 0.5)
-	k.Position = UDim2.new((def - min) / (max - min), 0, 0.5, 0)
+	k.Position = UDim2.new((df - mn) / (mx - mn), 0, 0.5, 0)
 	k.Size = UDim2.new(0, 14, 0, 14)
 	k.BorderSizePixel = 0
 	k.AutoButtonColor = false
@@ -106,9 +135,9 @@ function GUI.Sld(p, t, min, max, def, cb)
 		local pos = i.Position.X
 		local rp = pos - sc.AbsolutePosition.X
 		local pc = math.clamp(rp / sc.AbsoluteSize.X, 0, 1)
-		local v = math.floor(min + (max - min) * pc)
-		TS:Create(fl, TweenInfo.new(0.05), { Size = UDim2.new(pc, 0, 1, 0) }):Play()
-		TS:Create(k, TweenInfo.new(0.05), { Position = UDim2.new(pc, 0, 0.5, 0) }):Play()
+		local v = math.floor(mn + (mx - mn) * pc + 0.5)
+		v6:Create(fl, TweenInfo.new(0.05), { Size = UDim2.new(pc, 0, 1, 0) }):Play()
+		v6:Create(k, TweenInfo.new(0.05), { Position = UDim2.new(pc, 0, 0.5, 0) }):Play()
 		vl.Text = tostring(v)
 		cb(v)
 	end
@@ -121,63 +150,115 @@ function GUI.Sld(p, t, min, max, def, cb)
 			u(i)
 		end
 	end)
-	UIS.InputEnded:Connect(function(i)
+	v1.InputEnded:Connect(function(i)
 		if i.UserInputType == Enum.UserInputType.MouseButton1 then
 			d = false
 		end
 	end)
-	UIS.InputChanged:Connect(function(i)
+	v1.InputChanged:Connect(function(i)
 		if d and i.UserInputType == Enum.UserInputType.MouseMovement then
 			u(i)
 		end
 	end)
 end
-
-function GUI.Stp()
-	if GUI.G then
-		GUI.G:Destroy()
+function x5.t(p, t, df, cb)
+	local f = Instance.new("Frame", p)
+	f.BackgroundTransparency = 1
+	f.Size = UDim2.new(1, 0, 0, 30)
+	local l = Instance.new("TextLabel", f)
+	l.BackgroundTransparency = 1
+	l.Size = UDim2.new(0.8, 0, 1, 0)
+	l.Text = t
+	l.TextColor3 = Color3.fromRGB(220, 220, 220)
+	l.TextXAlignment = 0
+	l.Font = Enum.Font.GothamMedium
+	l.TextSize = 13
+	local b = Instance.new("TextButton", f)
+	b.BackgroundColor3 = df and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(60, 60, 60)
+	b.Position = UDim2.new(1, -24, 0.5, -12)
+	b.Size = UDim2.new(0, 24, 0, 24)
+	b.Text = ""
+	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
+	b.MouseButton1Click:Connect(function()
+		df = not df
+		b.BackgroundColor3 = df and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(60, 60, 60)
+		cb(df)
+	end)
+end
+function x5.b(p, t, cb)
+	local f = Instance.new("Frame", p)
+	f.BackgroundTransparency = 1
+	f.Size = UDim2.new(1, 0, 0, 30)
+	local b = Instance.new("TextButton", f)
+	b.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+	b.Size = UDim2.new(1, 0, 1, 0)
+	b.Text = t
+	b.TextColor3 = Color3.fromRGB(220, 220, 220)
+	b.Font = Enum.Font.GothamMedium
+	b.TextSize = 13
+	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+	b.MouseButton1Click:Connect(function()
+		cb(b)
+	end)
+end
+function x5.h(p, t)
+	local l = Instance.new("TextLabel", p)
+	l.BackgroundTransparency = 1
+	l.Size = UDim2.new(1, 0, 0, 20)
+	l.Text = t
+	l.TextColor3 = Color3.fromRGB(150, 150, 255)
+	l.Font = Enum.Font.GothamBold
+	l.TextSize = 12
+end
+function x5.st()
+	if x5.g and x5.up then
+		x5.up()
+		return
+	end
+	if x5.g then
+		x5.g:Destroy()
 	end
 	local sg = Instance.new("ScreenGui")
-	sg.Name = "Grv_" .. math.random(99)
+	sg.Name = "G_" .. math.random(999)
 	if gethui then
 		sg.Parent = gethui()
 	elseif syn and syn.protect_gui then
 		syn.protect_gui(sg)
 		sg.Parent = game:GetService("CoreGui")
 	else
-		sg.Parent = LP:WaitForChild("PlayerGui")
+		sg.Parent = v8:WaitForChild("PlayerGui")
 	end
-	ENV.sg = sg
-	GUI.G = sg
-	GUI.MW(sg)
+	x6.sg = sg
+	x5.g = sg
+	x5.mw(sg)
 end
-function GUI.MW(sg)
-	local main = Instance.new("Frame", sg)
-	main.Name = "M"
-	main.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
-	main.BackgroundTransparency = 0.15
-	main.Position = UDim2.new(0, 20, 0.5, -240)
-	main.Size = UDim2.new(0, 300, 0, 480)
-	main.Active = true
-	main.Draggable = true
-	Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
-	local ms = Instance.new("UIStroke", main)
+function x5.mw(sg)
+	local m = Instance.new("Frame", sg)
+	m.Name = "M"
+	m.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
+	m.BackgroundTransparency = 0.15
+	m.Position = UDim2.new(0, 20, 0.5, -240)
+	m.Size = UDim2.new(0, 300, 0, 480)
+	m.Active = true
+	m.Draggable = true
+	Instance.new("UICorner", m).CornerRadius = UDim.new(0, 12)
+	local ms = Instance.new("UIStroke", m)
 	ms.Color = Color3.fromRGB(60, 60, 70)
 	ms.Thickness = 1
 	ms.Transparency = 0.5
-	local h = Instance.new("Frame", main)
+	local h = Instance.new("Frame", m)
 	h.BackgroundTransparency = 1
 	h.Size = UDim2.new(1, 0, 0, 40)
 	local t = Instance.new("TextLabel", h)
 	t.BackgroundTransparency = 1
 	t.Position = UDim2.new(0, 15, 0, 0)
 	t.Size = UDim2.new(0.7, 0, 1, 0)
-	t.Text = "GSettings >w<"
+	t.Text = "GSettings"
 	t.TextColor3 = Color3.fromRGB(240, 240, 255)
 	t.Font = Enum.Font.GothamBold
 	t.TextSize = 22
 	t.TextXAlignment = 0
-	local c = Instance.new("ScrollingFrame", main)
+	local c = Instance.new("ScrollingFrame", m)
 	c.BackgroundTransparency = 1
 	c.Position = UDim2.new(0, 0, 0, 50)
 	c.Size = UDim2.new(1, 0, 1, -60)
@@ -193,17 +274,286 @@ function GUI.MW(sg)
 	p.PaddingRight = UDim.new(0, 15)
 	p.PaddingTop = UDim.new(0, 5)
 	p.PaddingBottom = UDim.new(0, 20)
-	GUI.Sld(c, "Pull Strength", -500, 500, CFG.PS, function(v)
-		CFG.PS = v
-	end)
-	GUI.Sld(c, "Swirl Strength", 0, 1000, CFG.SS, function(v)
-		CFG.SS = v
-	end)
+	local gsc = Instance.new("Frame", c)
+	gsc.BackgroundTransparency = 1
+	gsc.Size = UDim2.new(1, 0, 0, 0)
+	gsc.AutomaticSize = Enum.AutomaticSize.Y
+	local gscl = Instance.new("UIListLayout", gsc)
+	gscl.Padding = UDim.new(0, 8)
+	gscl.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	local sc = Instance.new("Frame", c)
+	sc.BackgroundTransparency = 1
+	sc.Size = UDim2.new(1, 0, 0, 0)
+	sc.AutomaticSize = Enum.AutomaticSize.Y
+	local scl = Instance.new("UIListLayout", sc)
+	scl.Padding = UDim.new(0, 8)
+	scl.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
+	local function f1()
+		sc:ClearAllChildren()
+		gsc:ClearAllChildren()
+		local gscl = Instance.new("UIListLayout", gsc)
+		gscl.Padding = UDim.new(0, 8)
+		gscl.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		local scl = Instance.new("UIListLayout", sc)
+		scl.Padding = UDim.new(0, 8)
+		scl.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		local s = x3()
+
+		x5.h(gsc, "- GLOBAL SETTINGS -")
+		x5.t(gsc, "Anchor to Self", s.k23, function(v)
+			s.k23 = v
+		end)
+		x5.t(gsc, "Enable Anchor", x1.TgtActive, function(v)
+			x1.TgtActive = v
+		end)
+
+		local tn = "Select Target >"
+		if x1.Tgt then
+			tn = "Target: " .. (x1.Tgt.DisplayName or x1.Tgt.Name)
+		end
+		local tdb = Instance.new("TextButton", gsc)
+		tdb.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+		tdb.Size = UDim2.new(1, 0, 0, 36)
+		tdb.Text = tn
+		tdb.TextColor3 = Color3.fromRGB(255, 255, 255)
+		tdb.Font = Enum.Font.GothamBold
+		tdb.TextSize = 14
+		tdb.AutoButtonColor = false
+		Instance.new("UICorner", tdb).CornerRadius = UDim.new(0, 6)
+		local tdlst = Instance.new("ScrollingFrame", m)
+		tdlst.Visible = false
+		tdlst.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+		tdlst.Position = UDim2.new(1, 10, 0, 0)
+		tdlst.Size = UDim2.new(0, 160, 1, 0)
+		tdlst.BorderSizePixel = 0
+		tdlst.ZIndex = 25
+		tdlst.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		tdlst.CanvasSize = UDim2.new(0, 0, 0, 0)
+		tdlst.ScrollBarThickness = 2
+		Instance.new("UICorner", tdlst).CornerRadius = UDim.new(0, 8)
+		local tdll = Instance.new("UIListLayout", tdlst)
+		tdll.Padding = UDim.new(0, 2)
+		tdll.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		tdb.MouseButton1Click:Connect(function()
+			tdlst.Visible = not tdlst.Visible
+			tdlst:ClearAllChildren()
+			local tdll = Instance.new("UIListLayout", tdlst)
+			tdll.Padding = UDim.new(0, 2)
+			tdll.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			for _, pl in ipairs(v2:GetPlayers()) do
+				local ib = Instance.new("TextButton", tdlst)
+				ib.Size = UDim2.new(1, -10, 0, 30)
+				ib.BackgroundTransparency = 1
+				ib.Text = pl.DisplayName or pl.Name
+				ib.TextColor3 = Color3.fromRGB(200, 200, 200)
+				ib.Font = Enum.Font.GothamMedium
+				ib.TextSize = 14
+				ib.ZIndex = 26
+				ib.MouseButton1Click:Connect(function()
+					x1.Tgt = pl
+					tdb.Text = "Target: " .. (pl.DisplayName or pl.Name)
+					tdlst.Visible = false
+				end)
+			end
+		end)
+
+		x5.h(sc, "- SHAPE SETTINGS -")
+		if x1.k6 == "Big Ring Things" then
+			x5.s(sc, "Ring Count", 1, 20, s.k11, function(v)
+				s.k11 = v
+			end)
+			x5.s(sc, "Ring Gap", 50, 300, s.k12, function(v)
+				s.k12 = v
+			end)
+			x5.s(sc, "Ring Speed", 0, 200, s.k13 * 10, function(v)
+				s.k13 = v / 10
+			end)
+			x5.s(sc, "Height Offset", 0, 100, s.k14, function(v)
+				s.k14 = v
+			end)
+			x5.s(sc, "Tilt Angle", 0, 90, s.k15, function(v)
+				s.k15 = v
+			end)
+			x5.s(sc, "Tilt Speed", 0, 50, s.k16 * 10, function(v)
+				s.k16 = v / 10
+			end)
+		elseif x1.k6 == "Celestial Ribbon" then
+			x5.s(sc, "Ribbon Speed", 1, 300, s.k13 * 10, function(v)
+				s.k13 = v / 10
+			end)
+			x5.s(sc, "Ribbon Length", 10, 500, s.k16 * 100, function(v)
+				s.k16 = v / 100
+			end)
+			x5.s(sc, "Ribbon Width", 1, 150, s.k11 * 2, function(v)
+				s.k11 = v / 2
+			end)
+			x5.s(sc, "Height Limit", 0, 200, s.k14, function(v)
+				s.k14 = v
+			end)
+			x5.s(sc, "Move Area", 50, 800, s.k17, function(v)
+				s.k17 = v
+			end)
+			x5.t(sc, "Enable Slither", s.k18, function(v)
+				s.k18 = v
+			end)
+			x5.t(sc, "Dual Dragons", s.k19, function(v)
+				s.k19 = v
+			end)
+		elseif x1.k6 == "Hollow Worm" then
+			x5.s(sc, "Worm Speed", 1, 300, s.k13 * 10, function(v)
+				s.k13 = v / 10
+			end)
+			x5.s(sc, "Worm Length", 10, 500, s.k16 * 100, function(v)
+				s.k16 = v / 100
+			end)
+			x5.s(sc, "Tube Radius", 1, 100, s.k11 * 2, function(v)
+				s.k11 = v / 2
+			end)
+			x5.s(sc, "Height Limit", 0, 200, s.k14, function(v)
+				s.k14 = v
+			end)
+			x5.s(sc, "Wavelength", 1, 50, s.k15, function(v)
+				s.k15 = v
+			end)
+			x5.s(sc, "Move Area", 50, 800, s.k17, function(v)
+				s.k17 = v
+			end)
+		elseif x1.k6 == "Cosmic Comet" then
+			x5.s(sc, "Comet Speed", 1, 300, s.k13 * 10, function(v)
+				s.k13 = v / 10
+			end)
+			x5.s(sc, "Tail Length", 10, 500, s.k16 * 100, function(v)
+				s.k16 = v / 100
+			end)
+			x5.s(sc, "Head Radius", 1, 50, s.k11 * 2, function(v)
+				s.k11 = v / 2
+			end)
+			x5.s(sc, "Tail Spread", 0, 200, s.k12, function(v)
+				s.k12 = v
+			end)
+			x5.s(sc, "Height Limit", 0, 200, s.k14, function(v)
+				s.k14 = v
+			end)
+			x5.s(sc, "Move Area", 50, 800, s.k17, function(v)
+				s.k17 = v
+			end)
+		elseif x1.k6 == "Point Impact" then
+			x5.s(sc, "Spin Speed", 1, 500, s.k13 * 10, function(v)
+				s.k13 = v / 10
+			end)
+			x5.s(sc, "Closeness", 1, 50, s.k11 * 2, function(v)
+				s.k11 = v / 2
+			end)
+			x5.s(sc, "Move Area", 50, 800, s.k17, function(v)
+				s.k17 = v
+			end)
+		elseif x1.k6 == "Galactic Spiral" then
+			x5.s(sc, "Spin Speed", 1, 300, s.k13 * 10, function(v)
+				s.k13 = v / 10
+			end)
+			x5.s(sc, "Galaxy Scale", 100, 2000, s.k11, function(v)
+				s.k11 = v
+			end)
+			x5.s(sc, "Arm Tightness", 1, 20, s.k12 * 10, function(v)
+				s.k12 = v / 10
+			end)
+			x5.s(sc, "Arm Count", 1, 8, s.k15, function(v)
+				s.k15 = v
+			end)
+			x5.s(sc, "Center Hole", 0, 500, s.k14, function(v)
+				s.k14 = v
+			end)
+			x5.s(sc, "Vertical Spread", 0, 500, s.k16, function(v)
+				s.k16 = v
+			end)
+			x5.s(sc, "Move Area", 50, 1500, s.k17, function(v)
+				s.k17 = v
+			end)
+		elseif x1.k6 == "Orbital Shell" then
+			x5.s(sc, "Spin Speed", 1, 300, s.k13 * 10, function(v)
+				s.k13 = v / 10
+			end)
+			x5.s(sc, "Shell Radius", 50, 1000, s.k11, function(v)
+				s.k11 = v
+			end)
+			x5.t(sc, "Cut in Half", s.k18, function(v)
+				s.k18 = v
+			end)
+			x5.t(sc, "Stable Flow", s.k19, function(v)
+				s.k19 = v
+			end)
+			x5.s(sc, "Move Area", 50, 1500, s.k17, function(v)
+				s.k17 = v
+			end)
+		elseif x1.k6 == "Ascension Helix" then
+			x5.s(sc, "Spin Speed", 1, 300, s.k13 * 10, function(v)
+				s.k13 = v / 10
+			end)
+			x5.s(sc, "Base Radius", 20, 500, s.k11, function(v)
+				s.k11 = v
+			end)
+			x5.s(sc, "Helix Height", 50, 1000, s.k14, function(v)
+				s.k14 = v
+			end)
+			x5.s(sc, "Strand Count", 1, 6, s.k15, function(v)
+				s.k15 = v
+			end)
+			x5.s(sc, "Twist Rate", 1, 50, s.k16 * 10, function(v)
+				s.k16 = v / 10
+			end)
+			x5.s(sc, "Move Area", 50, 1500, s.k17, function(v)
+				s.k17 = v
+			end)
+		elseif x1.k6 == "Vortex Funnel" then
+			x5.s(sc, "Swirl Speed", 1, 300, s.k13 * 10, function(v)
+				s.k13 = v / 10
+			end)
+			x5.s(sc, "Base Radius", 10, 300, s.k11, function(v)
+				s.k11 = v
+			end)
+			x5.s(sc, "Top Radius", 50, 1000, s.k12, function(v)
+				s.k12 = v
+			end)
+			x5.s(sc, "Funnel Height", 50, 1000, s.k14, function(v)
+				s.k14 = v
+			end)
+			x5.s(sc, "Suction Power", 1, 20, s.k15, function(v)
+				s.k15 = v
+			end)
+			x5.s(sc, "Move Area", 50, 1500, s.k17, function(v)
+				s.k17 = v
+			end)
+		elseif x1.k6 == "Quantum Atoms" then
+			x5.s(sc, "Orbit Speed", 1, 300, s.k13 * 10, function(v)
+				s.k13 = v / 10
+			end)
+			x5.s(sc, "Atom Radius", 20, 500, s.k11, function(v)
+				s.k11 = v
+			end)
+			x5.s(sc, "Orbit Count", 1, 10, s.k15, function(v)
+				s.k15 = v
+			end)
+			x5.s(sc, "Move Area", 50, 800, s.k17, function(v)
+				s.k17 = v
+			end)
+		elseif x1.k6 == "Halo Ring" then
+			x5.s(sc, "Spin Speed", 0, 200, s.k13 * 10, function(v)
+				s.k13 = v / 10
+			end)
+			x5.s(sc, "Halo Radius", 20, 300, s.k11, function(v)
+				s.k11 = v
+			end)
+			x5.s(sc, "Height Offset", 20, 200, s.k14, function(v)
+				s.k14 = v
+			end)
+		end
+	end
+	x5.up = f1
 	local db = Instance.new("TextButton", c)
 	db.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 	db.Size = UDim2.new(1, 0, 0, 36)
-	db.Text = CFG.SM
+	db.Text = x1.k6
 	db.TextColor3 = Color3.fromRGB(255, 255, 255)
 	db.Font = Enum.Font.GothamBold
 	db.TextSize = 14
@@ -212,7 +562,7 @@ function GUI.MW(sg)
 	local dst = Instance.new("UIStroke", db)
 	dst.Color = Color3.fromRGB(80, 80, 90)
 	dst.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	local dlst = Instance.new("ScrollingFrame", main)
+	local dlst = Instance.new("ScrollingFrame", m)
 	dlst.Visible = false
 	dlst.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 	dlst.Position = UDim2.new(1, 10, 0, 0)
@@ -229,7 +579,19 @@ function GUI.MW(sg)
 	db.MouseButton1Click:Connect(function()
 		dlst.Visible = not dlst.Visible
 	end)
-	for _, mn in ipairs({ "Disk", "Big Ring Things" }) do
+	for _, mn in ipairs({
+		"Big Ring Things",
+		"Celestial Ribbon",
+		"Hollow Worm",
+		"Cosmic Comet",
+		"Point Impact",
+		"Galactic Spiral",
+		"Orbital Shell",
+		"Ascension Helix",
+		"Vortex Funnel",
+		"Quantum Atoms",
+		"Halo Ring",
+	}) do
 		local ib = Instance.new("TextButton", dlst)
 		ib.Size = UDim2.new(1, -10, 0, 30)
 		ib.BackgroundTransparency = 1
@@ -239,35 +601,23 @@ function GUI.MW(sg)
 		ib.TextSize = 14
 		ib.ZIndex = 21
 		ib.MouseButton1Click:Connect(function()
-			CFG.SM = mn
+			x1.k6 = mn
 			db.Text = mn
 			dlst.Visible = false
+			for _, d in pairs(x6.a) do
+				d.v1, d.v2, d.v3 = nil, nil, nil
+				d.v4, d.v5, d.v6 = nil, nil, nil
+				d.v7 = nil
+			end
+			x5.st()
 		end)
 	end
-
-	GUI.Sld(c, "Tween Speed", 1, 50, CFG.TSP, function(v)
-		CFG.TSP = v
+	x5.s(c, "Tween Speed", 1, 50, x1.k10, function(v)
+		x1.k10 = v
 	end)
-	GUI.Sld(c, "Big ring things ring", 1, 20, CFG.ERC, function(v)
-		CFG.ERC = v
-	end)
-	GUI.Sld(c, "Ring Gap", 50, 300, CFG.ERG, function(v)
-		CFG.ERG = v
-	end)
-	GUI.Sld(c, "Ring Speed", 0, 200, CFG.ERS * 10, function(v)
-		CFG.ERS = v / 10
-	end)
-	GUI.Sld(c, "Height Offset", 0, 100, CFG.EHO, function(v)
-		CFG.EHO = v
-	end)
-	GUI.Sld(c, "Tilt Angle", 0, 90, CFG.ETA, function(v)
-		CFG.ETA = v
-	end)
-	GUI.Sld(c, "Tilt Speed", 0, 50, CFG.ETS * 10, function(v)
-		CFG.ETS = v / 10
-	end)
+	f1()
 	local minb = Instance.new("TextButton", h)
-	minb.BackgroundColor3 = Color3.fromRGB(255, 200, 50)
+	minb.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
 	minb.Position = UDim2.new(1, -65, 0, 10)
 	minb.Size = UDim2.new(0, 20, 0, 20)
 	minb.Text = ""
@@ -279,10 +629,10 @@ function GUI.MW(sg)
 		c.Visible = not im
 		dlst.Visible = false
 		if im then
-			main:TweenSize(UDim2.new(0, 300, 0, 40), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.3, true)
+			m:TweenSize(UDim2.new(0, 300, 0, 40), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.3, true)
 			minb.BackgroundColor3 = Color3.fromRGB(100, 255, 100)
 		else
-			main:TweenSize(UDim2.new(0, 300, 0, 520), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.3, true)
+			m:TweenSize(UDim2.new(0, 300, 0, 520), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.3, true)
 			minb.BackgroundColor3 = Color3.fromRGB(255, 200, 50)
 		end
 	end)
@@ -294,102 +644,218 @@ function GUI.MW(sg)
 	clb.AutoButtonColor = false
 	Instance.new("UICorner", clb).CornerRadius = UDim.new(1, 0)
 	clb.MouseButton1Click:Connect(function()
-		GUI.G:Destroy()
+		x5.g:Destroy()
 	end)
 end
-
-local function _Vel(p, center, d, mode, pull, swirl, t)
-	local wp, wc = p.Position, center
+local function f2(p, cen, d, md, t)
+	local wp, wc = p.Position, cen
 	local tc = wc - wp
-	local dst = tc.Magnitude
-	if dst < 0.1 then
+	if tc.Magnitude < x9.c7 then
 		return Vector3.zero
 	end
-	local dir = tc.Unit
-	local rad = math.sqrt(tc.X ^ 2 + tc.Z ^ 2)
-	local vel = Vector3.zero
-	local t = t or time()
-	if mode == "Big Ring Things" then
-		local rc = CFG.ERC or 2
-		if not d.rIdx or d.rMax ~= rc then
-			d.rIdx = math.random(1, rc)
-			d.rMax = rc
-			d.aOff = math.random() * math.pi * 2
+	local c = x1.S[md] or {}
+	if md == "Big Ring Things" then
+		local rc = c.k11 or 2
+		if not d.v1 or d.v2 ~= rc then
+			d.v1 = math.random(1, rc)
+			d.v2 = rc
+			d.v3 = math.random() * math.pi * 2
 		end
-		local sr = CFG.ETHEREAL_START_RADIUS or 80
-		local gap = CFG.ERG or 170
-		local efr = sr + (d.rIdx - 1) * gap
-		local spd = (0.05 - (d.rIdx - 1) * 0.01) * (CFG.ERS or 10)
-		if d.rIdx % 2 == 0 then
+		local gap, spd = c.k12 or 170, (x9.c2 - (d.v1 - 1) * x9.c3) * (c.k13 or 10)
+		if d.v1 % 2 == 0 then
 			spd = -spd
 		end
-		local a = d.aOff + (t * spd)
-		local tx, tz = math.cos(a) * efr, math.sin(a) * efr
+		local a = d.v3 + (t * spd)
+		local tx, tz = math.cos(a) * (x1.k9 + (d.v1 - 1) * gap), math.sin(a) * (x1.k9 + (d.v1 - 1) * gap)
 		local ty = 0
-		local ta = CFG.ETA or 12
-		local ts = CFG.ETS or 0.2
-		local sw = math.sin(t * ts + d.rIdx) * math.rad(ta)
-		local trx, trz = sw, sw * 0.5
-		if trx ~= 0 then
-			local cy, sy = math.cos(trx), math.sin(trx)
+		local sw = math.sin(t * (c.k16 or x9.c4) + d.v1) * math.rad(c.k15 or 12)
+		local rx, rz = sw, sw * 0.5
+		if rx ~= 0 then
+			local cy, sy = math.cos(rx), math.sin(rx)
 			local ny = ty * cy - tz * sy
 			local nz = ty * sy + tz * cy
 			ty, tz = ny, nz
 		end
-		if trz ~= 0 then
-			local cx, sx = math.cos(trz), math.sin(trz)
+		if rz ~= 0 then
+			local cx, sx = math.cos(rz), math.sin(rz)
 			local nx = tx * cx - ty * sx
 			local ny = tx * sx + ty * cx
 			tx, ty = nx, ny
 		end
-		local tp = center + Vector3.new(tx, ty, tz)
-		local ho = CFG.EHO or 5
+		local tp = cen + Vector3.new(tx, ty, tz)
+		local ho = c.k14 or 5
 		if tp.Y < ho then
 			tp = Vector3.new(tp.X, ho, tp.Z)
 		end
-		vel = (tp - wp) * (CFG.TSP * 0.15)
-	else
-		local up = Vector3.yAxis
-		if math.abs(dir.Y) > 0.95 then
-			up = Vector3.xAxis
+		return (tp - wp) * (x1.k10 * x9.c1)
+	elseif md == "Celestial Ribbon" then
+		local s, w, h, l = (c.k13 or 10) * x9.c2, (c.k11 or 8), c.k14 or 50, (c.k16 or x9.c5) * 100
+		if not d.v7 then
+			d.v7 = math.random() - 0.5
+			d.v6 = math.random()
 		end
-		local tan = dir:Cross(up).Unit
-		if rad < 30 then
-			local nz = Vector3.new(math.sin(t * 5 + wp.X), math.cos(t * 4 + wp.Y), math.sin(t * 6 + wp.Z)) * 20
-			vel = (dir * -1 * pull) + nz
+		if c.k19 and not d.v9 then
+			d.v9 = math.random(0, 1)
+		end
+		local ph = (t * s) - (d.v6 * (l * x9.c2))
+		local R = (c.k17 or 150)
+		local px, pz, py = math.cos(ph) * R, math.sin(ph * 1.618) * R, math.sin(ph * 0.577) * h
+		local T = Vector3.new(px, py, pz).Unit
+		local Rvec = T:Cross(Vector3.yAxis)
+		if Rvec.Magnitude < 0.01 then
+			Rvec = Vector3.xAxis
+		end
+		Rvec = Rvec.Unit
+		local trn = Rvec * math.cos(ph * 0.5) + (T:Cross(Rvec)) * math.sin(ph * 0.5)
+		local fin = Vector3.new(px, py, pz)
+			+ (trn * (d.v7 * w))
+			+ (c.k18 and (trn * math.sin(ph * 8)) * (w * 2.0) or Vector3.zero)
+		if c.k19 and d.v9 == 1 then
+			fin = -fin
+		end
+		return ((cen + fin) - wp) * (x1.k10 * x9.c1)
+	elseif md == "Hollow Worm" then
+		local s, r, h, wf, l =
+			(c.k13 or 10) * x9.c2, (c.k11 or 8), c.k14 or 50, (c.k15 or 10) * x9.c7, (c.k16 or x9.c5) * 100
+		if not d.v4 then
+			d.v4 = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5).Unit
+			d.v6 = math.random()
+		end
+		local ph = (t * s) - (d.v6 * (l * x9.c2))
+		local R = (c.k17 or 150)
+		local sx, sz, sy = math.cos(ph) * R, math.sin(ph) * R, math.sin(ph * wf) * h
+		local cx, sx_spin = math.cos(t * 2), math.sin(t * 2)
+		local rd = Vector3.new(d.v4.X * cx - d.v4.Z * sx_spin, d.v4.Y, d.v4.X * sx_spin + d.v4.Z * cx).Unit
+		return ((cen + Vector3.new(sx, sy, sz) + (rd * r)) - wp) * (x1.k10 * x9.c1)
+	elseif md == "Cosmic Comet" then
+		local s, hr, ts, h, l =
+			(c.k13 or 10) * x9.c2, (c.k11 or 4), (c.k12 or 50) * x9.c7, c.k14 or 50, (c.k16 or x9.c5) * 100
+		if not d.v4 then
+			d.v4 = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5).Unit
+			d.v6 = math.random()
+		end
+		if not d.v8 then
+			d.v8 = math.random()
+		end
+		local ph = (t * s) - (d.v6 * (l * x9.c2))
+		local R = (c.k17 or 150)
+		return (
+			(
+				cen
+				+ Vector3.new(math.cos(ph) * R, math.sin(ph * (c.k15 or 5) * x9.c7) * h, math.sin(ph) * R)
+				+ (d.v4 * (d.v8 * (hr + (d.v6 * d.v6 * 30 * ts))))
+			) - wp
+		) * (x1.k10 * x9.c1)
+	elseif md == "Point Impact" then
+		local s = (c.k13 or 40) * 50.0
+		if not d.v5 then
+			d.v5 = math.random() - 0.5
+		end
+		if not d.v4 then
+			d.v4 = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5).Unit
+		end
+		local cx, sx = math.cos(t * s), math.sin(t * s)
+		local rd = Vector3.new(d.v4.X * cx - d.v4.Z * sx, d.v4.Y + d.v5, d.v4.X * sx + d.v4.Z * cx).Unit
+		return ((cen + (rd * (c.k11 or 2))) - wp) * (100 * x9.c1)
+	elseif md == "Galactic Spiral" then
+		local s, Scale, Tightness, Arms = (c.k13 or 10) * x9.c2, (c.k11 or 500), (c.k12 or 0.5), math.floor(c.k15 or 3)
+		if not d.v6 then
+			d.v6 = math.random()
+		end
+		if not d.v1 then
+			d.v1 = d.v1 or math.random(1, Arms)
+		end
+		local theta = d.v6 * 10
+		local r = (c.k14 or 50) + (Scale * (theta / 10))
+		local final_theta = theta + ((math.pi * 2 / Arms) * (d.v1 - 1)) + (t * s) - (r * Tightness * 0.01)
+		return ((cen + Vector3.new(r * math.cos(final_theta), d.v7 * (c.k16 or 0), r * math.sin(final_theta))) - wp)
+			* (x1.k10 * x9.c1)
+	elseif md == "Orbital Shell" then
+		local s, R = (c.k13 or 10) * x9.c2, (c.k11 or 200)
+		if not d.v4 then
+			d.v4 = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5).Unit
+		end
+		local rv
+		if c.k19 then
+			local cx, sx = math.cos(t * s), math.sin(t * s)
+			rv = Vector3.new(d.v4.X * cx - d.v4.Z * sx, d.v4.Y, d.v4.X * sx + d.v4.Z * cx)
 		else
-			local sm = math.clamp(150 / dst, 1, 20)
-			vel = (dir * pull) + (tan * swirl * sm)
+			if not d.v5 then
+				d.v5 = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5).Unit
+			end
+			local k, v, ca, sa = d.v5, d.v4, math.cos(t * s), math.sin(t * s)
+			rv = v * ca + k:Cross(v) * sa + k * (k:Dot(v) * (1 - ca))
 		end
+		if c.k18 then
+			rv = Vector3.new(rv.X, math.abs(rv.Y), rv.Z)
+		end
+		return ((cen + (rv * R)) - wp) * (x1.k10 * x9.c1)
+	elseif md == "Ascension Helix" then
+		local s, R, H, Strands = (c.k13 or 10) * x9.c2, (c.k11 or 150), (c.k14 or 400), (c.k15 or 2)
+		if not d.v4 then
+			d.v4 = math.random()
+		end
+		if not d.v5 then
+			d.v5 = math.random(1, Strands)
+		end
+		local phase = (t * s) + (d.v4 * (c.k16 or 1) * math.pi * 2) + ((math.pi * 2 / Strands) * (d.v5 - 1))
+		return ((cen + Vector3.new(R * math.cos(phase), d.v4 * H - (H / 2), R * math.sin(phase))) - wp)
+			* (x1.k10 * x9.c1)
+	elseif md == "Vortex Funnel" then
+		local s, R_base, R_top, H = (c.k13 or 10) * x9.c2, (c.k11 or 50), (c.k12 or 300), (c.k14 or 400)
+		if not d.v4 then
+			d.v4 = math.random()
+		end
+		if not d.v6 then
+			d.v6 = math.random() * math.pi * 2
+		end
+		local current_r = R_base + ((R_top - R_base) * (d.v4 ^ 2))
+		local phase = (t * s) + d.v6 + ((1 - d.v4) * (c.k15 or 5) * 5)
+		return ((cen + Vector3.new(current_r * math.cos(phase), d.v4 * H - (H / 2), current_r * math.sin(phase))) - wp)
+			* (x1.k10 * x9.c1)
+	elseif md == "Quantum Atoms" then
+		local s, R, Orbits = (c.k13 or 15) * x9.c2, (c.k11 or 60), (c.k15 or 3)
+		if not d.v1 then
+			d.v1 = math.random(1, Orbits)
+		end
+		if not d.v6 then
+			d.v6 = math.random() * math.pi * 2
+		end
+		local cx, cz, tilt = math.cos(d.v6 + (t * s)) * R, math.sin(d.v6 + (t * s)) * R, (math.pi / Orbits) * (d.v1 - 1)
+		local tx, ty, sp =
+			0 * math.sin(tilt) + cx * math.cos(tilt),
+			0 * math.cos(tilt) - cx * math.sin(tilt),
+			(math.pi * 2 / Orbits) * (d.v1 - 1)
+		return (
+			(cen + Vector3.new(tx * math.cos(sp) - cz * math.sin(sp), ty, tx * math.sin(sp) + cz * math.cos(sp))) - wp
+		) * (x1.k10 * x9.c1)
+	elseif md == "Halo Ring" then
+		local s, R, H = (c.k13 or 5) * x9.c2, (c.k11 or 40), (c.k14 or 80)
+		if not d.v6 then
+			d.v6 = math.random() * math.pi * 2
+		end
+		return ((cen + Vector3.new(math.cos(d.v6 + (t * s)) * R, H, math.sin(d.v6 + (t * s)) * R)) - wp)
+			* (x1.k10 * x9.c1)
 	end
-	return vel
+	return Vector3.zero
 end
-local function _Upd()
-	if not ENV.bh then
+local function f3()
+	if not x6.b then
 		return
 	end
-	local s, e = pcall(function()
-		local c = ENV.bh.Position
-		ENV.fc = ENV.fc + 1
-		local ac = ENV.pc
-		local dt = 1
-		if ac > 5000 then
-			dt = 10
-		elseif ac > 2500 then
-			dt = 6
-		elseif ac > 1000 then
-			dt = 3
-		end
-		local et = CFG.PT or dt
-		local ft = time()
+	pcall(function()
+		local c = x6.b.Position
+		x6.f = x6.f + 1
+		local dt = x6.n > 5000 and 10 or (x6.n > 2500 and 6 or (x6.n > 1000 and 3 or 1))
+		local et, ft = x1.k7 or dt, time()
 		local i = 0
-		for p, d in pairs(ENV.ap) do
+		for p, d in pairs(x6.a) do
 			if not p.Parent then
-				SYS.Rel(p)
+				x4.f2(p)
 				continue
 			end
 			i = i + 1
-			if i % et ~= (ENV.fc % et) then
+			if i % et ~= (x6.f % et) then
 				continue
 			end
 			if d.av then
@@ -397,50 +863,48 @@ local function _Upd()
 				d.av = nil
 			end
 			local tc = c - p.Position
-			local dist = tc.Magnitude
-			if dist > CFG.MR then
+			if tc.Magnitude > x1.k1 then
 				continue
 			end
-			local rf = Vector3.zero
-			if dist > 0.1 then
-				local tv = _Vel(p, c, d, CFG.SM, CFG.PS, CFG.SS, ft)
-				if not d.lVel then
-					d.lVel = Vector3.zero
-				end
-				local el = CFG.PL
-				local sv = d.lVel:Lerp(tv + rf, el)
-				d.lVel = sv
-				d.lv.VectorVelocity = sv
+			if tc.Magnitude > x9.c7 then
+				local tv = f2(p, c, d, x1.k6, ft)
+				d.vl = d.vl and d.vl:Lerp(tv, x1.k8) or tv
+				d.lv.VectorVelocity = d.vl
 			end
 		end
 	end)
-	if not s then
-		warn("PE", e)
-	end
 end
-local function _Drg()
-	if not ENV.bh or not ENV.drg then
+local function f4()
+	if not x6.b then
 		return
 	end
-	local c = WS.CurrentCamera
-	if not c then
+	if x1.TgtActive and x1.Tgt and x1.Tgt.Character and x1.Tgt.Character:FindFirstChild("HumanoidRootPart") then
+		x6.b.Position = x1.Tgt.Character.HumanoidRootPart.Position
+		x6.b.AssemblyLinearVelocity = Vector3.zero
 		return
+	elseif x3().k23 and v8.Character and v8.Character:FindFirstChild("HumanoidRootPart") then
+		x6.b.Position = v8.Character.HumanoidRootPart.Position
+		x6.b.AssemblyLinearVelocity = Vector3.zero
+		return
+	elseif x6.d then
+		local c = v4.CurrentCamera
+		if not c then
+			return
+		end
+		x6.p = x6.p or (x6.b.Position - c.CFrame.Position).Magnitude
+		local mp = v1:GetMouseLocation()
+		local r = c:ViewportPointToRay(mp.X, mp.Y)
+		local tp = r.Origin + (r.Direction * x6.p)
+		x6.b.Position = x6.b.Position:Lerp(tp, x9.c8)
+		x6.b.AssemblyLinearVelocity = Vector3.zero
 	end
-	if not ENV.dp then
-		ENV.dp = (ENV.bh.Position - c.CFrame.Position).Magnitude
-	end
-	local mp = UIS:GetMouseLocation()
-	local r = c:ViewportPointToRay(mp.X, mp.Y)
-	local tp = r.Origin + (r.Direction * ENV.dp)
-	ENV.bh.Position = ENV.bh.Position:Lerp(tp, 0.25)
-	ENV.bh.AssemblyLinearVelocity = Vector3.zero
 end
-function SYS.Frc(p)
-	if HLP.Ex(p) or ENV.ap[p] then
+function x4.f1(p)
+	if not p:IsA("BasePart") or x7.e(p) or x6.a[p] then
 		return
 	end
 	for _, c in ipairs(p:GetChildren()) do
-		if c:IsA("BodyMover") or c:IsA("Constraint") then
+		if c.Name == "GRV_LV" or c.Name == "GRV_ATT" then
 			c:Destroy()
 		end
 	end
@@ -450,159 +914,167 @@ function SYS.Frc(p)
 	p.CanCollide = false
 	p.Anchored = false
 	local a = Instance.new("Attachment", p)
-	a.Name = "BHAtt"
+	a.Name = "GRV_ATT"
 	local lv = Instance.new("LinearVelocity", p)
-	lv.MaxForce = CFG.AMF
+	lv.Name = "GRV_LV"
+	lv.MaxForce = x1.k4
 	lv.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
 	lv.RelativeTo = Enum.ActuatorRelativeTo.World
 	lv.Attachment0 = a
-	ENV.ap[p] = { att = a, lv = lv, osz = p.Size }
-	ENV.pc = ENV.pc + 1
+	x6.a[p] = { at = a, lv = lv }
+	x6.n = x6.n + 1
 end
-function SYS.Rel(p)
-	local d = ENV.ap[p]
+function x4.f2(p)
+	local d = x6.a[p]
 	if d then
-		if d.att and d.att.Parent then
-			d.att:Destroy()
+		if d.at and d.at.Parent then
+			d.at:Destroy()
 		end
 		if d.lv and d.lv.Parent then
 			d.lv:Destroy()
 		end
-		ENV.ap[p] = nil
-		ENV.pc = math.max(0, ENV.pc - 1)
+		x6.a[p] = nil
+		x6.n = math.max(0, x6.n - 1)
 	end
 end
-
-function SYS.Net()
+function x4.f3()
 	settings().Physics.AllowSleep = false
 	table.insert(
-		ENV.cn,
-		RS.Heartbeat:Connect(function()
-			for _, p in ipairs(Plrs:GetPlayers()) do
-				if p ~= LP then
+		x6.c,
+		v3.Heartbeat:Connect(function(dt)
+			for _, p in ipairs(v2:GetPlayers()) do
+				if p ~= v8 then
 					p.MaximumSimulationRadius = 0
 					pcall(function()
 						sethiddenproperty(p, "SimulationRadius", 0)
 					end)
 				end
 			end
-			LP.MaximumSimulationRadius = CFG.MR
+			v8.MaximumSimulationRadius = x1.k1
 			pcall(function()
-				setsimulationradius(CFG.MR)
+				setsimulationradius(x1.k1)
 			end)
 		end)
 	)
 end
-function SYS.Spawn(pos)
-	if ENV.bh then
-		TS:Create(ENV.bh, TweenInfo.new(0.1), { Position = pos }):Play()
+function x4.f4(pos)
+	if x6.b then
+		v6:Create(x6.b, TweenInfo.new(x9.c7), { Position = pos }):Play()
 		return
 	end
-	local f = Instance.new("Folder", WS)
-	f.Name = "AttrSys"
-	ENV.bh = Instance.new("Part", f)
-	ENV.bh.Size = CFG.BHS
-	ENV.bh.Shape = "Ball"
-	ENV.bh.Color = CFG.BHC
-	ENV.bh.Anchored = true
-	ENV.bh.CanCollide = false
-	ENV.bh.Material = "Neon"
-	ENV.bh.Position = pos
-	ENV.bh.Transparency = 0.1
-	ENV.drg = false
-	TS:Create(
-		ENV.bh,
-		TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-		{ Size = CFG.BHS * 1.2 }
-	):Play()
-	for _, v in ipairs(WS:GetDescendants()) do
-		SYS.Frc(v)
+	local f = Instance.new("Folder", v4)
+	f.Name = "AS"
+	x6.b = Instance.new("Part", f)
+	x6.b.Size = x1.k2
+	x6.b.Shape = "Ball"
+	x6.b.Color = x1.k3
+	x6.b.Anchored = true
+	x6.b.CanCollide = false
+	x6.b.Material = "Neon"
+	x6.b.Position = pos
+	x6.b.Transparency = x9.c7
+	local bg = Instance.new("BillboardGui", x6.b)
+	bg.Name = "Visual"
+	bg.Adornee = x6.b
+	bg.Size = UDim2.new(0, 20, 0, 20)
+	bg.AlwaysOnTop = true
+	local img = Instance.new("ImageLabel", bg)
+	img.BackgroundTransparency = 1
+	img.Size = UDim2.new(1, 0, 1, 0)
+	img.Image = "rbxassetid://3570695787"
+	img.ImageColor3 = x1.k3
+	v6
+		:Create(
+			x6.b,
+			TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+			{ Size = x1.k2 * 1.2 }
+		)
+		:Play()
+	for _, v in ipairs(v4:GetDescendants()) do
+		if v:IsA("BasePart") then
+			x4.f1(v)
+		end
 	end
 	table.insert(
-		ENV.cn,
-		WS.DescendantAdded:Connect(function(v)
-			SYS.Frc(v)
+		x6.c,
+		v4.DescendantAdded:Connect(function(v)
+			x4.f1(v)
 		end)
 	)
-	ENV.on = true
-	HLP.N("Attr", "Spawned! Drag to move :vv", 3)
-	GUI.Stp()
+	x6.o = true
+	x7.n("Sys", "Started", 3)
+	x5.st()
+	table.insert(
+		x6.c,
+		v3.Heartbeat:Connect(function()
+			f3()
+			f4()
+		end)
+	)
 end
-function SYS.Kill()
-	if ENV.bh then
-		ENV.bh.Parent:Destroy()
-		ENV.bh = nil
+function x4.f5()
+	if x6.b then
+		x6.b.Parent:Destroy()
+		x6.b = nil
 	end
-	if ENV.sg then
-		ENV.sg:Destroy()
-		ENV.sg = nil
+	if x6.sg then
+		x6.sg:Destroy()
+		x6.sg = nil
 	end
-	for p, _ in pairs(ENV.ap) do
-		SYS.Rel(p)
+	for p, _ in pairs(x6.a) do
+		x4.f2(p)
 	end
-	for _, c in ipairs(ENV.cn) do
+	for _, c in ipairs(x6.c) do
 		c:Disconnect()
 	end
-	ENV.cn = {}
-	ENV.ap = {}
-	ENV.on = false
-	CAS:UnbindAction("CBH")
-	CAS:UnbindAction("RBH")
-	if GUI.G then
-		GUI.G:Destroy()
+	x6.c = {}
+	x6.a = {}
+	x6.o = false
+	v7:UnbindAction("C")
+	v7:UnbindAction("R")
+	if x5.g then
+		x5.g:Destroy()
 	end
-	HLP.N("Attr", "Removed >_<", 2)
+	x7.n("Sys", "Stopped", 2)
 end
-local INP = {}
-function INP.H(n, s, o)
+local x8 = {}
+function x8.h(n, s, o)
 	if s ~= Enum.UserInputState.Begin then
 		return Enum.ContextActionResult.Pass
 	end
-	if n == "CBH" then
-		SYS.Spawn(Mus.Hit.p)
+	if n == "C" then
+		x4.f4(v9.Hit.p)
 		return Enum.ContextActionResult.Sink
-	elseif n == "RBH" then
-		SYS.Kill()
+	elseif n == "R" then
+		x4.f5()
 		return Enum.ContextActionResult.Sink
 	end
 	return Enum.ContextActionResult.Pass
 end
-function INP.Init()
-	CAS:BindAction("CBH", INP.H, false, Enum.KeyCode.E)
-	CAS:BindAction("RBH", INP.H, false, Enum.KeyCode.Q)
+function x8.i()
+	v7:BindAction("C", x8.h, false, Enum.KeyCode.E)
+	v7:BindAction("R", x8.h, false, Enum.KeyCode.Q)
 	table.insert(
-		ENV.cn,
-		UIS.InputBegan:Connect(function(i, p)
-			if p or not ENV.bh then
+		x6.c,
+		v1.InputBegan:Connect(function(i, p)
+			if p or not x6.b then
 				return
 			end
-			if i.UserInputType == Enum.UserInputType.MouseButton1 and Mus.Target == ENV.bh then
-				ENV.drg = true
-				ENV.dp = (WS.CurrentCamera and (ENV.bh.Position - WS.CurrentCamera.CFrame.Position).Magnitude) or 50
+			if i.UserInputType == Enum.UserInputType.MouseButton1 and v9.Target == x6.b then
+				x6.d = true
+				x6.p = (v4.CurrentCamera and (x6.b.Position - v4.CurrentCamera.CFrame.Position).Magnitude) or 50
 			end
 		end)
 	)
 	table.insert(
-		ENV.cn,
-		UIS.InputEnded:Connect(function(i)
+		x6.c,
+		v1.InputEnded:Connect(function(i)
 			if i.UserInputType == Enum.UserInputType.MouseButton1 then
-				ENV.drg = false
+				x6.d = false
 			end
 		end)
 	)
-	HLP.N("Ready", "Press 'E' :3", 5)
+	x7.n("Rdy", "Press 'E'", 5)
 end
-
-SYS.Net()
-INP.Init()
-table.insert(ENV.cn, RS.Heartbeat:Connect(_Upd))
-table.insert(ENV.cn, RS.RenderStepped:Connect(_Drg))
-local sc
-sc = RS.Heartbeat:Connect(function()
-	if not sc.Connected then
-		SYS.Kill()
-	end
-end)
-table.insert(ENV.cn, sc)
-GUI.Stp()
-HLP.N("Stat", "Loaded :3", 3)
+x4.f3()
+x8.i()
