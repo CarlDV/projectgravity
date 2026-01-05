@@ -32,16 +32,42 @@ local x1 = {
 	k16 = 0.6,
 	k17 = 150,
 	Tgt = nil,
+	ImpactManual = false,
+	IsLaunching = false,
+	Disabled = false,
 	TgtActive = false,
+	PI_All = false,
+	Excluded = {},
 }
 local x2 = {
 	["Big Ring Things"] = { k12 = 100, k13 = 10, k14 = 5, k16 = 0.6, k15 = 10, k11 = 2, k17 = 150, k23 = false },
-	["Celestial Ribbon"] = { k12 = 0, k13 = 15, k14 = 30, k16 = 0.4, k11 = 1, k17 = 150, k18 = false, k19 = false, k23 = false },
+	["Celestial Ribbon"] = {
+		k12 = 0,
+		k13 = 15,
+		k14 = 30,
+		k16 = 0.4,
+		k11 = 1,
+		k17 = 150,
+		k18 = false,
+		k19 = false,
+		k23 = false,
+	},
 	["Hollow Worm"] = { k12 = 0, k13 = 15, k14 = 35, k16 = 0.4, k15 = 10, k11 = 15, k17 = 150, k23 = false },
 	["Cosmic Comet"] = { k12 = 50, k13 = 20, k14 = 20, k16 = 0.5, k15 = 5, k11 = 5, k17 = 150, k23 = false },
-	["Point Impact"] = { k12 = 0, k13 = 40, k14 = 0, k16 = 0, k15 = 0, k11 = 2, k17 = 50, k23 = false },
+	["Point Impact"] = { k12 = 0, k13 = 500, k14 = 0, k16 = 0, k15 = 0, k11 = 0, k17 = 50, k23 = false },
 	["Galactic Spiral"] = { k11 = 600, k12 = 0.5, k13 = 10, k14 = 50, k15 = 3, k16 = 20, k17 = 150, k23 = false },
-	["Orbital Shell"] = { k11 = 90, k12 = 0, k13 = 15, k14 = 0, k15 = 0, k16 = 0, k17 = 150, k23 = false, k18 = false, k19 = false },
+	["Orbital Shell"] = {
+		k11 = 90,
+		k12 = 0,
+		k13 = 15,
+		k14 = 0,
+		k15 = 0,
+		k16 = 0,
+		k17 = 150,
+		k23 = false,
+		k18 = false,
+		k19 = false,
+	},
 	["Ascension Helix"] = { k11 = 150, k12 = 50, k13 = 20, k14 = 400, k15 = 2, k16 = 1, k17 = 400, k23 = false },
 	["Vortex Funnel"] = { k11 = 50, k12 = 300, k13 = 30, k14 = 400, k15 = 5, k16 = 0, k17 = 400, k23 = false },
 	["Quantum Atoms"] = { k11 = 60, k12 = 0, k13 = 15, k14 = 0, k15 = 3, k16 = 0, k17 = 150, k23 = false },
@@ -55,7 +81,20 @@ local function x3()
 	return x1.S[x1.k6] or {}
 end
 local x4, x5 = {}, {}
-local x6 = { b = nil, c = {}, a = {}, o = false, d = false, p = 0, f = 0, n = 0 }
+local x6 = {
+	b = nil,
+	c = {},
+	a = {},
+	o = false,
+	d = false,
+	p = 0,
+	f = 0,
+	n = 0,
+	pi_targets = {},
+	pi_timer = 0,
+	ex_nodes = {},
+	ex_timer = 0,
+}
 local x7 = {}
 function x7.n(t, x, d)
 	pcall(function()
@@ -304,9 +343,147 @@ function x5.mw(sg)
 		x5.t(gsc, "Anchor to Self", s.k23, function(v)
 			s.k23 = v
 		end)
+		x5.t(gsc, "Disable Gravity", x1.Disabled, function(v)
+			x1.Disabled = v
+			if x6.b then
+				x6.b.Transparency = v and 1 or x9.c7
+				if x6.b:FindFirstChild("Visual") then
+					x6.b.Visual.Enabled = not v
+				end
+			end
+			for _, d in pairs(x6.a) do
+				if d.lv then
+					d.lv.MaxForce = v and 0 or x1.k4
+				end
+				if d.av then
+					d.av.MaxTorque = v and 0 or math.huge
+				end
+			end
+		end)
 		x5.t(gsc, "Enable Anchor", x1.TgtActive, function(v)
 			x1.TgtActive = v
 		end)
+		x5.t(gsc, "Impact All", x1.PI_All, function(v)
+			x1.PI_All = v
+		end)
+
+		-- Exclude List UI
+		local edb = Instance.new("TextButton", gsc)
+		edb.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+		edb.Size = UDim2.new(1, 0, 0, 30)
+		edb.Text = "Exclude Players >"
+		edb.TextColor3 = Color3.fromRGB(255, 255, 255)
+		edb.Font = Enum.Font.GothamBold
+		edb.TextSize = 13
+		edb.AutoButtonColor = false
+		Instance.new("UICorner", edb).CornerRadius = UDim.new(0, 6)
+		local edlst = Instance.new("ScrollingFrame", m)
+		edlst.Visible = false
+		edlst.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+		edlst.Position = UDim2.new(1, 10, 0, 0)
+		edlst.Size = UDim2.new(0, 160, 1, 0)
+		edlst.BorderSizePixel = 0
+		edlst.ZIndex = 30
+		edlst.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		edlst.CanvasSize = UDim2.new(0, 0, 0, 0)
+		edlst.ScrollBarThickness = 2
+		Instance.new("UICorner", edlst).CornerRadius = UDim.new(0, 8)
+		local edll = Instance.new("UIListLayout", edlst)
+		edll.Padding = UDim.new(0, 2)
+		edll.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+		edb.MouseButton1Click:Connect(function()
+			edlst.Visible = not edlst.Visible
+			if not edlst.Visible then
+				return
+			end
+			edlst:ClearAllChildren()
+			local edll = Instance.new("UIListLayout", edlst)
+			edll.Padding = UDim.new(0, 2)
+			edll.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+			for _, pl in ipairs(v2:GetPlayers()) do
+				if pl == v8 then
+					continue
+				end
+				local ib = Instance.new("TextButton", edlst)
+				ib.Size = UDim2.new(1, -10, 0, 30)
+				ib.BackgroundTransparency = 1
+				ib.Text = pl.DisplayName or pl.Name
+				local is_excluded = x1.Excluded[pl.Name]
+				ib.TextColor3 = is_excluded and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(200, 200, 200)
+				if is_excluded then
+					ib.Text = "[X] " .. ib.Text
+				end
+
+				ib.Font = Enum.Font.GothamMedium
+				ib.TextSize = 14
+				ib.ZIndex = 31
+				ib.MouseButton1Click:Connect(function()
+					if x1.Excluded[pl.Name] then
+						x1.Excluded[pl.Name] = nil
+						ib.TextColor3 = Color3.fromRGB(200, 200, 200)
+						ib.Text = pl.DisplayName or pl.Name
+					else
+						x1.Excluded[pl.Name] = true
+						ib.TextColor3 = Color3.fromRGB(255, 100, 100)
+						ib.Text = "[X] " .. (pl.DisplayName or pl.Name)
+					end
+				end)
+			end
+		end)
+
+		x5.t(gsc, "Manual Trigger", x1.ImpactManual, function(v)
+			x1.ImpactManual = v
+			-- Reset launch state when toggling
+			x1.IsLaunching = false
+			-- Trigger UI refresh to show/hide launch button?
+			-- Simplified: We just add the button always but make it visible/usable?
+			-- Actually, let's just add the button below and update its text/color.
+		end)
+
+		local l_btn = Instance.new("TextButton", gsc)
+		l_btn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+		l_btn.Size = UDim2.new(1, 0, 0, 30)
+		l_btn.Text = "LAUNCH"
+		l_btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+		l_btn.Font = Enum.Font.GothamBlack
+		l_btn.TextSize = 14
+		Instance.new("UICorner", l_btn).CornerRadius = UDim.new(0, 6)
+		l_btn.Visible = x1.ImpactManual
+
+		-- Loop to update button visibility/text? Or just update on click/toggle
+		-- Let's update on toggle callback (need to reference l_btn there)
+		-- We need to rebuild the toggle callback to access l_btn
+
+		-- Re-define Toggle with logic
+		-- x5.t already created a button, we can't hook into it easily without returning the object
+		-- Let's just run a heartbeat loop for UI? No, wasteful.
+		-- Let's just make the button update itself.
+
+		l_btn.MouseButton1Click:Connect(function()
+			x1.IsLaunching = not x1.IsLaunching
+			l_btn.Text = x1.IsLaunching and "RESET" or "LAUNCH"
+			l_btn.BackgroundColor3 = x1.IsLaunching and Color3.fromRGB(60, 180, 255) or Color3.fromRGB(255, 60, 60)
+		end)
+
+		-- Hook visibility into state loop or something?
+		-- Easy hack: Update in f3? No, UI is separate.
+		-- Let's just check every second in the main loop?
+		-- Better: The previous x5.t callback didn't capture l_btn.
+		-- I will replace the x5.t call above with a custom button implementation here to ensure linkage.
+		-- Actually, simply putting it in the Heartbeat loop to set Visible is fine.
+		table.insert(
+			x6.c,
+			v3.Heartbeat:Connect(function()
+				l_btn.Visible = x1.ImpactManual
+				if x1.ImpactManual then
+					l_btn.Text = x1.IsLaunching and "RESET" or "LAUNCH"
+					l_btn.BackgroundColor3 = x1.IsLaunching and Color3.fromRGB(60, 180, 255)
+						or Color3.fromRGB(255, 60, 60)
+				end
+			end)
+		)
 
 		local tn = "Select Target >"
 		if x1.Tgt then
@@ -747,16 +924,37 @@ local function f2(p, cen, d, md, t)
 			) - wp
 		) * (x1.k10 * x9.c1)
 	elseif md == "Point Impact" then
-		local s = (c.k13 or 40) * 50.0
+		local s = (c.k13 or 40) * 100.0 -- Ultra fast
+		local radius = c.k11 or 0
+
+		-- MANUAL TRIGGER LOGIC
+		if x1.ImpactManual then
+			if not x1.IsLaunching then
+				-- SUSPENSE: Slow Encircle
+				s = 1 -- Slower spin (was 5)
+				radius = 35 -- Wide berth
+			else
+				-- ATTACK: Instant Kill
+				s = 500 -- Max speed
+				radius = 0 -- Center
+			end
+		end
+
 		if not d.v5 then
 			d.v5 = math.random() - 0.5
 		end
 		if not d.v4 then
 			d.v4 = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5).Unit
 		end
+
 		local cx, sx = math.cos(t * s), math.sin(t * s)
+		-- Spin around Y axis for visual clarity of "spin", or omni-directional?
+		-- User said "exact middle".
+		-- We'll effectively zero out the offset but keep the rotation calculation so velocity is high
 		local rd = Vector3.new(d.v4.X * cx - d.v4.Z * sx, d.v4.Y + d.v5, d.v4.X * sx + d.v4.Z * cx).Unit
-		return ((cen + (rd * (c.k11 or 2))) - wp) * (100 * x9.c1)
+
+		-- Radius effectively 0 from config, but we ensure some scaling if needed
+		return ((cen + (rd * radius)) - wp) * (100 * x9.c1)
 	elseif md == "Galactic Spiral" then
 		local s, Scale, Tightness, Arms = (c.k13 or 10) * x9.c2, (c.k11 or 500), (c.k12 or 0.5), math.floor(c.k15 or 3)
 		if not d.v6 then
@@ -840,7 +1038,7 @@ local function f2(p, cen, d, md, t)
 	return Vector3.zero
 end
 local function f3()
-	if not x6.b then
+	if not x6.b or x1.Disabled then
 		return
 	end
 	pcall(function()
@@ -849,6 +1047,37 @@ local function f3()
 		local dt = x6.n > 5000 and 10 or (x6.n > 2500 and 6 or (x6.n > 1000 and 3 or 1))
 		local et, ft = x1.k7 or dt, time()
 		local i = 0
+		local i = 0
+
+		-- Point Impact "All" Optimization (Cache targets)
+		if x1.PI_All and x1.k6 == "Point Impact" then
+			if ft > x6.pi_timer then
+				x6.pi_timer = ft + 1 -- Update cache every 1 second
+				x6.pi_targets = {}
+				for _, pl in ipairs(v2:GetPlayers()) do
+					if pl ~= v8 and pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") then
+						if not x1.Excluded[pl.Name] then
+							table.insert(x6.pi_targets, pl)
+						end
+					end
+				end
+			end
+		else
+			x6.pi_targets = {} -- Clear if inactive
+		end
+
+		-- Repulsion Cache Update (Every 0.1s)
+		if ft > x6.ex_timer then
+			x6.ex_timer = ft + 0.1
+			x6.ex_nodes = {}
+			for name, _ in pairs(x1.Excluded) do
+				local pl = v2:FindFirstChild(name)
+				if pl and pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") then
+					table.insert(x6.ex_nodes, pl.Character.HumanoidRootPart.Position)
+				end
+			end
+		end
+
 		for p, d in pairs(x6.a) do
 			if not p.Parent then
 				x4.f2(p)
@@ -858,24 +1087,66 @@ local function f3()
 			if i % et ~= (x6.f % et) then
 				continue
 			end
+			-- if d.av logic... (handled in f1 usually but kept for cleanup check)
 			if d.av then
-				d.av:Destroy()
-				d.av = nil
+				-- d.av:Destroy() -- Angular Velocity is DESIRED now, do not destroy!
+				-- d.av = nil
+				-- Actually wait, the user wanted stability. We KEEP AV.
 			end
-			local tc = c - p.Position
+
+			local active_c = c
+			-- Override center if Impact All
+			if #x6.pi_targets > 0 then
+				-- Deterministic Assignment (Stable & Fast)
+				local t_idx = ((i - 1) % #x6.pi_targets) + 1
+				local tgt = x6.pi_targets[t_idx]
+
+				if tgt and tgt.Character and tgt.Character:FindFirstChild("HumanoidRootPart") then
+					active_c = tgt.Character.HumanoidRootPart.Position
+				end
+			end
+
+			local tc = active_c - p.Position
 			if tc.Magnitude > x1.k1 then
 				continue
 			end
 			if tc.Magnitude > x9.c7 then
-				local tv = f2(p, c, d, x1.k6, ft)
-				d.vl = d.vl and d.vl:Lerp(tv, x1.k8) or tv
+				local tv = f2(p, active_c, d, x1.k6, ft)
+				local smoothing = (x1.k6 == "Point Impact" and 1) or x1.k8
+				if x1.DramaMode and x1.k6 == "Point Impact" then
+					-- Even with Drama, during "Suspense" phase (radius > 0), maybe we want smoothing?
+					-- Actually, instant is better to snap between phases.
+					smoothing = 1
+				end
+
+				d.vl = d.vl and d.vl:Lerp(tv, smoothing) or tv
+
+				-- Repulsion Field (Avoid Whitelisted Players)
+				local repelled = false
+				if #x6.ex_nodes > 0 then
+					local pp = p.Position
+					for _, ep in ipairs(x6.ex_nodes) do
+						local dst = (pp - ep).Magnitude
+						if dst < 30 then -- Increased to 30 Stud repulsive bubble
+							-- HARD OVERRIDE: Ignore all other forces, just GET OUT
+							d.vl = (pp - ep).Unit * 1000
+							repelled = true
+							break -- Handled, stop checking other nodes
+						end
+					end
+				end
+
+				-- Velocity Clamp (Only if not being repelled, to let it fly away fast)
+				if not repelled and d.vl.Magnitude > 3000 then
+					d.vl = d.vl.Unit * 3000
+				end
 				d.lv.VectorVelocity = d.vl
 			end
 		end
 	end)
 end
 local function f4()
-	if not x6.b then
+	if not x6.b or x1.Disabled then
 		return
 	end
 	if x1.TgtActive and x1.Tgt and x1.Tgt.Character and x1.Tgt.Character:FindFirstChild("HumanoidRootPart") then
@@ -904,7 +1175,7 @@ function x4.f1(p)
 		return
 	end
 	for _, c in ipairs(p:GetChildren()) do
-		if c.Name == "GRV_LV" or c.Name == "GRV_ATT" then
+		if c.Name == "GRV_LV" or c.Name == "GRV_ATT" or c.Name == "GRV_AV" then
 			c:Destroy()
 		end
 	end
@@ -921,7 +1192,13 @@ function x4.f1(p)
 	lv.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
 	lv.RelativeTo = Enum.ActuatorRelativeTo.World
 	lv.Attachment0 = a
-	x6.a[p] = { at = a, lv = lv }
+	local av = Instance.new("AngularVelocity", p)
+	av.Name = "GRV_AV"
+	av.MaxTorque = math.huge
+	av.RelativeTo = Enum.ActuatorRelativeTo.World
+	av.AngularVelocity = Vector3.zero
+	av.Attachment0 = a
+	x6.a[p] = { at = a, lv = lv, av = av }
 	x6.n = x6.n + 1
 end
 function x4.f2(p)
@@ -932,6 +1209,9 @@ function x4.f2(p)
 		end
 		if d.lv and d.lv.Parent then
 			d.lv:Destroy()
+		end
+		if d.av and d.av.Parent then
+			d.av:Destroy()
 		end
 		x6.a[p] = nil
 		x6.n = math.max(0, x6.n - 1)
