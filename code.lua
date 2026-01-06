@@ -55,7 +55,6 @@ local x2 = {
 	["Hollow Worm"] = { k12 = 0, k13 = 15, k14 = 35, k16 = 0.4, k15 = 10, k11 = 15, k17 = 150, k23 = false },
 	["Cosmic Comet"] = { k12 = 50, k13 = 20, k14 = 20, k16 = 0.5, k15 = 5, k11 = 5, k17 = 150, k23 = false },
 	["Point Impact"] = { k12 = 0, k13 = 500, k14 = 0, k16 = 0, k15 = 0, k11 = 0, k17 = 50, k23 = false },
-	["Galactic Spiral"] = { k11 = 600, k12 = 0.5, k13 = 10, k14 = 50, k15 = 3, k16 = 20, k17 = 150, k23 = false },
 	["Orbital Shell"] = {
 		k11 = 90,
 		k12 = 0,
@@ -72,6 +71,8 @@ local x2 = {
 	["Vortex Funnel"] = { k11 = 50, k12 = 300, k13 = 30, k14 = 400, k15 = 5, k16 = 0, k17 = 400, k23 = false },
 	["Quantum Atoms"] = { k11 = 60, k12 = 0, k13 = 15, k14 = 0, k15 = 3, k16 = 0, k17 = 150, k23 = false },
 	["Halo Ring"] = { k11 = 40, k12 = 0, k13 = 5, k14 = 80, k15 = 0, k16 = 0, k17 = 50, k23 = false },
+	["Slingshot"] = { k11 = 50, k12 = 3, k13 = 100, k14 = 0, k15 = 5, k16 = 0, k17 = 100, k23 = false },
+	["Gods Call"] = { k11 = 10, k12 = 0, k13 = 0, k14 = 0, k15 = 0, k16 = 0, k17 = 50, k23 = false },
 }
 x1.S = {}
 for m, d in pairs(x2) do
@@ -93,7 +94,10 @@ local x6 = {
 	pi_targets = {},
 	pi_timer = 0,
 	ex_nodes = {},
+	ex_nodes = {},
 	ex_timer = 0,
+	esp_timer = 0,
+	claim_queue = {},
 }
 local x7 = {}
 function x7.n(t, x, d)
@@ -367,7 +371,6 @@ function x5.mw(sg)
 			x1.PI_All = v
 		end)
 
-		-- Exclude List UI
 		local edb = Instance.new("TextButton", gsc)
 		edb.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 		edb.Size = UDim2.new(1, 0, 0, 30)
@@ -435,11 +438,7 @@ function x5.mw(sg)
 
 		x5.t(gsc, "Manual Trigger", x1.ImpactManual, function(v)
 			x1.ImpactManual = v
-			-- Reset launch state when toggling
 			x1.IsLaunching = false
-			-- Trigger UI refresh to show/hide launch button?
-			-- Simplified: We just add the button always but make it visible/usable?
-			-- Actually, let's just add the button below and update its text/color.
 		end)
 
 		local l_btn = Instance.new("TextButton", gsc)
@@ -452,35 +451,25 @@ function x5.mw(sg)
 		Instance.new("UICorner", l_btn).CornerRadius = UDim.new(0, 6)
 		l_btn.Visible = x1.ImpactManual
 
-		-- Loop to update button visibility/text? Or just update on click/toggle
-		-- Let's update on toggle callback (need to reference l_btn there)
-		-- We need to rebuild the toggle callback to access l_btn
-
-		-- Re-define Toggle with logic
-		-- x5.t already created a button, we can't hook into it easily without returning the object
-		-- Let's just run a heartbeat loop for UI? No, wasteful.
-		-- Let's just make the button update itself.
-
 		l_btn.MouseButton1Click:Connect(function()
 			x1.IsLaunching = not x1.IsLaunching
 			l_btn.Text = x1.IsLaunching and "RESET" or "LAUNCH"
 			l_btn.BackgroundColor3 = x1.IsLaunching and Color3.fromRGB(60, 180, 255) or Color3.fromRGB(255, 60, 60)
 		end)
-
-		-- Hook visibility into state loop or something?
-		-- Easy hack: Update in f3? No, UI is separate.
-		-- Let's just check every second in the main loop?
-		-- Better: The previous x5.t callback didn't capture l_btn.
-		-- I will replace the x5.t call above with a custom button implementation here to ensure linkage.
-		-- Actually, simply putting it in the Heartbeat loop to set Visible is fine.
 		table.insert(
 			x6.c,
 			v3.Heartbeat:Connect(function()
-				l_btn.Visible = x1.ImpactManual
 				if x1.ImpactManual then
 					l_btn.Text = x1.IsLaunching and "RESET" or "LAUNCH"
 					l_btn.BackgroundColor3 = x1.IsLaunching and Color3.fromRGB(60, 180, 255)
 						or Color3.fromRGB(255, 60, 60)
+				elseif x1.k6 == "Slingshot" and x1.SlingshotManual then
+					l_btn.Visible = true
+					l_btn.Text = x1.IsLaunching and "RESET" or "LAUNCH"
+					l_btn.BackgroundColor3 = x1.IsLaunching and Color3.fromRGB(60, 180, 255)
+						or Color3.fromRGB(255, 60, 60)
+				else
+					l_btn.Visible = false
 				end
 			end)
 		)
@@ -533,6 +522,20 @@ function x5.mw(sg)
 					tdlst.Visible = false
 				end)
 			end
+		end)
+
+		local ctb = Instance.new("TextButton", gsc)
+		ctb.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+		ctb.Size = UDim2.new(1, 0, 0, 30)
+		ctb.Text = "Clear Target"
+		ctb.TextColor3 = Color3.fromRGB(255, 255, 255)
+		ctb.Font = Enum.Font.GothamBold
+		ctb.TextSize = 13
+		ctb.AutoButtonColor = false
+		Instance.new("UICorner", ctb).CornerRadius = UDim.new(0, 6)
+		ctb.MouseButton1Click:Connect(function()
+			x1.Tgt = nil
+			tdb.Text = "Select Target >"
 		end)
 
 		x5.h(sc, "- SHAPE SETTINGS -")
@@ -724,6 +727,24 @@ function x5.mw(sg)
 			x5.s(sc, "Height Offset", 20, 200, s.k14, function(v)
 				s.k14 = v
 			end)
+		elseif x1.k6 == "Slingshot" then
+			x5.s(sc, "Charge Dist", 10, 200, s.k11, function(v)
+				s.k11 = v
+			end)
+			x5.s(sc, "Cycle Time", 1, 10, s.k12, function(v)
+				s.k12 = v
+			end)
+			x5.s(sc, "Fling Speed", 1, 500, s.k13, function(v)
+				s.k13 = v
+			end)
+			x5.t(sc, "Manual Fire", x1.SlingshotManual, function(v)
+				x1.SlingshotManual = v
+				x1.IsLaunching = false
+			end)
+		elseif x1.k6 == "Gods Call" then
+			x5.s(sc, "Ascent Speed", 1, 100, s.k11, function(v)
+				s.k11 = v
+			end)
 		end
 	end
 	x5.up = f1
@@ -762,12 +783,13 @@ function x5.mw(sg)
 		"Hollow Worm",
 		"Cosmic Comet",
 		"Point Impact",
-		"Galactic Spiral",
 		"Orbital Shell",
 		"Ascension Helix",
 		"Vortex Funnel",
 		"Quantum Atoms",
 		"Halo Ring",
+		"Slingshot",
+		"Gods Call",
 	}) do
 		local ib = Instance.new("TextButton", dlst)
 		ib.Size = UDim2.new(1, -10, 0, 30)
@@ -924,19 +946,16 @@ local function f2(p, cen, d, md, t)
 			) - wp
 		) * (x1.k10 * x9.c1)
 	elseif md == "Point Impact" then
-		local s = (c.k13 or 40) * 100.0 -- Ultra fast
+		local s = (c.k13 or 40) * 100.0
 		local radius = c.k11 or 0
 
-		-- MANUAL TRIGGER LOGIC
 		if x1.ImpactManual then
 			if not x1.IsLaunching then
-				-- SUSPENSE: Slow Encircle
-				s = 1 -- Slower spin (was 5)
-				radius = 35 -- Wide berth
+				s = 1
+				radius = 35
 			else
-				-- ATTACK: Instant Kill
-				s = 500 -- Max speed
-				radius = 0 -- Center
+				s = 500
+				radius = 0
 			end
 		end
 
@@ -948,12 +967,8 @@ local function f2(p, cen, d, md, t)
 		end
 
 		local cx, sx = math.cos(t * s), math.sin(t * s)
-		-- Spin around Y axis for visual clarity of "spin", or omni-directional?
-		-- User said "exact middle".
-		-- We'll effectively zero out the offset but keep the rotation calculation so velocity is high
 		local rd = Vector3.new(d.v4.X * cx - d.v4.Z * sx, d.v4.Y + d.v5, d.v4.X * sx + d.v4.Z * cx).Unit
 
-		-- Radius effectively 0 from config, but we ensure some scaling if needed
 		return ((cen + (rd * radius)) - wp) * (100 * x9.c1)
 	elseif md == "Galactic Spiral" then
 		local s, Scale, Tightness, Arms = (c.k13 or 10) * x9.c2, (c.k11 or 500), (c.k12 or 0.5), math.floor(c.k15 or 3)
@@ -1034,6 +1049,39 @@ local function f2(p, cen, d, md, t)
 		end
 		return ((cen + Vector3.new(math.cos(d.v6 + (t * s)) * R, H, math.sin(d.v6 + (t * s)) * R)) - wp)
 			* (x1.k10 * x9.c1)
+	elseif md == "Slingshot" then
+		-- k11: Charge Distance, k12: Cycle Time, k13: Fling Speed
+		local dist = c.k11 or 50
+		local cycle = c.k12 or 3
+		local speed = c.k13 or 100
+
+		if not d.v1 then -- Initialize offsets
+			d.v1 = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5).Unit
+			d.v2 = math.random() * cycle -- Random offset to desync parts slightly? No, sync them for impact.
+			-- Actually sync is better for impact
+			d.v2 = 0
+		end
+
+		local phase = (t + d.v2) % cycle
+		local is_charging = phase < (cycle * 0.8)
+
+		if x1.SlingshotManual then
+			is_charging = not x1.IsLaunching
+		end
+
+		if is_charging then
+			-- CHARGE: Go to randomized point away from center
+			local charge_pos = cen + (d.v1 * dist)
+			return (charge_pos - wp) * (5 * x9.c1) -- Slow gather
+		else
+			-- FIRE: SMASH into center
+			local smash_pos = cen
+			-- Ultra fast velocity
+			return (smash_pos - wp) * (speed * x9.c1)
+		end
+	elseif md == "Gods Call" then
+		local ascent_speed = c.k11 or 10
+		return Vector3.new(0, ascent_speed, 0)
 	end
 	return Vector3.zero
 end
@@ -1047,13 +1095,11 @@ local function f3()
 		local dt = x6.n > 5000 and 10 or (x6.n > 2500 and 6 or (x6.n > 1000 and 3 or 1))
 		local et, ft = x1.k7 or dt, time()
 		local i = 0
-		local i = 0
 
-		-- Point Impact "All" Optimization (Cache targets)
-		if x1.PI_All and x1.k6 == "Point Impact" then
-			if ft > x6.pi_timer then
-				x6.pi_timer = ft + 1 -- Update cache every 1 second
-				x6.pi_targets = {}
+		if ft > x6.pi_timer then
+			x6.pi_timer = ft + 1
+			x6.pi_targets = {}
+			if x1.PI_All then
 				for _, pl in ipairs(v2:GetPlayers()) do
 					if pl ~= v8 and pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") then
 						if not x1.Excluded[pl.Name] then
@@ -1061,12 +1107,13 @@ local function f3()
 						end
 					end
 				end
+			else
+				if x1.Tgt and x1.Tgt.Character and x1.Tgt.Character:FindFirstChild("HumanoidRootPart") then
+					table.insert(x6.pi_targets, x1.Tgt)
+				end
 			end
-		else
-			x6.pi_targets = {} -- Clear if inactive
 		end
 
-		-- Repulsion Cache Update (Every 0.1s)
 		if ft > x6.ex_timer then
 			x6.ex_timer = ft + 0.1
 			x6.ex_nodes = {}
@@ -1087,17 +1134,8 @@ local function f3()
 			if i % et ~= (x6.f % et) then
 				continue
 			end
-			-- if d.av logic... (handled in f1 usually but kept for cleanup check)
-			if d.av then
-				-- d.av:Destroy() -- Angular Velocity is DESIRED now, do not destroy!
-				-- d.av = nil
-				-- Actually wait, the user wanted stability. We KEEP AV.
-			end
-
 			local active_c = c
-			-- Override center if Impact All
 			if #x6.pi_targets > 0 then
-				-- Deterministic Assignment (Stable & Fast)
 				local t_idx = ((i - 1) % #x6.pi_targets) + 1
 				local tgt = x6.pi_targets[t_idx]
 
@@ -1114,29 +1152,24 @@ local function f3()
 				local tv = f2(p, active_c, d, x1.k6, ft)
 				local smoothing = (x1.k6 == "Point Impact" and 1) or x1.k8
 				if x1.DramaMode and x1.k6 == "Point Impact" then
-					-- Even with Drama, during "Suspense" phase (radius > 0), maybe we want smoothing?
-					-- Actually, instant is better to snap between phases.
 					smoothing = 1
 				end
 
 				d.vl = d.vl and d.vl:Lerp(tv, smoothing) or tv
 
-				-- Repulsion Field (Avoid Whitelisted Players)
 				local repelled = false
 				if #x6.ex_nodes > 0 then
 					local pp = p.Position
 					for _, ep in ipairs(x6.ex_nodes) do
 						local dst = (pp - ep).Magnitude
-						if dst < 30 then -- Increased to 30 Stud repulsive bubble
-							-- HARD OVERRIDE: Ignore all other forces, just GET OUT
+						if dst < 30 then
 							d.vl = (pp - ep).Unit * 1000
 							repelled = true
-							break -- Handled, stop checking other nodes
+							break
 						end
 					end
 				end
 
-				-- Velocity Clamp (Only if not being repelled, to let it fly away fast)
 				if not repelled and d.vl.Magnitude > 3000 then
 					d.vl = d.vl.Unit * 3000
 				end
@@ -1144,6 +1177,16 @@ local function f3()
 			end
 		end
 	end)
+end
+function x4.ProcessQueue()
+	local processed = 0
+	while #x6.claim_queue > 0 and processed < 10 do
+		local p = table.remove(x6.claim_queue, 1)
+		if p and p:IsA("BasePart") and p:IsDescendantOf(v4) then
+			x4.f1(p)
+		end
+		processed = processed + 1
+	end
 end
 local function f4()
 	if not x6.b or x1.Disabled then
@@ -1270,15 +1313,19 @@ function x4.f4(pos)
 			{ Size = x1.k2 * 1.2 }
 		)
 		:Play()
+	-- Initial Scan to Queue
 	for _, v in ipairs(v4:GetDescendants()) do
 		if v:IsA("BasePart") then
-			x4.f1(v)
+			table.insert(x6.claim_queue, v)
 		end
 	end
+
 	table.insert(
 		x6.c,
 		v4.DescendantAdded:Connect(function(v)
-			x4.f1(v)
+			if v:IsA("BasePart") then
+				table.insert(x6.claim_queue, v)
+			end
 		end)
 	)
 	x6.o = true
@@ -1289,6 +1336,7 @@ function x4.f4(pos)
 		v3.Heartbeat:Connect(function()
 			f3()
 			f4()
+			x4.ProcessQueue()
 		end)
 	)
 end
