@@ -41,32 +41,11 @@ local x1 = {
 }
 local x2 = {
 	["Big Ring Things"] = { k12 = 100, k13 = 10, k14 = 5, k16 = 0.6, k15 = 10, k11 = 2, k17 = 150, k23 = false },
-	["Celestial Ribbon"] = {
-		k12 = 0,
-		k13 = 15,
-		k14 = 30,
-		k16 = 0.4,
-		k11 = 1,
-		k17 = 150,
-		k18 = false,
-		k19 = false,
-		k23 = false,
-	},
+	["Celestial Ribbon"] = { k12 = 0, k13 = 15, k14 = 30, k16 = 0.4, k11 = 1, k17 = 150, k18 = false, k19 = false, k23 = false },
 	["Hollow Worm"] = { k12 = 0, k13 = 15, k14 = 35, k16 = 0.4, k15 = 10, k11 = 15, k17 = 150, k23 = false },
 	["Cosmic Comet"] = { k12 = 50, k13 = 20, k14 = 20, k16 = 0.5, k15 = 5, k11 = 5, k17 = 150, k23 = false },
 	["Point Impact"] = { k12 = 0, k13 = 500, k14 = 0, k16 = 0, k15 = 0, k11 = 0, k17 = 50, k23 = false },
-	["Orbital Shell"] = {
-		k11 = 90,
-		k12 = 0,
-		k13 = 15,
-		k14 = 0,
-		k15 = 0,
-		k16 = 0,
-		k17 = 150,
-		k23 = false,
-		k18 = false,
-		k19 = false,
-	},
+	["Orbital Shell"] = { k11 = 90, k12 = 0, k13 = 15, k14 = 0, k15 = 0, k16 = 0, k17 = 150, k23 = false, k18 = false, k19 = false },
 	["Ascension Helix"] = { k11 = 150, k12 = 50, k13 = 20, k14 = 400, k15 = 2, k16 = 1, k17 = 400, k23 = false },
 	["Vortex Funnel"] = { k11 = 50, k12 = 300, k13 = 30, k14 = 400, k15 = 5, k16 = 0, k17 = 400, k23 = false },
 	["Quantum Atoms"] = { k11 = 60, k12 = 0, k13 = 15, k14 = 0, k15 = 3, k16 = 0, k17 = 150, k23 = false },
@@ -331,7 +310,6 @@ function x5.mw(sg)
 	local scl = Instance.new("UIListLayout", sc)
 	scl.Padding = UDim.new(0, 8)
 	scl.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
 	local function f1()
 		sc:ClearAllChildren()
 		gsc:ClearAllChildren()
@@ -342,7 +320,6 @@ function x5.mw(sg)
 		scl.Padding = UDim.new(0, 8)
 		scl.HorizontalAlignment = Enum.HorizontalAlignment.Center
 		local s = x3()
-
 		x5.h(gsc, "- GLOBAL SETTINGS -")
 		x5.t(gsc, "Anchor to Self", s.k23, function(v)
 			s.k23 = v
@@ -370,7 +347,6 @@ function x5.mw(sg)
 		x5.t(gsc, "Impact All", x1.PI_All, function(v)
 			x1.PI_All = v
 		end)
-
 		local edb = Instance.new("TextButton", gsc)
 		edb.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 		edb.Size = UDim2.new(1, 0, 0, 30)
@@ -394,7 +370,6 @@ function x5.mw(sg)
 		local edll = Instance.new("UIListLayout", edlst)
 		edll.Padding = UDim.new(0, 2)
 		edll.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
 		edb.MouseButton1Click:Connect(function()
 			edlst.Visible = not edlst.Visible
 			if not edlst.Visible then
@@ -404,7 +379,6 @@ function x5.mw(sg)
 			local edll = Instance.new("UIListLayout", edlst)
 			edll.Padding = UDim.new(0, 2)
 			edll.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
 			for _, pl in ipairs(v2:GetPlayers()) do
 				if pl == v8 then
 					continue
@@ -418,7 +392,6 @@ function x5.mw(sg)
 				if is_excluded then
 					ib.Text = "[X] " .. ib.Text
 				end
-
 				ib.Font = Enum.Font.GothamMedium
 				ib.TextSize = 14
 				ib.ZIndex = 31
@@ -435,12 +408,10 @@ function x5.mw(sg)
 				end)
 			end
 		end)
-
 		x5.t(gsc, "Manual Trigger", x1.ImpactManual, function(v)
 			x1.ImpactManual = v
 			x1.IsLaunching = false
 		end)
-
 		local l_btn = Instance.new("TextButton", gsc)
 		l_btn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
 		l_btn.Size = UDim2.new(1, 0, 0, 30)
@@ -473,7 +444,6 @@ function x5.mw(sg)
 				end
 			end)
 		)
-
 		local tn = "Select Target >"
 		if x1.Tgt then
 			tn = "Target: " .. (x1.Tgt.DisplayName or x1.Tgt.Name)
@@ -523,7 +493,6 @@ function x5.mw(sg)
 				end)
 			end
 		end)
-
 		local ctb = Instance.new("TextButton", gsc)
 		ctb.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
 		ctb.Size = UDim2.new(1, 0, 0, 30)
@@ -537,7 +506,6 @@ function x5.mw(sg)
 			x1.Tgt = nil
 			tdb.Text = "Select Target >"
 		end)
-
 		x5.h(sc, "- SHAPE SETTINGS -")
 		if x1.k6 == "Big Ring Things" then
 			x5.s(sc, "Ring Count", 1, 20, s.k11, function(v)
@@ -948,7 +916,6 @@ local function f2(p, cen, d, md, t)
 	elseif md == "Point Impact" then
 		local s = (c.k13 or 40) * 100.0
 		local radius = c.k11 or 0
-
 		if x1.ImpactManual then
 			if not x1.IsLaunching then
 				s = 1
@@ -958,17 +925,14 @@ local function f2(p, cen, d, md, t)
 				radius = 0
 			end
 		end
-
 		if not d.v5 then
 			d.v5 = math.random() - 0.5
 		end
 		if not d.v4 then
 			d.v4 = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5).Unit
-		end
-
+        end
 		local cx, sx = math.cos(t * s), math.sin(t * s)
 		local rd = Vector3.new(d.v4.X * cx - d.v4.Z * sx, d.v4.Y + d.v5, d.v4.X * sx + d.v4.Z * cx).Unit
-
 		return ((cen + (rd * radius)) - wp) * (100 * x9.c1)
 	elseif md == "Galactic Spiral" then
 		local s, Scale, Tightness, Arms = (c.k13 or 10) * x9.c2, (c.k11 or 500), (c.k12 or 0.5), math.floor(c.k15 or 3)
@@ -1050,33 +1014,24 @@ local function f2(p, cen, d, md, t)
 		return ((cen + Vector3.new(math.cos(d.v6 + (t * s)) * R, H, math.sin(d.v6 + (t * s)) * R)) - wp)
 			* (x1.k10 * x9.c1)
 	elseif md == "Slingshot" then
-		-- k11: Charge Distance, k12: Cycle Time, k13: Fling Speed
 		local dist = c.k11 or 50
 		local cycle = c.k12 or 3
 		local speed = c.k13 or 100
-
-		if not d.v1 then -- Initialize offsets
+		if not d.v1 then
 			d.v1 = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5).Unit
-			d.v2 = math.random() * cycle -- Random offset to desync parts slightly? No, sync them for impact.
-			-- Actually sync is better for impact
+			d.v2 = math.random() * cycle
 			d.v2 = 0
 		end
-
 		local phase = (t + d.v2) % cycle
 		local is_charging = phase < (cycle * 0.8)
-
 		if x1.SlingshotManual then
 			is_charging = not x1.IsLaunching
 		end
-
 		if is_charging then
-			-- CHARGE: Go to randomized point away from center
 			local charge_pos = cen + (d.v1 * dist)
-			return (charge_pos - wp) * (5 * x9.c1) -- Slow gather
+			return (charge_pos - wp) * (5 * x9.c1)
 		else
-			-- FIRE: SMASH into center
 			local smash_pos = cen
-			-- Ultra fast velocity
 			return (smash_pos - wp) * (speed * x9.c1)
 		end
 	elseif md == "Gods Call" then
@@ -1095,7 +1050,6 @@ local function f3()
 		local dt = x6.n > 5000 and 10 or (x6.n > 2500 and 6 or (x6.n > 1000 and 3 or 1))
 		local et, ft = x1.k7 or dt, time()
 		local i = 0
-
 		if ft > x6.pi_timer then
 			x6.pi_timer = ft + 1
 			x6.pi_targets = {}
@@ -1113,7 +1067,6 @@ local function f3()
 				end
 			end
 		end
-
 		if ft > x6.ex_timer then
 			x6.ex_timer = ft + 0.1
 			x6.ex_nodes = {}
@@ -1124,7 +1077,6 @@ local function f3()
 				end
 			end
 		end
-
 		for p, d in pairs(x6.a) do
 			if not p.Parent then
 				x4.f2(p)
@@ -1143,7 +1095,6 @@ local function f3()
 					active_c = tgt.Character.HumanoidRootPart.Position
 				end
 			end
-
 			local tc = active_c - p.Position
 			if tc.Magnitude > x1.k1 then
 				continue
@@ -1154,9 +1105,7 @@ local function f3()
 				if x1.DramaMode and x1.k6 == "Point Impact" then
 					smoothing = 1
 				end
-
 				d.vl = d.vl and d.vl:Lerp(tv, smoothing) or tv
-
 				local repelled = false
 				if #x6.ex_nodes > 0 then
 					local pp = p.Position
@@ -1169,7 +1118,6 @@ local function f3()
 						end
 					end
 				end
-
 				if not repelled and d.vl.Magnitude > 3000 then
 					d.vl = d.vl.Unit * 3000
 				end
@@ -1313,7 +1261,6 @@ function x4.f4(pos)
 			{ Size = x1.k2 * 1.2 }
 		)
 		:Play()
-	-- Initial Scan to Queue
 	for _, v in ipairs(v4:GetDescendants()) do
 		if v:IsA("BasePart") then
 			table.insert(x6.claim_queue, v)
