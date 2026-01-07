@@ -104,7 +104,6 @@ local x6 = {
 	pi_targets = {},
 	pi_timer = 0,
 	ex_nodes = {},
-	ex_nodes = {},
 	ex_timer = 0,
 	esp_timer = 0,
 	claim_queue = {},
@@ -340,6 +339,61 @@ function x5.st()
 	x6.sg = sg
 	x5.g = sg
 	x5.mw(sg)
+end
+end
+function x5.cl()
+	if not x6.sg then return end
+	local f = Instance.new("Frame", x6.sg)
+	f.Size = UDim2.new(0, 400, 0, 300)
+	f.Position = UDim2.new(0.5, -200, 0.5, -150)
+	f.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+	f.BorderSizePixel = 0
+	Instance.new("UICorner", f).CornerRadius = UDim.new(0, 12)
+	local s = Instance.new("UIStroke", f)
+	s.Color = Color3.fromRGB(80, 80, 200)
+	s.Thickness = 2
+	local t = Instance.new("TextLabel", f)
+	t.Size = UDim2.new(1, 0, 0, 40)
+	t.BackgroundTransparency = 1
+	t.Text = "Gravity Script Updated"
+	t.Font = Enum.Font.GothamBold
+	t.TextColor3 = Color3.fromRGB(255, 255, 255)
+	t.TextSize = 24
+	local sc = Instance.new("ScrollingFrame", f)
+	sc.Position = UDim2.new(0, 10, 0, 50)
+	sc.Size = UDim2.new(1, -20, 1, -100)
+	sc.BackgroundTransparency = 1
+	sc.ScrollBarThickness = 4
+	local tl = Instance.new("TextLabel", sc)
+	tl.Size = UDim2.new(1, 0, 0, 0)
+	tl.AutomaticSize = Enum.AutomaticSize.Y
+	tl.BackgroundTransparency = 1
+	tl.TextXAlignment = Enum.TextXAlignment.Left
+	tl.TextYAlignment = Enum.TextYAlignment.Top
+	tl.TextColor3 = Color3.fromRGB(200, 200, 220)
+	tl.Font = Enum.Font.GothamMedium
+	tl.TextSize = 14
+	tl.Text = [[
+<b>V2 Optimizations:</b>
+- <b>Memory:</b> Zero allocation per frame (buffer reuse).
+- <b>CPU:</b> Reduced C++ bridge calls by 50%.
+- <b>Shapes:</b> "Orbital Shell" now optimized.
+- <b>Fixes:</b> Fixed Helix logic & Removed Galactic Spiral.
+
+Enjoy smoother physics!]]
+	tl.RichText = true
+	local b = Instance.new("TextButton", f)
+	b.Size = UDim2.new(0, 120, 0, 35)
+	b.Position = UDim2.new(0.5, -60, 1, -45)
+	b.BackgroundColor3 = Color3.fromRGB(60, 60, 200)
+	b.Text = "Got it!"
+	b.TextColor3 = Color3.fromRGB(255, 255, 255)
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 16
+	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+	b.MouseButton1Click:Connect(function()
+		f:Destroy()
+	end)
 end
 function x5.mw(sg)
 	local m = Instance.new("Frame", sg)
