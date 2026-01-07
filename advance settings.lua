@@ -113,45 +113,48 @@ local function px(md, t, c)
 	local r = {}
 	local res = 200
 	if md == "Celestial Ribbon" then
-		local s, w, h, l = (c.k13 or 10)*x9.c2, (c.k11 or 8), c.k14 or 50, (c.k16 or x9.c5)*100
+		local s, w, h, l = (c.k13 or 10) * x9.c2, (c.k11 or 8), c.k14 or 50, (c.k16 or x9.c5) * 100
 		local R = (c.k17 or 150)
-		for i=1,res do
-			local pc = (i-1)/(res-1)
-			local ph = (t*s) - (pc*(l*x9.c2))
-			local px, pz, py = math.cos(ph)*R, math.sin(ph*1.618)*R, math.sin(ph*0.577)*h
+		for i = 1, res do
+			local pc = (i - 1) / (res - 1)
+			local ph = (t * s) - (pc * (l * x9.c2))
+			local px, pz, py = math.cos(ph) * R, math.sin(ph * 1.618) * R, math.sin(ph * 0.577) * h
 			local T = Vector3.new(px, py, pz).Unit
 			local Rv = T:Cross(Vector3.yAxis)
-			if Rv.Magnitude < 0.01 then Rv = Vector3.xAxis end
+			if Rv.Magnitude < 0.01 then
+				Rv = Vector3.xAxis
+			end
 			Rv = Rv.Unit
-			local trn = Rv*math.cos(ph*0.5) + (T:Cross(Rv))*math.sin(ph*0.5)
-			r[i] = {p=Vector3.new(px, py, pz), t=trn, ph=ph}
+			local trn = Rv * math.cos(ph * 0.5) + (T:Cross(Rv)) * math.sin(ph * 0.5)
+			r[i] = { p = Vector3.new(px, py, pz), t = trn, ph = ph }
 		end
 	elseif md == "Hollow Worm" then
-		local s, radius, h, wf, l = (c.k13 or 10)*x9.c2, (c.k11 or 8), c.k14 or 50, (c.k15 or 10)*x9.c7, (c.k16 or x9.c5)*100
+		local s, radius, h, wf, l =
+			(c.k13 or 10) * x9.c2, (c.k11 or 8), c.k14 or 50, (c.k15 or 10) * x9.c7, (c.k16 or x9.c5) * 100
 		local R = (c.k17 or 150)
-		for i=1,res do
-			local pc = (i-1)/(res-1)
-			local ph = (t*s) - (pc*(l*x9.c2))
-			local sx, sz, sy = math.cos(ph)*R, math.sin(ph)*R, math.sin(ph*wf)*h
+		for i = 1, res do
+			local pc = (i - 1) / (res - 1)
+			local ph = (t * s) - (pc * (l * x9.c2))
+			local sx, sz, sy = math.cos(ph) * R, math.sin(ph) * R, math.sin(ph * wf) * h
 			r[i] = Vector3.new(sx, sy, sz)
 		end
 	elseif md == "Cosmic Comet" then
-		local s, h, l = (c.k13 or 10)*x9.c2, c.k14 or 50, (c.k16 or x9.c5)*100
+		local s, h, l = (c.k13 or 10) * x9.c2, c.k14 or 50, (c.k16 or x9.c5) * 100
 		local R = (c.k17 or 150)
-		for i=1,res do
-			local pc = (i-1)/(res-1)
-			local ph = (t*s) - (pc*(l*x9.c2))
-			r[i] = Vector3.new(math.cos(ph)*R, math.sin(ph*(c.k15 or 5)*x9.c7)*h, math.sin(ph)*R)
+		for i = 1, res do
+			local pc = (i - 1) / (res - 1)
+			local ph = (t * s) - (pc * (l * x9.c2))
+			r[i] = Vector3.new(math.cos(ph) * R, math.sin(ph * (c.k15 or 5) * x9.c7) * h, math.sin(ph) * R)
 		end
 	elseif md == "Ascension Helix" then
-    local s, R, H, Strands = (c.k13 or 10)*x9.c2, (c.k11 or 150), (c.k14 or 400), (c.k15 or 2)
-    for i=1,res do
-        local pc = (i-1)/(res-1)
-        local ph = (t*s)
-        local p = Vector3.new(R * math.cos(ph), (pc - 0.5) * H, R * math.sin(ph))
-        r[i] = {p=p, ph=ph} 
-    end
-end
+		local s, R, H, Strands = (c.k13 or 10) * x9.c2, (c.k11 or 150), (c.k14 or 400), (c.k15 or 2)
+		for i = 1, res do
+			local pc = (i - 1) / (res - 1)
+			local ph = (t * s)
+			local p = Vector3.new(R * math.cos(ph), (pc - 0.5) * H, R * math.sin(ph))
+			r[i] = { p = p, ph = ph }
+		end
+	end
 	x6.pre[md] = r
 end
 local x7 = {}
@@ -974,32 +977,49 @@ local function f2(p, cen, d, md, t)
 			tp = Vector3.new(tp.X, ho, tp.Z)
 		end
 		return (tp - wp) * (x1.k10 * x9.c1)
-		return (tp - wp) * (x1.k10 * x9.c1)
 	elseif md == "Celestial Ribbon" then
 		local w = c.k11 or 8
-		if not d.v7 then d.v7 = math.random() - 0.5; d.v6 = math.random() end
-		if c.k19 and not d.v9 then d.v9 = math.random(0, 1) end
+		if not d.v7 then
+			d.v7 = math.random() - 0.5
+			d.v6 = math.random()
+		end
+		if c.k19 and not d.v9 then
+			d.v9 = math.random(0, 1)
+		end
 		local p_data = x6.pre and x6.pre[md]
 		local fin
 		if p_data and #p_data > 0 then
 			local idx = math.floor(d.v6 * (#p_data - 1)) + 1
 			local node = p_data[idx]
-			fin = node.p + (node.t * (d.v7 * w)) + (c.k18 and (node.t * math.sin(node.ph * 8)) * (w * 2.0) or Vector3.zero)
+			fin = node.p
+				+ (node.t * (d.v7 * w))
+				+ (c.k18 and (node.t * math.sin(node.ph * 8)) * (w * 2.0) or Vector3.zero)
 		else
 			local s, h, l = (c.k13 or 10) * x9.c2, c.k14 or 50, (c.k16 or x9.c5) * 100
 			local ph = (t * s) - (d.v6 * (l * x9.c2))
 			local R = (c.k17 or 150)
 			local px, pz, py = math.cos(ph) * R, math.sin(ph * 1.618) * R, math.sin(ph * 0.577) * h
 			local T = Vector3.new(px, py, pz).Unit
-			local Rvec = T:Cross(Vector3.yAxis); if Rvec.Magnitude < 0.01 then Rvec = Vector3.xAxis end; Rvec = Rvec.Unit
+			local Rvec = T:Cross(Vector3.yAxis)
+			if Rvec.Magnitude < 0.01 then
+				Rvec = Vector3.xAxis
+			end
+			Rvec = Rvec.Unit
 			local trn = Rvec * math.cos(ph * 0.5) + (T:Cross(Rvec)) * math.sin(ph * 0.5)
-			fin = Vector3.new(px, py, pz) + (trn * (d.v7 * w)) + (c.k18 and (trn * math.sin(ph * 8)) * (w * 2.0) or Vector3.zero)
+			fin = Vector3.new(px, py, pz)
+				+ (trn * (d.v7 * w))
+				+ (c.k18 and (trn * math.sin(ph * 8)) * (w * 2.0) or Vector3.zero)
 		end
-		if c.k19 and d.v9 == 1 then fin = -fin end
+		if c.k19 and d.v9 == 1 then
+			fin = -fin
+		end
 		return ((cen + fin) - wp) * (x1.k10 * x9.c1)
 	elseif md == "Hollow Worm" then
 		local r, wf = (c.k11 or 8), (c.k15 or 10) * x9.c7
-		if not d.v4 then d.v4 = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5).Unit; d.v6 = math.random() end
+		if not d.v4 then
+			d.v4 = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5).Unit
+			d.v6 = math.random()
+		end
 		local p_data = x6.pre and x6.pre[md]
 		local center_pos
 		if p_data and #p_data > 0 then
@@ -1016,8 +1036,13 @@ local function f2(p, cen, d, md, t)
 		return ((cen + center_pos + (rd * r)) - wp) * (x1.k10 * x9.c1)
 	elseif md == "Cosmic Comet" then
 		local hr, ts = (c.k11 or 4), (c.k12 or 50) * x9.c7
-		if not d.v4 then d.v4 = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5).Unit; d.v6 = math.random() end
-		if not d.v8 then d.v8 = math.random() end
+		if not d.v4 then
+			d.v4 = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5).Unit
+			d.v6 = math.random()
+		end
+		if not d.v8 then
+			d.v8 = math.random()
+		end
 		local p_data = x6.pre and x6.pre[md]
 		local center_pos
 		if p_data and #p_data > 0 then
@@ -1094,10 +1119,14 @@ local function f2(p, cen, d, md, t)
 		end
 	elseif md == "Ascension Helix" then
 		local s, R, H, Strands = (c.k13 or 10) * x9.c2, (c.k11 or 150), (c.k14 or 400), (c.k15 or 2)
-		if not d.v4 then d.v4 = math.random() end
-		if not d.v5 then d.v5 = math.random(1, Strands) end
+		if not d.v4 then
+			d.v4 = math.random()
+		end
+		if not d.v5 then
+			d.v5 = math.random(1, Strands)
+		end
 		if not d.ca then
-			local ang = (math.pi*2/Strands)*(d.v5-1)
+			local ang = (math.pi * 2 / Strands) * (d.v5 - 1)
 			d.ca, d.sa = math.cos(ang), math.sin(ang)
 		end
 		local p_data = x6.pre and x6.pre[md]
@@ -1106,7 +1135,7 @@ local function f2(p, cen, d, md, t)
 			local idx = math.floor(d.v4 * (#p_data - 1)) + 1
 			local node = p_data[idx]
 			local p = node.p
-			fin = Vector3.new(p.X*d.ca - p.Z*d.sa, p.Y, p.X*d.sa + p.Z*d.ca)
+			fin = Vector3.new(p.X * d.ca - p.Z * d.sa, p.Y, p.X * d.sa + p.Z * d.ca)
 		else
 			local phase = (t * s) + (d.v4 * (c.k16 or 1) * math.pi * 2) + ((math.pi * 2 / Strands) * (d.v5 - 1))
 			fin = Vector3.new(R * math.cos(phase), d.v4 * H - (H / 2), R * math.sin(phase))
