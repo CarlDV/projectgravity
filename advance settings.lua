@@ -109,8 +109,6 @@ local x6 = {
 	esp_timer = 0,
 	claim_queue = {},
 	pre = {},
-}
-	pre = {},
 	pre_buffer = table.create(200),
 }
 local function px(md, t, c)
