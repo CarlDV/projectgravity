@@ -1,3 +1,4 @@
+--!native
 local v1, v2, v3, v4, v5, v6, v7 =
 	game:GetService("UserInputService"),
 	game:GetService("Players"),
@@ -37,7 +38,6 @@ local x1 = {
 	IsLaunching = false,
 	Disabled = false,
 	TgtActive = false,
-	PI_All = false,
 	PI_All = false,
 	AnchorSelf = false,
 	Paused = false,
@@ -1172,6 +1172,7 @@ local function f3()
 			end
 		end
 		px(x1.k6, ft, x3())
+		local no_damp = { ["Slingshot"] = true, ["Point Impact"] = true, ["Deflect"] = true }
 		for p, d in pairs(x6.a) do
 			if not p.Parent then
 				x4.f2(p)
@@ -1210,7 +1211,6 @@ local function f3()
 					target_pos_delta = target_pos_delta + (d.integral * x1.Ki)
 				end
 				local tv = target_pos_delta
-				local no_damp = { ["Slingshot"] = true, ["Point Impact"] = true, ["Deflect"] = true }
 				if x1.Damping and x1.Damping > 0 and not no_damp[x1.k6] then
 					tv = tv - (p_vel * x1.Damping)
 				end
@@ -1238,7 +1238,8 @@ local function f3()
 				end
 				d.lv.VectorVelocity = d.vl
 				if x1.AngularDamping and x1.AngularDamping > 0 then
-					p.AssemblyAngularVelocity = p.AssemblyAngularVelocity * (1 - x1.AngularDamping * dt)
+					p.AssemblyAngularVelocity = p.AssemblyAngularVelocity
+						* math.pow(1 - math.clamp(x1.AngularDamping, 0, 0.99), dt)
 				end
 			end
 		end
@@ -1339,20 +1340,22 @@ function x4.f2(p)
 	end
 end
 function x4.f3()
-	settings().Physics.AllowSleep = false
+	pcall(function()
+		settings().Physics.AllowSleep = false
+	end)
 	table.insert(
 		x6.c,
 		v3.Heartbeat:Connect(function(dt)
 			for _, p in ipairs(v2:GetPlayers()) do
 				if p ~= v8 then
-					p.MaximumSimulationRadius = 0
 					pcall(function()
+						p.MaximumSimulationRadius = 0
 						sethiddenproperty(p, "SimulationRadius", 0)
 					end)
 				end
 			end
-			v8.MaximumSimulationRadius = x1.k1
 			pcall(function()
+				v8.MaximumSimulationRadius = x1.k1
 				setsimulationradius(x1.k1)
 				if x6.b then
 					v8.ReplicationFocus = x6.b
@@ -1498,3 +1501,4 @@ function x8.i()
 end
 x4.f3()
 x8.i()
+x5.st()
