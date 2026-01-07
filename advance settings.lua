@@ -13,6 +13,7 @@ if v1.TouchEnabled and not v1.KeyboardEnabled then
 	end
 end
 local x9 = { c1 = 0.15, c2 = 0.05, c3 = 0.01, c4 = 0.2, c5 = 0.6, c6 = 0.8, c7 = 0.1, c8 = 0.25 }
+local ANTI_SLEEP = Vector3.new(0, 0.01, 0)
 local x1 = {
 	k1 = 2000,
 	k2 = Vector3.new(5, 5, 5),
@@ -109,8 +110,12 @@ local x6 = {
 	claim_queue = {},
 	pre = {},
 }
+	pre = {},
+	pre_buffer = table.create(200),
+}
 local function px(md, t, c)
-	local r = {}
+	local r = x6.pre_buffer
+	table.clear(r)
 	local res = 200
 	if md == "Celestial Ribbon" then
 		local s, w, h, l = (c.k13 or 10) * x9.c2, (c.k11 or 8), c.k14 or 50, (c.k16 or x9.c5) * 100
@@ -152,10 +157,15 @@ local function px(md, t, c)
 			local pc = (i - 1) / (res - 1)
 			local ph = (t * s)
 			local p = Vector3.new(R * math.cos(ph), (pc - 0.5) * H, R * math.sin(ph))
-			r[i] = { p = p, ph = ph }
+
+			r[i] = { p = p, ph = ph, pc = pc }
 		end
+	elseif md == "Orbital Shell" then
+		local s = (c.k13 or 10) * x9.c2
+		local ph = t * s
+		r[1] = { ca = math.cos(ph), sa = math.sin(ph) }
 	end
-	x6.pre[md] = r
+	x6.pre[md] = table.clone(r)
 end
 local x7 = {}
 function x7.n(t, x, d)
@@ -693,28 +703,6 @@ function x5.mw(sg)
 			x5.s(sc, "Move Area", 50, 800, s.k17, function(v)
 				s.k17 = v
 			end)
-		elseif x1.k6 == "Galactic Spiral" then
-			x5.s(sc, "Spin Speed", 1, 300, s.k13 * 10, function(v)
-				s.k13 = v / 10
-			end)
-			x5.s(sc, "Galaxy Scale", 100, 2000, s.k11, function(v)
-				s.k11 = v
-			end)
-			x5.s(sc, "Arm Tightness", 1, 20, s.k12 * 10, function(v)
-				s.k12 = v / 10
-			end)
-			x5.s(sc, "Arm Count", 1, 8, s.k15, function(v)
-				s.k15 = v
-			end)
-			x5.s(sc, "Center Hole", 0, 500, s.k14, function(v)
-				s.k14 = v
-			end)
-			x5.s(sc, "Vertical Spread", 0, 500, s.k16, function(v)
-				s.k16 = v
-			end)
-			x5.s(sc, "Move Area", 50, 1500, s.k17, function(v)
-				s.k17 = v
-			end)
 		elseif x1.k6 == "Orbital Shell" then
 			x5.s(sc, "Spin Speed", 1, 300, s.k13 * 10, function(v)
 				s.k13 = v / 10
@@ -1076,33 +1064,27 @@ local function f2(p, cen, d, md, t)
 		local cx, sx = math.cos(t * s), math.sin(t * s)
 		local rd = Vector3.new(d.v4.X * cx - d.v4.Z * sx, d.v4.Y + d.v5, d.v4.X * sx + d.v4.Z * cx).Unit
 		return ((cen + (rd * radius)) - wp) * (100 * x9.c1)
-	elseif md == "Galactic Spiral" then
-		local s, Scale, Tightness, Arms = (c.k13 or 10) * x9.c2, (c.k11 or 500), (c.k12 or 0.5), math.floor(c.k15 or 3)
-		if not d.v6 then
-			d.v6 = math.random()
-		end
-		if not d.v1 then
-			d.v1 = d.v1 or math.random(1, Arms)
-		end
-		local theta = d.v6 * 10
-		local r = (c.k14 or 50) + (Scale * (theta / 10))
-		local final_theta = theta + ((math.pi * 2 / Arms) * (d.v1 - 1)) + (t * s) - (r * Tightness * 0.01)
-		return ((cen + Vector3.new(r * math.cos(final_theta), d.v7 * (c.k16 or 0), r * math.sin(final_theta))) - wp)
-			* (x1.k10 * x9.c1)
 	elseif md == "Orbital Shell" then
-		local s, R = (c.k13 or 10) * x9.c2, (c.k11 or 200)
+		local R = (c.k11 or 200)
 		if not d.v4 then
 			d.v4 = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5).Unit
 		end
+		local pd = x6.pre and x6.pre[md] and x6.pre[md][1]
+		local ca, sa
+		if pd then
+			ca, sa = pd.ca, pd.sa
+		else
+			local s = (c.k13 or 10) * x9.c2
+			ca, sa = math.cos(t * s), math.sin(t * s)
+		end
 		local rv
 		if c.k19 then
-			local cx, sx = math.cos(t * s), math.sin(t * s)
-			rv = Vector3.new(d.v4.X * cx - d.v4.Z * sx, d.v4.Y, d.v4.X * sx + d.v4.Z * cx)
+			rv = Vector3.new(d.v4.X * ca - d.v4.Z * sa, d.v4.Y, d.v4.X * sa + d.v4.Z * ca)
 		else
 			if not d.v5 then
 				d.v5 = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5).Unit
 			end
-			local k, v, ca, sa = d.v5, d.v4, math.cos(t * s), math.sin(t * s)
+			local k, v = d.v5, d.v4
 			rv = v * ca + k:Cross(v) * sa + k * (k:Dot(v) * (1 - ca))
 		end
 		if c.k18 then
@@ -1217,7 +1199,7 @@ local function f2(p, cen, d, md, t)
 		local ty = (d.v5 * h) + h_off
 		return ((cen + Vector3.new(tx, ty, tz)) - wp) * (x1.k10 * x9.c1)
 	end
-	return Vector3.new(0, 0.01, 0)
+	return ANTI_SLEEP
 end
 local function f3()
 	if not x6.b or x1.Disabled then
@@ -1253,11 +1235,11 @@ local function f3()
 			end
 		end
 		px(x1.k6, ft, x3())
-		for p, d in pairs(x6.a) do
 			if not p.Parent then
 				x4.f2(p)
 				continue
 			end
+			local p_vel = p.AssemblyLinearVelocity
 			i = i + 1
 			if i % et ~= (x6.f % et) then
 				continue
@@ -1292,12 +1274,12 @@ local function f3()
 				local tv = target_pos_delta
 				local no_damp = { ["Slingshot"] = true, ["Point Impact"] = true, ["Deflect"] = true }
 				if x1.Damping and x1.Damping > 0 and not no_damp[x1.k6] then
-					tv = tv - (p.AssemblyLinearVelocity * x1.Damping)
+					tv = tv - (p_vel * x1.Damping)
 				end
 
 				-- Energy-Aware Scaling
 				if x1.MaxSpeed and not no_damp[x1.k6] then
-					local spd = p.AssemblyLinearVelocity.Magnitude
+					local spd = p_vel.Magnitude
 					local s_factor = math.clamp(1 - (spd / x1.MaxSpeed), 0.2, 1)
 					tv = tv * s_factor
 				end
