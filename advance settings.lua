@@ -75,7 +75,7 @@ local x2 = {
 		k18 = false,
 		k19 = false,
 	},
-	["Ascension Helix"] = { k11 = 150, k12 = 50, k13 = 20, k14 = 400, k15 = 2, k16 = 1, k17 = 400, k23 = false },
+
 	["Vortex Funnel"] = { k11 = 50, k12 = 300, k13 = 30, k14 = 400, k15 = 5, k16 = 0, k17 = 400, k23 = false },
 	["Quantum Atoms"] = { k11 = 60, k12 = 0, k13 = 15, k14 = 0, k15 = 3, k16 = 0, k17 = 150, k23 = false },
 	["Halo Ring"] = { k11 = 40, k12 = 0, k13 = 5, k14 = 80, k15 = 0, k16 = 0, k17 = 50, k23 = false },
@@ -147,15 +147,6 @@ local function px(md, t, c)
 			local pc = (i - 1) / (res - 1)
 			local ph = (t * s) - (pc * (l * x9.c2))
 			r[i] = Vector3.new(math.cos(ph) * R, math.sin(ph * (c.k15 or 5) * x9.c7) * h, math.sin(ph) * R)
-		end
-	elseif md == "Ascension Helix" then
-		local s, R, H, Strands = (c.k13 or 10) * x9.c2, (c.k11 or 150), (c.k14 or 400), (c.k15 or 2)
-		for i = 1, res do
-			local pc = (i - 1) / (res - 1)
-			local ph = (t * s)
-			local p = Vector3.new(R * math.cos(ph), (pc - 0.5) * H, R * math.sin(ph))
-
-			r[i] = { p = p, ph = ph, pc = pc }
 		end
 	elseif md == "Orbital Shell" then
 		local s = (c.k13 or 10) * x9.c2
@@ -340,61 +331,7 @@ function x5.st()
 	x5.g = sg
 	x5.mw(sg)
 end
-end
-function x5.cl()
-	if not x6.sg then return end
-	local f = Instance.new("Frame", x6.sg)
-	f.Size = UDim2.new(0, 400, 0, 300)
-	f.Position = UDim2.new(0.5, -200, 0.5, -150)
-	f.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-	f.BorderSizePixel = 0
-	Instance.new("UICorner", f).CornerRadius = UDim.new(0, 12)
-	local s = Instance.new("UIStroke", f)
-	s.Color = Color3.fromRGB(80, 80, 200)
-	s.Thickness = 2
-	local t = Instance.new("TextLabel", f)
-	t.Size = UDim2.new(1, 0, 0, 40)
-	t.BackgroundTransparency = 1
-	t.Text = "Gravity Script Updated"
-	t.Font = Enum.Font.GothamBold
-	t.TextColor3 = Color3.fromRGB(255, 255, 255)
-	t.TextSize = 24
-	local sc = Instance.new("ScrollingFrame", f)
-	sc.Position = UDim2.new(0, 10, 0, 50)
-	sc.Size = UDim2.new(1, -20, 1, -100)
-	sc.BackgroundTransparency = 1
-	sc.ScrollBarThickness = 4
-	local tl = Instance.new("TextLabel", sc)
-	tl.Size = UDim2.new(1, 0, 0, 0)
-	tl.AutomaticSize = Enum.AutomaticSize.Y
-	tl.BackgroundTransparency = 1
-	tl.TextXAlignment = Enum.TextXAlignment.Left
-	tl.TextYAlignment = Enum.TextYAlignment.Top
-	tl.TextColor3 = Color3.fromRGB(200, 200, 220)
-	tl.Font = Enum.Font.GothamMedium
-	tl.TextSize = 14
-	tl.Text = [[
-<b>V2 Optimizations:</b>
-- <b>Memory:</b> Zero allocation per frame (buffer reuse).
-- <b>CPU:</b> Reduced C++ bridge calls by 50%.
-- <b>Shapes:</b> "Orbital Shell" now optimized.
-- <b>Fixes:</b> Fixed Helix logic & Removed Galactic Spiral.
 
-Enjoy smoother physics!]]
-	tl.RichText = true
-	local b = Instance.new("TextButton", f)
-	b.Size = UDim2.new(0, 120, 0, 35)
-	b.Position = UDim2.new(0.5, -60, 1, -45)
-	b.BackgroundColor3 = Color3.fromRGB(60, 60, 200)
-	b.Text = "Got it!"
-	b.TextColor3 = Color3.fromRGB(255, 255, 255)
-	b.Font = Enum.Font.GothamBold
-	b.TextSize = 16
-	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
-	b.MouseButton1Click:Connect(function()
-		f:Destroy()
-	end)
-end
 function x5.mw(sg)
 	local m = Instance.new("Frame", sg)
 	m.Name = "M"
@@ -771,25 +708,6 @@ function x5.mw(sg)
 			x5.s(sc, "Move Area", 50, 1500, s.k17, function(v)
 				s.k17 = v
 			end)
-		elseif x1.k6 == "Ascension Helix" then
-			x5.s(sc, "Spin Speed", 1, 300, s.k13 * 10, function(v)
-				s.k13 = v / 10
-			end)
-			x5.s(sc, "Base Radius", 20, 500, s.k11, function(v)
-				s.k11 = v
-			end)
-			x5.s(sc, "Helix Height", 50, 1000, s.k14, function(v)
-				s.k14 = v
-			end)
-			x5.s(sc, "Strand Count", 1, 6, s.k15, function(v)
-				s.k15 = v
-			end)
-			x5.s(sc, "Twist Rate", 1, 50, s.k16 * 10, function(v)
-				s.k16 = v / 10
-			end)
-			x5.s(sc, "Move Area", 50, 1500, s.k17, function(v)
-				s.k17 = v
-			end)
 		elseif x1.k6 == "Vortex Funnel" then
 			x5.s(sc, "Swirl Speed", 1, 300, s.k13 * 10, function(v)
 				s.k13 = v / 10
@@ -912,7 +830,6 @@ function x5.mw(sg)
 		"Cosmic Comet",
 		"Point Impact",
 		"Orbital Shell",
-		"Ascension Helix",
 		"Vortex Funnel",
 		"Quantum Atoms",
 		"Halo Ring",
@@ -1143,38 +1060,6 @@ local function f2(p, cen, d, md, t)
 			rv = Vector3.new(rv.X, math.abs(rv.Y), rv.Z)
 		end
 		return ((cen + (rv * R)) - wp) * (x1.k10 * x9.c1)
-	elseif md == "Ascension Helix" then
-		local s, R, H, Strands = (c.k13 or 10) * x9.c2, (c.k11 or 150), (c.k14 or 400), (c.k15 or 2)
-		if not d.v4 then
-			d.v4 = math.random()
-		end
-		if not d.v5 then
-			d.v5 = math.random(1, Strands)
-		end
-	elseif md == "Ascension Helix" then
-		local s, R, H, Strands = (c.k13 or 10) * x9.c2, (c.k11 or 150), (c.k14 or 400), (c.k15 or 2)
-		if not d.v4 then
-			d.v4 = math.random()
-		end
-		if not d.v5 then
-			d.v5 = math.random(1, Strands)
-		end
-		if not d.ca then
-			local ang = (math.pi * 2 / Strands) * (d.v5 - 1)
-			d.ca, d.sa = math.cos(ang), math.sin(ang)
-		end
-		local p_data = x6.pre and x6.pre[md]
-		local fin
-		if p_data and #p_data > 0 then
-			local idx = math.floor(d.v4 * (#p_data - 1)) + 1
-			local node = p_data[idx]
-			local p = node.p
-			fin = Vector3.new(p.X * d.ca - p.Z * d.sa, p.Y, p.X * d.sa + p.Z * d.ca)
-		else
-			local phase = (t * s) + (d.v4 * (c.k16 or 1) * math.pi * 2) + ((math.pi * 2 / Strands) * (d.v5 - 1))
-			fin = Vector3.new(R * math.cos(phase), d.v4 * H - (H / 2), R * math.sin(phase))
-		end
-		return ((cen + fin) - wp) * (x1.k10 * x9.c1)
 	elseif md == "Vortex Funnel" then
 		local s, R_base, R_top, H = (c.k13 or 10) * x9.c2, (c.k11 or 50), (c.k12 or 300), (c.k14 or 400)
 		if not d.v4 then
@@ -1287,6 +1172,7 @@ local function f3()
 			end
 		end
 		px(x1.k6, ft, x3())
+		for p, d in pairs(x6.a) do
 			if not p.Parent then
 				x4.f2(p)
 				continue
