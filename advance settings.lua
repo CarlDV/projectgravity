@@ -1,12 +1,12 @@
 --!native
 local v1, v2, v3, v4, v5, v6, v7 =
-	game:GetService("UserInputService"),
-	game:GetService("Players"),
-	game:GetService("RunService"),
-	game:GetService("Workspace"),
-	game:GetService("StarterGui"),
-	game:GetService("TweenService"),
-	game:GetService("ContextActionService")
+	game:GetService("UserInputService"), --v1
+	game:GetService("Players"), --v2
+	game:GetService("RunService"), --v3
+	game:GetService("Workspace"), --v4
+	game:GetService("StarterGui"), --v5
+	game:GetService("TweenService"), --v6
+	game:GetService("ContextActionService") --v7
 local v8, v9 = v2.LocalPlayer, v2.LocalPlayer:GetMouse()
 if v1.TouchEnabled and not v1.KeyboardEnabled then
 	v8:Kick("PC ONLY. GET OFF MOBILE.")
@@ -16,7 +16,7 @@ end
 local x9 = { c1 = 0.15, c2 = 0.05, c3 = 0.01, c4 = 0.2, c5 = 0.6, c6 = 0.8, c7 = 0.1, c8 = 0.25 }
 local ANTI_SLEEP = Vector3.new(0, 0.01, 0)
 local x1 = {
-	k1 = 2000,
+	k1 = 2000, --sim rad !!!important 🤬
 	k2 = Vector3.new(5, 5, 5),
 	k3 = Color3.fromRGB(255, 105, 180),
 	k4 = math.huge,
@@ -487,7 +487,7 @@ function x5.mw(sg)
 		x5.t(gsc, "Anchor to Self", x1.AnchorSelf, function(v)
 			x1.AnchorSelf = v
 		end)
-		x5.t(gsc, "Disable Gravity", x1.Disabled, function(v)
+		x5.t(gsc, "Disable Script", x1.Disabled, function(v)
 			x1.Disabled = v
 			if x6.b then
 				x6.b.Transparency = v and 1 or x9.c7
@@ -504,9 +504,7 @@ function x5.mw(sg)
 				end
 			end
 		end)
-		x5.t(gsc, "Enable Anchor", x1.TgtActive, function(v)
-			x1.TgtActive = v
-		end)
+
 		x5.t(gsc, "Impact All", x1.PI_All, function(v)
 			x1.PI_All = v
 		end)
@@ -556,40 +554,158 @@ function x5.mw(sg)
 		tdb.TextSize = 14
 		tdb.AutoButtonColor = false
 		Instance.new("UICorner", tdb).CornerRadius = UDim.new(0, 6)
-		local tdlst = Instance.new("ScrollingFrame", m)
+		local tdlst = Instance.new("Frame", m)
 		tdlst.Visible = false
 		tdlst.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 		tdlst.Position = UDim2.new(1, 10, 0, 0)
-		tdlst.Size = UDim2.new(0, 160, 1, 0)
+		tdlst.Size = UDim2.new(0, 200, 1, 0)
 		tdlst.BorderSizePixel = 0
 		tdlst.ZIndex = 25
-		tdlst.AutomaticCanvasSize = Enum.AutomaticSize.Y
-		tdlst.CanvasSize = UDim2.new(0, 0, 0, 0)
-		tdlst.ScrollBarThickness = 2
 		Instance.new("UICorner", tdlst).CornerRadius = UDim.new(0, 8)
-		local tdll = Instance.new("UIListLayout", tdlst)
-		tdll.Padding = UDim.new(0, 2)
+
+		local search_bar = Instance.new("TextBox", tdlst)
+		search_bar.BackgroundTransparency = 1
+		search_bar.Position = UDim2.new(0, 10, 0, 5)
+		search_bar.Size = UDim2.new(1, -20, 0, 30)
+		search_bar.Font = Enum.Font.Gotham
+		search_bar.PlaceholderText = "Search..."
+		search_bar.Text = ""
+		search_bar.TextColor3 = Color3.fromRGB(255, 255, 255)
+		search_bar.TextSize = 14
+		search_bar.TextXAlignment = Enum.TextXAlignment.Left
+		search_bar.ZIndex = 26
+		local sb_line = Instance.new("Frame", search_bar)
+		sb_line.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
+		sb_line.BorderSizePixel = 0
+		sb_line.Position = UDim2.new(0, 0, 1, 0)
+		sb_line.Size = UDim2.new(1, 0, 0, 1)
+
+		local scroll_frame = Instance.new("ScrollingFrame", tdlst)
+		scroll_frame.BackgroundTransparency = 1
+		scroll_frame.Position = UDim2.new(0, 0, 0, 40)
+		scroll_frame.Size = UDim2.new(1, 0, 1, -45)
+		scroll_frame.CanvasSize = UDim2.new(0, 0, 0, 0)
+		scroll_frame.ScrollBarThickness = 2
+		scroll_frame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		scroll_frame.ZIndex = 26
+
+		local tdll = Instance.new("UIListLayout", scroll_frame)
+		tdll.Padding = UDim.new(0, 4)
 		tdll.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+		local active_highlight = nil
+		local function clear_highlight()
+			if active_highlight then
+				active_highlight:Destroy()
+				active_highlight = nil
+			end
+		end
+
+		local function update_list(filter_text)
+			clear_highlight() -- Clean up any existing highlight when refreshing
+			scroll_frame:ClearAllChildren()
+			local tdll = Instance.new("UIListLayout", scroll_frame)
+			tdll.Padding = UDim.new(0, 4)
+			tdll.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+			for _, pl in ipairs(v2:GetPlayers()) do
+				local show = true
+				if filter_text and filter_text ~= "" then
+					filter_text = filter_text:lower()
+					local dn = (pl.DisplayName or ""):lower()
+					local nm = (pl.Name or ""):lower()
+					if not (dn:find(filter_text) or nm:find(filter_text)) then
+						show = false
+					end
+				end
+
+				if show then
+					local ib = Instance.new("TextButton", scroll_frame)
+					ib.Size = UDim2.new(1, -10, 0, 50)
+					ib.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+					ib.Text = ""
+					ib.AutoButtonColor = false
+					Instance.new("UICorner", ib).CornerRadius = UDim.new(0, 6)
+					ib.ZIndex = 27
+
+					local icon = Instance.new("ImageLabel", ib)
+					icon.BackgroundTransparency = 1
+					icon.Position = UDim2.new(0, 5, 0.5, -20)
+					icon.Size = UDim2.new(0, 40, 0, 40)
+					icon.ZIndex = 28
+					Instance.new("UICorner", icon).CornerRadius = UDim.new(1, 0)
+
+					task.spawn(function()
+						local content, isReady = v2:GetUserThumbnailAsync(
+							pl.UserId,
+							Enum.ThumbnailType.HeadShot,
+							Enum.ThumbnailSize.Size48x48
+						)
+						if isReady then
+							icon.Image = content
+						end
+					end)
+
+					local dname = Instance.new("TextLabel", ib)
+					dname.BackgroundTransparency = 1
+					dname.Position = UDim2.new(0, 55, 0, 8)
+					dname.Size = UDim2.new(1, -60, 0, 16)
+					dname.Font = Enum.Font.GothamBold
+					dname.Text = pl.DisplayName
+					dname.TextColor3 = Color3.fromRGB(255, 255, 255)
+					dname.TextSize = 14
+					dname.TextXAlignment = Enum.TextXAlignment.Left
+					dname.ZIndex = 28
+
+					local uname = Instance.new("TextLabel", ib)
+					uname.BackgroundTransparency = 1
+					uname.Position = UDim2.new(0, 55, 0, 26)
+					uname.Size = UDim2.new(1, -60, 0, 14)
+					uname.Font = Enum.Font.Gotham
+					uname.Text = "@" .. pl.Name
+					uname.TextColor3 = Color3.fromRGB(180, 180, 180)
+					uname.TextSize = 12
+					uname.TextXAlignment = Enum.TextXAlignment.Left
+					uname.ZIndex = 28
+
+					ib.MouseEnter:Connect(function()
+						clear_highlight()
+						if pl.Character then
+							local h = Instance.new("Highlight")
+							h.Adornee = pl.Character
+							h.FillColor = Color3.fromRGB(255, 0, 0)
+							h.FillTransparency = 0.5
+							h.OutlineColor = Color3.fromRGB(255, 255, 255)
+							h.OutlineTransparency = 0
+							h.Parent = pl.Character
+							active_highlight = h
+						end
+					end)
+
+					ib.MouseLeave:Connect(function()
+						clear_highlight()
+					end)
+
+					ib.MouseButton1Click:Connect(function()
+						x1.Tgt = pl
+						x1.TgtActive = true -- Auto-enable anchor
+						tdb.Text = "Target: " .. (pl.DisplayName or pl.Name)
+						tdlst.Visible = false
+						clear_highlight()
+					end)
+				end
+			end
+		end
+
+		search_bar:GetPropertyChangedSignal("Text"):Connect(function()
+			update_list(search_bar.Text)
+		end)
+
 		tdb.MouseButton1Click:Connect(function()
 			tdlst.Visible = not tdlst.Visible
-			tdlst:ClearAllChildren()
-			local tdll = Instance.new("UIListLayout", tdlst)
-			tdll.Padding = UDim.new(0, 2)
-			tdll.HorizontalAlignment = Enum.HorizontalAlignment.Center
-			for _, pl in ipairs(v2:GetPlayers()) do
-				local ib = Instance.new("TextButton", tdlst)
-				ib.Size = UDim2.new(1, -10, 0, 30)
-				ib.BackgroundTransparency = 1
-				ib.Text = pl.DisplayName or pl.Name
-				ib.TextColor3 = Color3.fromRGB(200, 200, 200)
-				ib.Font = Enum.Font.GothamMedium
-				ib.TextSize = 14
-				ib.ZIndex = 26
-				ib.MouseButton1Click:Connect(function()
-					x1.Tgt = pl
-					tdb.Text = "Target: " .. (pl.DisplayName or pl.Name)
-					tdlst.Visible = false
-				end)
+			if tdlst.Visible then
+				search_bar.Text = ""
+				update_list("")
 			end
 		end)
 		local ctb = Instance.new("TextButton", gsc)
@@ -603,6 +719,7 @@ function x5.mw(sg)
 		Instance.new("UICorner", ctb).CornerRadius = UDim.new(0, 6)
 		ctb.MouseButton1Click:Connect(function()
 			x1.Tgt = nil
+			x1.TgtActive = false -- Auto-disable anchor
 			tdb.Text = "Select Target >"
 		end)
 		x5.h(sc, "- SHAPE SETTINGS -")
