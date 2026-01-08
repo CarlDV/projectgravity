@@ -40,6 +40,7 @@ local x1 = {
 	TgtActive = false,
 	PI_All = false,
 	AnchorSelf = false,
+	AntiFling = false,
 	Paused = false,
 	Damping = 0.5,
 	Ki = 0.1,
@@ -286,6 +287,7 @@ function x5.t(p, t, df, cb)
 		b.BackgroundColor3 = df and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(60, 60, 60)
 		cb(df)
 	end)
+	return b
 end
 function x5.b(p, t, cb)
 	local f = Instance.new("Frame", p)
@@ -336,6 +338,47 @@ function x5.st()
 end
 
 function x5.mw(sg)
+	-- Status HUD
+	local hud = Instance.new("TextLabel", sg)
+	hud.Name = "StatusHUD"
+	hud.BackgroundTransparency = 1
+	hud.AnchorPoint = Vector2.new(1, 0)
+	hud.Size = UDim2.new(0, 500, 0, 30)
+	hud.Position = UDim2.new(1, -50, 0, 10)
+	hud.Font = Enum.Font.GothamBold
+	hud.TextSize = 18
+	hud.TextColor3 = Color3.fromRGB(255, 255, 255)
+	hud.TextStrokeTransparency = 0.5
+	hud.TextXAlignment = Enum.TextXAlignment.Right
+	hud.TextYAlignment = Enum.TextYAlignment.Top
+	hud.ZIndex = 100
+
+	table.insert(
+		x6.c,
+		v3.RenderStepped:Connect(function()
+			local tgt_txt = "None"
+			if x1.Tgt then
+				tgt_txt = x1.Tgt.Name
+			end
+
+			local status_txt = ""
+			local status_col = Color3.fromRGB(100, 255, 100) -- Green for Active
+
+			if x1.Disabled then
+				status_txt = "Script Disabled"
+				status_col = Color3.fromRGB(255, 60, 60)
+			elseif x1.Paused then
+				status_txt = "Script Paused"
+				status_col = Color3.fromRGB(255, 150, 60)
+			else
+				status_txt = "Script Active"
+			end
+
+			hud.Text = string.format("CURRENT TARGET: %s || %s", tgt_txt, status_txt)
+			hud.TextColor3 = status_col
+		end)
+	)
+
 	local m = Instance.new("Frame", sg)
 	m.Name = "M"
 	m.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
@@ -487,7 +530,12 @@ function x5.mw(sg)
 		x5.t(gsc, "Anchor to Self", x1.AnchorSelf, function(v)
 			x1.AnchorSelf = v
 		end)
-		x5.t(gsc, "Disable Script", x1.Disabled, function(v)
+
+		x5.t(gsc, "Anti-Fling", x1.AntiFling, function(v)
+			x1.AntiFling = v
+		end)
+
+		x6.disable_btn = x5.t(gsc, "Disable Script", x1.Disabled, function(v)
 			x1.Disabled = v
 			if x6.b then
 				x6.b.Transparency = v and 1 or x9.c7
@@ -1505,6 +1553,22 @@ function x4.f3()
 			end
 		end)
 	)
+	table.insert(
+		x6.c,
+		v3.Stepped:Connect(function()
+			if x1.AntiFling then
+				for _, p in ipairs(v2:GetPlayers()) do
+					if p ~= v8 and p.Character then
+						for _, part in ipairs(p.Character:GetChildren()) do
+							if part:IsA("BasePart") and part.CanCollide then
+								part.CanCollide = false
+							end
+						end
+					end
+				end
+			end
+		end)
+	)
 end
 function x4.f4(pos)
 	if x6.b then
@@ -1617,6 +1681,39 @@ function x8.i()
 			x7.n("Sys", x1.Paused and "Paused" or "Resumed", 2)
 		end
 	end, false, Enum.KeyCode.P)
+	v7:BindAction("Disable", function(_, s)
+		if s == Enum.UserInputState.Begin then
+			x1.Disabled = not x1.Disabled
+			local state = x1.Disabled and "Disabled" or "Enabled"
+			x7.n("Sys", "Script " .. state, 2)
+			-- Update UI toggle
+			if x6.disable_btn then
+				x6.disable_btn.BackgroundColor3 = x1.Disabled and Color3.fromRGB(100, 255, 100)
+					or Color3.fromRGB(60, 60, 60)
+				-- Trigger callback logic if needed, but x1.Disabled is already set.
+				-- Wait, x5.t logic runs on click. Here we manually set x1.Disabled.
+				-- We should maintain the side-effects of disabling script which are inside the x5.t callback.
+				-- Refactoring: The callback creates side effects.
+				-- It's better to just invoke the button click logic or replicate it.
+				-- Replicating side effects here:
+				local v = x1.Disabled
+				if x6.b then
+					x6.b.Transparency = v and 1 or x9.c7
+					if x6.b:FindFirstChild("Visual") then
+						x6.b.Visual.Enabled = not v
+					end
+				end
+				for _, d in pairs(x6.a) do
+					if d.lv then
+						d.lv.MaxForce = v and 0 or x1.k4
+					end
+					if d.av then
+						d.av.MaxTorque = v and 0 or math.huge
+					end
+				end
+			end
+		end
+	end, false, Enum.KeyCode.L)
 	table.insert(
 		x6.c,
 		v1.InputBegan:Connect(function(i, p)
