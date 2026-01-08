@@ -107,11 +107,15 @@ local x6 = {
 	ex_timer = 0,
 	esp_timer = 0,
 	claim_queue = {},
+	active_array = {},
 	pre = {},
 	pre_buffer = table.create(200),
 }
 local function px(md, t, c)
-	local r = x6.pre_buffer
+	if not x6.pre[md] then
+		x6.pre[md] = table.create(200)
+	end
+	local r = x6.pre[md]
 	table.clear(r)
 	local res = 200
 	if md == "Celestial Ribbon" then
@@ -153,7 +157,6 @@ local function px(md, t, c)
 		local ph = t * s
 		r[1] = { ca = math.cos(ph), sa = math.sin(ph) }
 	end
-	x6.pre[md] = table.clone(r)
 end
 local x7 = {}
 function x7.n(t, x, d)
@@ -1173,7 +1176,12 @@ local function f3()
 		end
 		px(x1.k6, ft, x3())
 		local no_damp = { ["Slingshot"] = true, ["Point Impact"] = true, ["Deflect"] = true }
-		for p, d in pairs(x6.a) do
+		for _, p in ipairs(x6.active_array) do
+			local d = x6.a[p]
+			if not d then
+				continue
+			end
+
 			if not p.Parent then
 				x4.f2(p)
 				continue
@@ -1246,13 +1254,15 @@ local function f3()
 	end)
 end
 function x4.ProcessQueue()
-	local processed = 0
-	while #x6.claim_queue > 0 and processed < 10 do
+	local start = os.clock()
+	while #x6.claim_queue > 0 do
+		if os.clock() - start > 0.0015 then
+			break
+		end
 		local p = table.remove(x6.claim_queue, 1)
 		if p and p:IsA("BasePart") and p:IsDescendantOf(v4) then
 			x4.f1(p)
 		end
-		processed = processed + 1
 	end
 end
 local function f4()
@@ -1321,6 +1331,7 @@ function x4.f1(p)
 	av.AngularVelocity = Vector3.zero
 	av.Attachment0 = a
 	x6.a[p] = { at = a, lv = lv, av = av, integral = Vector3.zero }
+	table.insert(x6.active_array, p)
 	x6.n = x6.n + 1
 end
 function x4.f2(p)
@@ -1336,6 +1347,14 @@ function x4.f2(p)
 			d.av:Destroy()
 		end
 		x6.a[p] = nil
+		local idx = table.find(x6.active_array, p)
+		if idx then
+			local last = #x6.active_array
+			if idx ~= last then
+				x6.active_array[idx] = x6.active_array[last]
+			end
+			table.remove(x6.active_array, last)
+		end
 		x6.n = math.max(0, x6.n - 1)
 	end
 end
@@ -1343,26 +1362,30 @@ function x4.f3()
 	pcall(function()
 		settings().Physics.AllowSleep = false
 	end)
+	local last_upd = 0
 	table.insert(
 		x6.c,
 		v3.Heartbeat:Connect(function(dt)
-			for _, p in ipairs(v2:GetPlayers()) do
-				if p ~= v8 then
-					pcall(function()
-						p.MaximumSimulationRadius = 0
-						sethiddenproperty(p, "SimulationRadius", 0)
-					end)
+			if time() - last_upd > 0.5 then
+				last_upd = time()
+				for _, p in ipairs(v2:GetPlayers()) do
+					if p ~= v8 then
+						pcall(function()
+							p.MaximumSimulationRadius = 0
+							sethiddenproperty(p, "SimulationRadius", 0)
+						end)
+					end
 				end
+				pcall(function()
+					v8.MaximumSimulationRadius = x1.k1
+					setsimulationradius(x1.k1)
+					if x6.b then
+						v8.ReplicationFocus = x6.b
+					else
+						v8.ReplicationFocus = nil
+					end
+				end)
 			end
-			pcall(function()
-				v8.MaximumSimulationRadius = x1.k1
-				setsimulationradius(x1.k1)
-				if x6.b then
-					v8.ReplicationFocus = x6.b
-				else
-					v8.ReplicationFocus = nil
-				end
-			end)
 		end)
 	)
 end
