@@ -1,3 +1,4 @@
+--!native
 local function safe_service(name)
 	local service = game:GetService(name)
 	if cloneref then
