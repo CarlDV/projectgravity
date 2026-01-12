@@ -1,12 +1,27 @@
---!native
+local function safe_service(name)
+	local service = game:GetService(name)
+	if cloneref then
+		return cloneref(service)
+	end
+	return service
+end
+
 local v1, v2, v3, v4, v5, v6, v7 =
-	game:GetService("UserInputService"), --v1
-	game:GetService("Players"), --v2
-	game:GetService("RunService"), --v3
-	game:GetService("Workspace"), --v4
-	game:GetService("StarterGui"), --v5
-	game:GetService("TweenService"), --v6
-	game:GetService("ContextActionService") --v7
+	safe_service("UserInputService"), --v1
+	safe_service("Players"), --v2
+	safe_service("RunService"), --v3
+	safe_service("Workspace"), --v4
+	safe_service("StarterGui"), --v5
+	safe_service("TweenService"), --v6
+	safe_service("ContextActionService") --v7
+local HttpService = safe_service("HttpService")
+
+if setthreadidentity then
+	pcall(function()
+		setthreadidentity(8)
+	end)
+end
+
 local v8, v9 = v2.LocalPlayer, v2.LocalPlayer:GetMouse()
 if v1.TouchEnabled and not v1.KeyboardEnabled then
 	v8:Kick("PC ONLY. GET OFF MOBILE.")
@@ -399,10 +414,14 @@ function x5.mw(sg)
 	t.BackgroundTransparency = 1
 	t.Position = UDim2.new(0, 15, 0, 0)
 	t.Size = UDim2.new(0.7, 0, 1, 0)
-	t.Text = "GSettings"
+	local exec_name = "Unknown"
+	if identifyexecutor then
+		exec_name = identifyexecutor()
+	end
+	t.Text = "GSettings [" .. exec_name .. "]"
 	t.TextColor3 = Color3.fromRGB(240, 240, 255)
 	t.Font = Enum.Font.GothamBold
-	t.TextSize = 22
+	t.TextSize = 18
 	t.TextXAlignment = 0
 	local c = Instance.new("ScrollingFrame", m)
 	c.BackgroundTransparency = 1
@@ -593,6 +612,30 @@ function x5.mw(sg)
 		if x1.Tgt then
 			tn = "Target: " .. (x1.Tgt.DisplayName or x1.Tgt.Name)
 		end
+		x5.t(gsc, "Performance Mode", false, function(v)
+			if v then
+				pcall(function()
+					local Lighting = game:GetService("Lighting")
+					Lighting.GlobalShadows = false
+					Lighting.FogEnd = 9e9
+					Lighting.Brightness = 0
+					if sethiddenproperty then
+						sethiddenproperty(Lighting, "Technology", Enum.Technology.Compatibility)
+					end
+					for _, d in ipairs(game:GetDescendants()) do
+						if d:IsA("BasePart") then
+							d.Material = Enum.Material.SmoothPlastic
+							d.Reflectance = 0
+						elseif d:IsA("Decal") or d:IsA("Texture") then
+							d.Transparency = 1
+						elseif d:IsA("ParticleEmitter") or d:IsA("Trail") then
+							d.Lifetime = NumberRange.new(0)
+						end
+					end
+				end)
+			end
+		end)
+
 		local tdb = Instance.new("TextButton", gsc)
 		tdb.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 		tdb.Size = UDim2.new(1, 0, 0, 36)
@@ -1030,6 +1073,209 @@ function x5.mw(sg)
 		x1.k10 = v
 	end)
 	f1()
+
+	-- Config System UI
+	local cfg_btn = Instance.new("TextButton", h)
+	cfg_btn.BackgroundColor3 = Color3.fromRGB(45, 100, 45)
+	cfg_btn.Position = UDim2.new(1, -90, 0, 10)
+	cfg_btn.Size = UDim2.new(0, 20, 0, 20)
+	cfg_btn.Text = "S"
+	cfg_btn.TextColor3 = Color3.fromRGB(220, 220, 220)
+	cfg_btn.Font = Enum.Font.GothamBold
+	cfg_btn.TextSize = 12
+	cfg_btn.AutoButtonColor = false
+	Instance.new("UICorner", cfg_btn).CornerRadius = UDim.new(0, 4)
+
+	local cm = Instance.new("Frame", m)
+	cm.Name = "CM"
+	cm.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+	cm.BackgroundTransparency = 0.1
+	cm.Position = UDim2.new(0, 330, 0.5, -240)
+	cm.Size = UDim2.new(0, 200, 0, 250)
+	cm.Visible = false
+	cm.Active = true
+	cm.Draggable = true
+	Instance.new("UICorner", cm).CornerRadius = UDim.new(0, 12)
+	local cms = Instance.new("UIStroke", cm)
+	cms.Color = Color3.fromRGB(80, 200, 80)
+	cms.Thickness = 1
+	cms.Transparency = 0.5
+
+	local ch = Instance.new("Frame", cm)
+	ch.BackgroundTransparency = 1
+	ch.Size = UDim2.new(1, 0, 0, 30)
+	x5.h(ch, "Configs")
+
+	local cname = Instance.new("TextBox", cm)
+	cname.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+	cname.Position = UDim2.new(0, 10, 0, 35)
+	cname.Size = UDim2.new(1, -20, 0, 30)
+	cname.Font = Enum.Font.Gotham
+	cname.PlaceholderText = "Config Name..."
+	cname.Text = ""
+	cname.TextColor3 = Color3.fromRGB(255, 255, 255)
+	cname.TextSize = 14
+	Instance.new("UICorner", cname).CornerRadius = UDim.new(0, 6)
+
+	local sf = Instance.new("ScrollingFrame", cm)
+	sf.BackgroundTransparency = 1
+	sf.Position = UDim2.new(0, 10, 0, 110)
+	sf.Size = UDim2.new(1, -20, 1, -120)
+	sf.CanvasSize = UDim2.new(0, 0, 0, 0)
+	sf.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	sf.ScrollBarThickness = 2
+	Instance.new("UIListLayout", sf).Padding = UDim.new(0, 4)
+
+	local function refresh_cfgs()
+		sf:ClearAllChildren()
+		if listfiles and isfolder and isfolder("GravityConfigs") then
+			for _, file in ipairs(listfiles("GravityConfigs")) do
+				if file:sub(-5) == ".json" then
+					local b = Instance.new("TextButton", sf)
+					b.Size = UDim2.new(1, 0, 0, 25)
+					b.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+					b.Text = file:match("([^\\/]+)%.json$")
+					b.TextColor3 = Color3.fromRGB(200, 200, 200)
+					b.Font = Enum.Font.Gotham
+					b.TextSize = 12
+					Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
+					b.MouseButton1Click:Connect(function()
+						cname.Text = b.Text
+					end)
+				end
+			end
+		end
+	end
+
+	local function sanitize(t)
+		local res = {}
+		for k, v in pairs(t) do
+			if typeof(v) == "Vector3" then
+				res[k] = { __type = "Vector3", x = v.X, y = v.Y, z = v.Z }
+			elseif typeof(v) == "Color3" then
+				res[k] = { __type = "Color3", r = v.R, g = v.G, b = v.B }
+			elseif typeof(v) == "table" then
+				res[k] = sanitize(v)
+			elseif typeof(v) == "Instance" or typeof(v) == "function" or typeof(v) == "userdata" then
+				-- skip
+			else
+				res[k] = v
+			end
+		end
+		return res
+	end
+
+	local function desanitize(t)
+		local res = {}
+		for k, v in pairs(t) do
+			if type(v) == "table" then
+				if v.__type == "Vector3" then
+					res[k] = Vector3.new(v.x, v.y, v.z)
+				elseif v.__type == "Color3" then
+					res[k] = Color3.new(v.r, v.g, v.b)
+				else
+					res[k] = desanitize(v)
+				end
+			else
+				res[k] = v
+			end
+		end
+		return res
+	end
+
+	local s_btn = Instance.new("TextButton", cm)
+	s_btn.BackgroundColor3 = Color3.fromRGB(40, 100, 40)
+	s_btn.Position = UDim2.new(0, 10, 0, 70)
+	s_btn.Size = UDim2.new(0.5, -15, 0, 30)
+	s_btn.Text = "SAVE"
+	s_btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	s_btn.Font = Enum.Font.GothamBold
+	s_btn.TextSize = 12
+	Instance.new("UICorner", s_btn).CornerRadius = UDim.new(0, 6)
+
+	s_btn.MouseButton1Click:Connect(function()
+		if not writefile then
+			return
+		end
+		if cname.Text == "" then
+			return
+		end
+		if not isfolder("GravityConfigs") then
+			makefolder("GravityConfigs")
+		end
+
+		-- Prepare Data
+		local data = {
+			x1 = sanitize(x1),
+			x2 = sanitize(x2),
+		}
+		-- Clean non-settings from x1
+		data.x1.Tgt = nil
+		data.x1.IsLaunching = nil
+		data.x1.IsLaunching = nil
+
+		local success, json = pcall(function()
+			return HttpService:JSONEncode(data)
+		end)
+		if success then
+			writefile("GravityConfigs/" .. cname.Text .. ".json", json)
+			refresh_cfgs()
+		end
+	end)
+
+	local l_btn = Instance.new("TextButton", cm)
+	l_btn.BackgroundColor3 = Color3.fromRGB(40, 40, 100)
+	l_btn.Position = UDim2.new(0.5, 5, 0, 70)
+	l_btn.Size = UDim2.new(0.5, -15, 0, 30)
+	l_btn.Text = "LOAD"
+	l_btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	l_btn.Font = Enum.Font.GothamBold
+	l_btn.TextSize = 12
+	Instance.new("UICorner", l_btn).CornerRadius = UDim.new(0, 6)
+
+	l_btn.MouseButton1Click:Connect(function()
+		if not readfile or not isfolder("GravityConfigs") then
+			return
+		end
+		local path = "GravityConfigs/" .. cname.Text .. ".json"
+		if isfile and isfile(path) then
+			local json = readfile(path)
+			local success, data = pcall(function()
+				return HttpService:JSONDecode(json)
+			end)
+			if success and data then
+				local cx1 = desanitize(data.x1)
+				local cx2 = desanitize(data.x2)
+
+				-- Apply Safely
+				for k, v in pairs(cx1) do
+					if x1[k] ~= nil and typeof(x1[k]) == typeof(v) then
+						x1[k] = v
+					end
+				end
+				-- Specifically override x2
+				for k, v in pairs(cx2) do
+					x2[k] = v
+				end
+				-- Refresh Derived
+				x1.S = {}
+				for m, d in pairs(x2) do
+					x1.S[m] = table.clone(d)
+				end
+
+				-- UI Refresh
+				x5.st()
+			end
+		end
+	end)
+
+	cfg_btn.MouseButton1Click:Connect(function()
+		cm.Visible = not cm.Visible
+		if cm.Visible then
+			refresh_cfgs()
+		end
+	end)
+
 	local minb = Instance.new("TextButton", h)
 	minb.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
 	minb.Position = UDim2.new(1, -65, 0, 10)
@@ -1537,13 +1783,37 @@ function x4.f3()
 					if p ~= v8 then
 						pcall(function()
 							p.MaximumSimulationRadius = 0
-							sethiddenproperty(p, "SimulationRadius", 0)
+							if sethiddenproperty then
+								sethiddenproperty(p, "SimulationRadius", 0)
+							end
 						end)
 					end
 				end
 				pcall(function()
-					v8.MaximumSimulationRadius = x1.k1
-					setsimulationradius(x1.k1)
+					if sethiddenproperty then
+						sethiddenproperty(v8, "NetworkIsSleeping", false)
+					end
+				end)
+				pcall(function()
+					if setscriptable then
+						setscriptable(v8, "SimulationRadius", true)
+						setscriptable(v8, "MaximumSimulationRadius", true)
+					end
+				end)
+
+				pcall(function()
+					v8.MaximumSimulationRadius = 9e9
+				end)
+
+				pcall(function()
+					if sethiddenproperty then
+						sethiddenproperty(v8, "SimulationRadius", 9e9)
+					elseif setsimulationradius then
+						setsimulationradius(9e9)
+					end
+				end)
+
+				pcall(function()
 					if x6.b then
 						v8.ReplicationFocus = x6.b
 					else
