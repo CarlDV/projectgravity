@@ -100,6 +100,7 @@ local x2 = {
 	["Gods Call"] = { k11 = 10, k12 = 0, k13 = 0, k14 = 0, k15 = 0, k16 = 0, k17 = 50, k23 = false },
 	["Deflect"] = { k11 = 50, k12 = 500, k13 = 0, k14 = 0, k15 = 0, k16 = 0, k17 = 50, k23 = false },
 	["Shield Wall"] = { k11 = 20, k12 = 25, k13 = 20, k14 = 50, k15 = 10, k16 = 0, k17 = 50, k23 = false },
+	["Sculptor"] = { k11 = 0, k12 = 0, k13 = 0, k14 = 0, k15 = 0, k16 = 0, k17 = 0, k23 = false },
 }
 x1.S = {}
 for m, d in pairs(x2) do
@@ -127,6 +128,14 @@ local x6 = {
 	active_array = {},
 	pre = {},
 	pre_buffer = table.create(200),
+	-- Sculptor mode state
+	sculptor_selected = {},
+	sculptor_dragging = false,
+	sculptor_drag_start = nil,
+	sculptor_box_start = nil,
+	sculptor_box = nil,
+	sculptor_highlights = {},
+	sculptor_preset_ui = nil,
 }
 local function px(md, t, c)
 	if not x6.pre[md] then
@@ -1049,6 +1058,7 @@ function x5.mw(sg)
 		"Gods Call",
 		"Deflect",
 		"Shield Wall",
+		"Sculptor",
 	}) do
 		local ib = Instance.new("TextButton", dlst)
 		ib.Size = UDim2.new(1, -10, 0, 30)
@@ -1059,6 +1069,22 @@ function x5.mw(sg)
 		ib.TextSize = 14
 		ib.ZIndex = 21
 		ib.MouseButton1Click:Connect(function()
+			-- Clear sculptor state when switching modes
+			if x1.k6 == "Sculptor" then
+				for part, highlight in pairs(x6.sculptor_highlights) do
+					if highlight and highlight.Parent then
+						highlight:Destroy()
+					end
+				end
+				x6.sculptor_highlights = {}
+				x6.sculptor_selected = {}
+				x6.sculptor_dragging = false
+				x6.sculptor_drag_target = nil
+				if x6.sculptor_box then
+					x6.sculptor_box:Destroy()
+					x6.sculptor_box = nil
+				end
+			end
 			x1.k6 = mn
 			db.Text = mn
 			dlst.Visible = false
@@ -1550,6 +1576,32 @@ local function f2(p, cen, d, md, t)
 		local tz = math.sin(angle) * d_val
 		local ty = (d.v5 * h) + h_off
 		return ((cen + Vector3.new(tx, ty, tz)) - wp) * (x1.k10 * x9.c1)
+	elseif md == "Sculptor" then
+		-- Sculptor mode: selected parts follow mouse, unselected hold position
+		if x6.sculptor_selected[p] then
+			if x6.sculptor_dragging and x6.sculptor_drag_target then
+				-- Move toward mouse target position (smooth, distance-based speed)
+				local target = x6.sculptor_drag_target
+				local offset = x6.sculptor_selected[p] or Vector3.zero
+				local target_pos = target + offset
+				local delta = target_pos - wp
+				local dist = delta.Magnitude
+				-- Smooth movement: slower when close, faster when far
+				if dist < 0.5 then
+					return Vector3.new(0, 0.01, 0) -- Basically at target, hold
+				else
+					-- Cap speed to prevent jitter, scale with distance
+					local speed = math.clamp(dist * 3, 1, 100)
+					return delta.Unit * speed
+				end
+			else
+				-- Hold position (near-zero velocity to prevent physics sleep)
+				return Vector3.new(0, 0.01, 0)
+			end
+		else
+			-- Unselected parts: just hold position (don't float toward center)
+			return Vector3.new(0, 0.01, 0)
+		end
 	end
 	return ANTI_SLEEP
 end
@@ -2005,6 +2057,202 @@ function x8.i()
 			end
 		end)
 	)
+
+	-- Sculptor Mode Helper Functions
+	local function sculptor_clear_highlights()
+		for part, highlight in pairs(x6.sculptor_highlights) do
+			if highlight and highlight.Parent then
+				highlight:Destroy()
+			end
+		end
+		x6.sculptor_highlights = {}
+	end
+
+	local function sculptor_add_highlight(part)
+		if x6.sculptor_highlights[part] then
+			return
+		end
+		local highlight = Instance.new("SelectionBox")
+		highlight.Adornee = part
+		highlight.Color3 = Color3.fromRGB(0, 255, 200)
+		highlight.LineThickness = 0.05
+		highlight.SurfaceTransparency = 0.8
+		highlight.SurfaceColor3 = Color3.fromRGB(0, 255, 200)
+		highlight.Parent = part
+		x6.sculptor_highlights[part] = highlight
+	end
+
+	local function sculptor_remove_highlight(part)
+		if x6.sculptor_highlights[part] then
+			x6.sculptor_highlights[part]:Destroy()
+			x6.sculptor_highlights[part] = nil
+		end
+	end
+
+	local function sculptor_select(part, add_to_selection)
+		if not add_to_selection then
+			-- Clear previous selection
+			for p, _ in pairs(x6.sculptor_selected) do
+				sculptor_remove_highlight(p)
+			end
+			x6.sculptor_selected = {}
+		end
+		if part and x6.a[part] then
+			x6.sculptor_selected[part] = Vector3.zero
+			sculptor_add_highlight(part)
+		end
+	end
+
+	local function sculptor_deselect(part)
+		x6.sculptor_selected[part] = nil
+		sculptor_remove_highlight(part)
+	end
+
+	local function sculptor_get_mouse_world_pos(distance)
+		local cam = v4.CurrentCamera
+		if not cam then
+			return nil
+		end
+		local mp = v1:GetMouseLocation()
+		local ray = cam:ViewportPointToRay(mp.X, mp.Y)
+		return ray.Origin + (ray.Direction * distance)
+	end
+
+	-- Sculptor Mode Input Handlers
+	table.insert(
+		x6.c,
+		v1.InputBegan:Connect(function(input, processed)
+			if processed or x1.k6 ~= "Sculptor" then
+				return
+			end
+
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				local target = v9.Target
+				local shift_held = v1:IsKeyDown(Enum.KeyCode.LeftShift) or v1:IsKeyDown(Enum.KeyCode.RightShift)
+
+				if target and x6.a[target] then
+					-- Clicked on a controlled part
+					if x6.sculptor_selected[target] then
+						if shift_held then
+							-- Shift+click on selected = deselect
+							sculptor_deselect(target)
+						else
+							-- Start dragging all selected
+							x6.sculptor_dragging = true
+							x6.sculptor_drag_start = target.Position
+							x6.sculptor_drag_distance = (v4.CurrentCamera.CFrame.Position - target.Position).Magnitude
+							x6.sculptor_drag_target = target.Position
+							-- Store relative offsets for all selected parts
+							for part, _ in pairs(x6.sculptor_selected) do
+								x6.sculptor_selected[part] = part.Position - target.Position
+							end
+						end
+					else
+						-- Click on unselected part = select it
+						sculptor_select(target, shift_held)
+						if not shift_held then
+							-- Start dragging this part
+							x6.sculptor_dragging = true
+							x6.sculptor_drag_start = target.Position
+							x6.sculptor_drag_distance = (v4.CurrentCamera.CFrame.Position - target.Position).Magnitude
+							x6.sculptor_drag_target = target.Position
+							x6.sculptor_selected[target] = Vector3.zero
+						end
+					end
+				else
+					-- Clicked on empty space - start box selection
+					if not shift_held then
+						for p, _ in pairs(x6.sculptor_selected) do
+							sculptor_remove_highlight(p)
+						end
+						x6.sculptor_selected = {}
+					end
+					x6.sculptor_box_start = v1:GetMouseLocation()
+					if not x6.sculptor_box and x6.sg then
+						x6.sculptor_box = Instance.new("Frame", x6.sg)
+						x6.sculptor_box.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
+						x6.sculptor_box.BackgroundTransparency = 0.7
+						x6.sculptor_box.BorderSizePixel = 2
+						x6.sculptor_box.BorderColor3 = Color3.fromRGB(0, 255, 200)
+						x6.sculptor_box.ZIndex = 50
+					end
+				end
+			end
+		end)
+	)
+
+	table.insert(
+		x6.c,
+		v1.InputChanged:Connect(function(input, processed)
+			if x1.k6 ~= "Sculptor" then
+				return
+			end
+
+			if input.UserInputType == Enum.UserInputType.MouseMovement then
+				if x6.sculptor_dragging then
+					-- Update drag target position
+					x6.sculptor_drag_target = sculptor_get_mouse_world_pos(x6.sculptor_drag_distance or 50)
+				elseif x6.sculptor_box_start and x6.sculptor_box then
+					-- Update box selection visual
+					local current = v1:GetMouseLocation()
+					local minX = math.min(x6.sculptor_box_start.X, current.X)
+					local minY = math.min(x6.sculptor_box_start.Y, current.Y)
+					local maxX = math.max(x6.sculptor_box_start.X, current.X)
+					local maxY = math.max(x6.sculptor_box_start.Y, current.Y)
+					x6.sculptor_box.Position = UDim2.new(0, minX, 0, minY)
+					x6.sculptor_box.Size = UDim2.new(0, maxX - minX, 0, maxY - minY)
+					x6.sculptor_box.Visible = true
+				end
+			end
+		end)
+	)
+
+	table.insert(
+		x6.c,
+		v1.InputEnded:Connect(function(input)
+			if x1.k6 ~= "Sculptor" then
+				return
+			end
+
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				if x6.sculptor_dragging then
+					x6.sculptor_dragging = false
+					x6.sculptor_drag_target = nil
+				end
+				if x6.sculptor_box_start and x6.sculptor_box then
+					-- Finish box selection
+					local current = v1:GetMouseLocation()
+					local minX = math.min(x6.sculptor_box_start.X, current.X)
+					local minY = math.min(x6.sculptor_box_start.Y, current.Y)
+					local maxX = math.max(x6.sculptor_box_start.X, current.X)
+					local maxY = math.max(x6.sculptor_box_start.Y, current.Y)
+
+					-- Select parts within the box
+					local cam = v4.CurrentCamera
+					if cam then
+						for part, _ in pairs(x6.a) do
+							local screenPos, onScreen = cam:WorldToViewportPoint(part.Position)
+							if
+								onScreen
+								and screenPos.X >= minX
+								and screenPos.X <= maxX
+								and screenPos.Y >= minY
+								and screenPos.Y <= maxY
+							then
+								x6.sculptor_selected[part] = Vector3.zero
+								sculptor_add_highlight(part)
+							end
+						end
+					end
+
+					x6.sculptor_box.Visible = false
+					x6.sculptor_box_start = nil
+				end
+			end
+		end)
+	)
+
+	-- Clear sculptor state when mode changes (handled on mode switch)
 	x7.n("Rdy", "Press 'E'", 5)
 end
 x4.f3()
