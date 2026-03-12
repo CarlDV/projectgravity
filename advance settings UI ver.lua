@@ -323,12 +323,31 @@ function x7.n(t, x, d)
 		v5:SetCore("SendNotification", { Title = t, Text = x, Duration = d or 3 })
 	end)
 end
+local EXCLUDED_NAMES = {
+	Baseplate = true, HumanoidRootPart = true, Terrain = true, Handle = true,
+	Head = true, Torso = true, ["Left Arm"] = true, ["Right Arm"] = true,
+	["Left Leg"] = true, ["Right Leg"] = true,
+	UpperTorso = true, LowerTorso = true, LeftUpperArm = true, LeftLowerArm = true,
+	LeftHand = true, RightUpperArm = true, RightLowerArm = true, RightHand = true,
+	LeftUpperLeg = true, LeftLowerLeg = true, LeftFoot = true,
+	RightUpperLeg = true, RightLowerLeg = true, RightFoot = true,
+}
 function x7.e(p)
 	if not p:IsA("BasePart") then
 		return true
 	end
+	if EXCLUDED_NAMES[p.Name] then
+		return true
+	end
 	for _, t in ipairs(x1.k5) do
 		if p:FindFirstChild(t) or (p.Parent and p.Parent:FindFirstChild(t)) then
+			return true
+		end
+	end
+
+	-- Check if part belongs to ANY player's character
+	for _, pl in ipairs(v2:GetPlayers()) do
+		if pl.Character and p:IsDescendantOf(pl.Character) then
 			return true
 		end
 	end
@@ -348,14 +367,7 @@ function x7.e(p)
 		target = target.Parent
 	end
 
-	if v8.Character and p:IsDescendantOf(v8.Character) then
-		return true
-	end
 	if p.Anchored then
-		return true
-	end
-	local n = p.Name
-	if n == "Baseplate" or n == "HumanoidRootPart" or n == "Terrain" or n == "Handle" then
 		return true
 	end
 	return false
@@ -365,134 +377,163 @@ function x5.s(p, t, mn, mx, df, cb)
 	df = df or mn
 	local f = Instance.new("Frame", p)
 	f.BackgroundTransparency = 1
-	f.Size = UDim2.new(1, 0, 0, 36)
+	f.Size = UDim2.new(1, 0, 0, 42)
+	
 	local l = Instance.new("TextLabel", f)
 	l.BackgroundTransparency = 1
-	l.Size = UDim2.new(1, 0, 0, 18)
+	l.Size = UDim2.new(1, 0, 0, 20)
 	l.Text = t
-	l.TextColor3 = Color3.fromRGB(220, 220, 220)
+	l.TextColor3 = Color3.fromRGB(180, 180, 180)
 	l.TextXAlignment = 0
-	l.Font = Enum.Font.GothamMedium
-	l.TextSize = 13
+	l.Font = Enum.Font.Gotham
+	l.TextSize = 12
+	
 	local vl = Instance.new("TextLabel", f)
 	vl.BackgroundTransparency = 1
 	vl.Position = UDim2.new(1, -50, 0, 0)
-	vl.Size = UDim2.new(0, 50, 0, 18)
+	vl.Size = UDim2.new(0, 50, 0, 20)
 	vl.Text = tostring(df)
-	vl.TextColor3 = Color3.fromRGB(220, 220, 220)
+	vl.TextColor3 = Color3.fromRGB(255, 255, 255)
 	vl.TextXAlignment = 1
 	vl.Font = Enum.Font.GothamBold
-	vl.TextSize = 13
+	vl.TextSize = 12
+	
 	local sc = Instance.new("Frame", f)
 	sc.BackgroundTransparency = 1
-	sc.Position = UDim2.new(0, 0, 0, 22)
-	sc.Size = UDim2.new(1, 0, 0, 6)
+	sc.Position = UDim2.new(0, 0, 0, 26)
+	sc.Size = UDim2.new(1, 0, 0, 4)
+	
 	local sb = Instance.new("Frame", sc)
-	sb.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+	sb.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 	sb.BorderSizePixel = 0
 	sb.Size = UDim2.new(1, 0, 1, 0)
 	Instance.new("UICorner", sb).CornerRadius = UDim.new(1, 0)
+	
 	local fl = Instance.new("Frame", sb)
-	fl.BackgroundColor3 = Color3.fromRGB(255, 105, 180)
+	fl.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- Pure white accent for modern look
 	fl.BorderSizePixel = 0
 	df = df or 0
 	fl.Size = UDim2.new((df - mn) / (mx - mn), 0, 1, 0)
 	Instance.new("UICorner", fl).CornerRadius = UDim.new(1, 0)
+	
 	local k = Instance.new("ImageButton", sc)
 	k.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	k.AnchorPoint = Vector2.new(0.5, 0.5)
 	k.Position = UDim2.new((df - mn) / (mx - mn), 0, 0.5, 0)
-	k.Size = UDim2.new(0, 14, 0, 14)
+	k.Size = UDim2.new(0, 12, 0, 12)
 	k.BorderSizePixel = 0
 	k.AutoButtonColor = false
 	Instance.new("UICorner", k).CornerRadius = UDim.new(1, 0)
+	
 	local d = false
 	local function u(i)
 		local pos = i.Position.X
 		local rp = pos - sc.AbsolutePosition.X
 		local pc = math.clamp(rp / sc.AbsoluteSize.X, 0, 1)
-		local v = math.floor(mn + (mx - mn) * pc + 0.5)
-		v6:Create(fl, TweenInfo.new(0.05), { Size = UDim2.new(pc, 0, 1, 0) }):Play()
-		v6:Create(k, TweenInfo.new(0.05), { Position = UDim2.new(pc, 0, 0.5, 0) }):Play()
+		local v = mn + (mx - mn) * pc
+		if mx - mn > 50 then
+			v = math.floor(v + 0.5)
+		else
+			v = math.floor(v * 10 + 0.5) / 10
+		end
+		v6:Create(fl, TweenInfo.new(0.1), { Size = UDim2.new(pc, 0, 1, 0) }):Play()
+		v6:Create(k, TweenInfo.new(0.1), { Position = UDim2.new(pc, 0, 0.5, 0) }):Play()
 		vl.Text = tostring(v)
 		cb(v)
 		if save_settings then
 			save_settings()
 		end
 	end
-	k.MouseButton1Down:Connect(function()
-		d = true
-	end)
+	
+	k.MouseButton1Down:Connect(function() d = true end)
 	sb.InputBegan:Connect(function(i)
 		if i.UserInputType == Enum.UserInputType.MouseButton1 then
 			d = true
 			u(i)
 		end
 	end)
-	v1.InputEnded:Connect(function(i)
-		if i.UserInputType == Enum.UserInputType.MouseButton1 then
-			d = false
-		end
-	end)
-	v1.InputChanged:Connect(function(i)
-		if d and i.UserInputType == Enum.UserInputType.MouseMovement then
-			u(i)
-		end
-	end)
+	v1.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then d = false end end)
+	v1.InputChanged:Connect(function(i) if d and i.UserInputType == Enum.UserInputType.MouseMovement then u(i) end end)
 end
+
 function x5.t(p, t, df, cb)
 	local f = Instance.new("Frame", p)
 	f.BackgroundTransparency = 1
-	f.Size = UDim2.new(1, 0, 0, 30)
+	f.Size = UDim2.new(1, 0, 0, 32)
+	
 	local l = Instance.new("TextLabel", f)
 	l.BackgroundTransparency = 1
 	l.Size = UDim2.new(0.8, 0, 1, 0)
 	l.Text = t
-	l.TextColor3 = Color3.fromRGB(220, 220, 220)
+	l.TextColor3 = Color3.fromRGB(180, 180, 180)
 	l.TextXAlignment = 0
-	l.Font = Enum.Font.GothamMedium
-	l.TextSize = 13
+	l.Font = Enum.Font.Gotham
+	l.TextSize = 12
+	
+	local bg = Instance.new("Frame", f)
+	bg.BackgroundColor3 = df and Color3.fromRGB(60, 200, 100) or Color3.fromRGB(40, 40, 45)
+	bg.Position = UDim2.new(1, -36, 0.5, -9)
+	bg.Size = UDim2.new(0, 36, 0, 18)
+	Instance.new("UICorner", bg).CornerRadius = UDim.new(1, 0)
+	
+	local toggle = Instance.new("Frame", bg)
+	toggle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	toggle.Position = df and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
+	toggle.Size = UDim2.new(0, 14, 0, 14)
+	Instance.new("UICorner", toggle).CornerRadius = UDim.new(1, 0)
+	
 	local b = Instance.new("TextButton", f)
-	b.BackgroundColor3 = df and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(60, 60, 60)
-	b.Position = UDim2.new(1, -24, 0.5, -12)
-	b.Size = UDim2.new(0, 24, 0, 24)
+	b.BackgroundTransparency = 1
+	b.Size = UDim2.new(1, 0, 1, 0)
 	b.Text = ""
-	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
+	
 	b.MouseButton1Click:Connect(function()
 		df = not df
-		b.BackgroundColor3 = df and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(60, 60, 60)
+		v6:Create(bg, TweenInfo.new(0.2), {BackgroundColor3 = df and Color3.fromRGB(60, 200, 100) or Color3.fromRGB(40, 40, 45)}):Play()
+		v6:Create(toggle, TweenInfo.new(0.2), {Position = df and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)}):Play()
 		cb(df)
-		if save_settings then
-			save_settings()
-		end
+		if save_settings then save_settings() end
 	end)
 	return b
 end
+
 function x5.b(p, t, cb)
-	local f = Instance.new("Frame", p)
-	f.BackgroundTransparency = 1
-	f.Size = UDim2.new(1, 0, 0, 30)
-	local b = Instance.new("TextButton", f)
-	b.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-	b.Size = UDim2.new(1, 0, 1, 0)
+	local b = Instance.new("TextButton", p)
+	b.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+	b.Size = UDim2.new(1, 0, 0, 34)
+	b.AutoButtonColor = false
 	b.Text = t
 	b.TextColor3 = Color3.fromRGB(220, 220, 220)
 	b.Font = Enum.Font.GothamMedium
 	b.TextSize = 13
 	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
-	b.MouseButton1Click:Connect(function()
-		cb(b)
+	
+	local str = Instance.new("UIStroke", b)
+	str.Color = Color3.fromRGB(50, 50, 55)
+	str.Thickness = 1
+	
+	b.MouseEnter:Connect(function()
+		v6:Create(b, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(40, 40, 45), TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
 	end)
+	b.MouseLeave:Connect(function()
+		v6:Create(b, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(30, 30, 35), TextColor3 = Color3.fromRGB(220, 220, 220)}):Play()
+	end)
+	
+	b.MouseButton1Click:Connect(function() cb(b) end)
+	return b
 end
+
 function x5.h(p, t)
 	local l = Instance.new("TextLabel", p)
 	l.BackgroundTransparency = 1
-	l.Size = UDim2.new(1, 0, 0, 20)
-	l.Text = t
-	l.TextColor3 = Color3.fromRGB(150, 150, 255)
+	l.Size = UDim2.new(1, 0, 0, 24)
+	l.Text = t:upper()
+	l.TextColor3 = Color3.fromRGB(100, 100, 110)
 	l.Font = Enum.Font.GothamBold
-	l.TextSize = 12
+	l.TextSize = 10
+	l.TextXAlignment = Enum.TextXAlignment.Left
 end
+
 function x5.st()
 	if x5.g and x5.up then
 		x5.up()
@@ -515,181 +556,170 @@ function x5.st()
 	x5.g = sg
 	x5.mw(sg)
 end
-
 function x5.mw(sg)
-	-- Status HUD
-	local hud = Instance.new("TextLabel", sg)
+	-- Status HUD (Simplified & Sleek)
+	local hud = Instance.new("Frame", sg)
 	hud.Name = "StatusHUD"
 	hud.BackgroundTransparency = 1
-	hud.AnchorPoint = Vector2.new(1, 0)
-	hud.Size = UDim2.new(0, 500, 0, 30)
-	hud.Position = UDim2.new(1, -50, 0, 10)
-	hud.Font = Enum.Font.GothamBold
-	hud.TextSize = 18
-	hud.TextColor3 = Color3.fromRGB(255, 255, 255)
-	hud.TextStrokeTransparency = 0.5
-	hud.TextXAlignment = Enum.TextXAlignment.Right
-	hud.TextYAlignment = Enum.TextYAlignment.Top
-	hud.ZIndex = 100
-
-	table.insert(
-		x6.c,
-		v3.RenderStepped:Connect(function()
-			local tgt_txt = "None"
-			if x1.Tgt then
-				tgt_txt = x1.Tgt.Name
-			end
-
-			local status_txt = ""
-			local status_col = Color3.fromRGB(100, 255, 100) -- Green for Active
-
-			if x1.Disabled then
-				status_txt = "Script Disabled"
-				status_col = Color3.fromRGB(255, 60, 60)
-			elseif x1.Paused then
-				status_txt = "Script Paused"
-				status_col = Color3.fromRGB(255, 150, 60)
-			else
-				status_txt = "Script Active"
-			end
-
-			hud.Text = string.format("CURRENT TARGET: %s || %s", tgt_txt, status_txt)
-			hud.TextColor3 = status_col
-		end)
-	)
+	hud.Position = UDim2.new(0.5, -200, 0, 20)
+	hud.Size = UDim2.new(0, 400, 0, 30)
+	
+	local hud_l = Instance.new("TextLabel", hud)
+	hud_l.BackgroundTransparency = 1
+	hud_l.Size = UDim2.new(1, 0, 1, 0)
+	hud_l.Font = Enum.Font.GothamBold
+	hud_l.TextSize = 14
+	hud_l.TextColor3 = Color3.fromRGB(255, 255, 255)
+	
+	table.insert(x6.c, v3.RenderStepped:Connect(function()
+		if not x5.g then return end
+		local tgt = x1.Tgt and (x1.Tgt.DisplayName or x1.Tgt.Name) or "None"
+		local state = x1.Disabled and "DISABLED" or (x1.Paused and "PAUSED" or "ACTIVE")
+		local col = x1.Disabled and Color3.fromRGB(255, 80, 80) or (x1.Paused and Color3.fromRGB(255, 180, 80) or Color3.fromRGB(80, 255, 150))
+		hud_l.Text = string.format("TARGET: %s  |  STATUS: %s", tgt:upper(), state)
+		hud_l.TextColor3 = col
+	end))
 
 	local m = Instance.new("Frame", sg)
-	m.Name = "M"
-	m.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
-	m.BackgroundTransparency = 0.15
-	m.Position = UDim2.new(0, 20, 0.5, -240)
-	m.Size = UDim2.new(0, 300, 0, 480)
+	m.Name = "Main"
+	m.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+	m.Position = UDim2.new(0, 30, 0.5, -250)
+	m.Size = UDim2.new(0, 320, 0, 500)
 	m.Active = true
 	m.Draggable = true
-	Instance.new("UICorner", m).CornerRadius = UDim.new(0, 12)
+	Instance.new("UICorner", m).CornerRadius = UDim.new(0, 10)
 	local ms = Instance.new("UIStroke", m)
-	ms.Color = Color3.fromRGB(60, 60, 70)
+	ms.Color = Color3.fromRGB(40, 40, 45)
 	ms.Thickness = 1
-	ms.Transparency = 0.5
+
 	local h = Instance.new("Frame", m)
 	h.BackgroundTransparency = 1
-	h.Size = UDim2.new(1, 0, 0, 40)
+	h.Size = UDim2.new(1, 0, 0, 50)
+	
 	local t = Instance.new("TextLabel", h)
 	t.BackgroundTransparency = 1
-	t.Position = UDim2.new(0, 15, 0, 0)
-	t.Size = UDim2.new(0.7, 0, 1, 0)
-	local exec_name = "Unknown"
-	if identifyexecutor then
-		exec_name = identifyexecutor()
-	end
-	t.Text = "GSettings [" .. exec_name .. "]"
-	t.TextColor3 = Color3.fromRGB(240, 240, 255)
-	t.Font = Enum.Font.GothamBold
-	t.TextSize = 18
+	t.Position = UDim2.new(0, 20, 0, 0)
+	t.Size = UDim2.new(0.6, 0, 1, 0)
+	t.Text = "PROJECT GRAVITY"
+	t.TextColor3 = Color3.fromRGB(255, 255, 255)
+	t.Font = Enum.Font.GothamBlack
+	t.TextSize = 16
 	t.TextXAlignment = 0
+
 	local c = Instance.new("ScrollingFrame", m)
 	c.BackgroundTransparency = 1
-	c.Position = UDim2.new(0, 0, 0, 50)
-	c.Size = UDim2.new(1, 0, 1, -95)
-	c.ScrollBarThickness = 4
+	c.Position = UDim2.new(0, 0, 0, 60)
+	c.Size = UDim2.new(1, 0, 1, -70)
+	c.ScrollBarThickness = 0
+	c.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	c.CanvasSize = UDim2.new(0, 0, 0, 0)
+	local l = Instance.new("UIListLayout", c)
+	l.Padding = UDim.new(0, 12)
+	l.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	local p = Instance.new("UIPadding", c)
+	p.PaddingLeft = UDim.new(0, 20)
+	p.PaddingRight = UDim.new(0, 20)
+	p.PaddingBottom = UDim.new(0, 20)
 
 	local am = Instance.new("Frame", sg)
-	am.Name = "AM"
-	am.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-	am.BackgroundTransparency = 0.1
-	am.Position = UDim2.new(0, 330, 0.5, -240)
-	am.Size = UDim2.new(0, 250, 0, 350)
+	am.Name = "Advanced"
+	am.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+	am.Position = UDim2.new(0, 360, 0.5, -200)
+	am.Size = UDim2.new(0, 260, 0, 380)
 	am.Visible = false
 	am.Active = true
 	am.Draggable = true
-	Instance.new("UICorner", am).CornerRadius = UDim.new(0, 12)
+	Instance.new("UICorner", am).CornerRadius = UDim.new(0, 10)
 	local ams = Instance.new("UIStroke", am)
-	ams.Color = Color3.fromRGB(80, 80, 200)
+	ams.Color = Color3.fromRGB(40, 40, 45)
 	ams.Thickness = 1
-	ams.Transparency = 0.5
 
 	local ah = Instance.new("Frame", am)
 	ah.BackgroundTransparency = 1
-	ah.Size = UDim2.new(1, 0, 0, 40)
+	ah.Size = UDim2.new(1, 0, 0, 50)
 	local at = Instance.new("TextLabel", ah)
 	at.BackgroundTransparency = 1
-	at.Position = UDim2.new(0, 15, 0, 0)
-	at.Size = UDim2.new(0.7, 0, 1, 0)
-	at.Text = "Advanced (advanced shits!)"
-	at.TextColor3 = Color3.fromRGB(200, 200, 255)
+	at.Position = UDim2.new(0, 20, 0, 0)
+	at.Size = UDim2.new(0.6, 0, 1, 0)
+	at.Text = "ADVANCED"
+	at.TextColor3 = Color3.fromRGB(255, 255, 255)
 	at.Font = Enum.Font.GothamBold
-	at.TextSize = 18
+	at.TextSize = 14
 	at.TextXAlignment = 0
 
 	local ac = Instance.new("ScrollingFrame", am)
 	ac.BackgroundTransparency = 1
 	ac.Position = UDim2.new(0, 0, 0, 50)
 	ac.Size = UDim2.new(1, 0, 1, -60)
-	ac.ScrollBarThickness = 4
+	ac.ScrollBarThickness = 0
 	ac.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	ac.CanvasSize = UDim2.new(0, 0, 0, 0)
-	Instance.new("UIListLayout", ac).Padding = UDim.new(0, 8)
+	local acl = Instance.new("UIListLayout", ac)
+	acl.Padding = UDim.new(0, 10)
+	acl.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	local ap = Instance.new("UIPadding", ac)
-	ap.PaddingLeft = UDim.new(0, 15)
-	ap.PaddingRight = UDim.new(0, 15)
+	ap.PaddingLeft = UDim.new(0, 20)
+	ap.PaddingRight = UDim.new(0, 20)
 
-	x5.s(ac, "Damping", 0, 50, x1.Damping * 10, function(v)
-		x1.Damping = v / 10
+	x5.s(ac, "Damping", 0, 5, x1.Damping, function(v)
+		x1.Damping = v
 		save_settings()
 	end)
-	x5.s(ac, "Integral Gain", 0, 100, x1.Ki * 10, function(v)
-		x1.Ki = v / 10
+	x5.s(ac, "Integral Gain", 0, 10, x1.Ki, function(v)
+		x1.Ki = v
 		save_settings()
 	end)
-	if not x1.MaxSpeed then
-		x1.MaxSpeed = 500
-	end
-	x5.s(ac, "Max Speed", 50, 1000, x1.MaxSpeed, function(v)
+	x5.s(ac, "Max Speed", 50, 2000, x1.MaxSpeed or 500, function(v)
 		x1.MaxSpeed = v
 		save_settings()
 	end)
-	if not x1.AngularDamping then
-		x1.AngularDamping = 0.5
-	end
-	x5.s(ac, "Angular Damp", 0, 10, x1.AngularDamping * 10, function(v)
-		x1.AngularDamping = v / 10
+	x5.s(ac, "Angular Damp", 0, 1, x1.AngularDamping or 0.5, function(v)
+		x1.AngularDamping = v
 		save_settings()
 	end)
-	if not x1.VerticalStiffness then
-		x1.VerticalStiffness = 1.0
-	end
-	x5.s(ac, "Vert Stiffness", 1, 50, x1.VerticalStiffness * 10, function(v)
-		x1.VerticalStiffness = v / 10
+	x5.s(ac, "Vert Stiffness", 0.1, 5, x1.VerticalStiffness or 1.0, function(v)
+		x1.VerticalStiffness = v
 		save_settings()
 	end)
 
-	local ab = Instance.new("TextButton", c)
-	ab.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-	ab.Size = UDim2.new(1, 0, 0, 30)
-	ab.Text = "Advanced Settings"
-	ab.TextColor3 = Color3.fromRGB(150, 150, 255)
-	ab.Font = Enum.Font.GothamBold
-	ab.TextSize = 14
-	ab.AutoButtonColor = false
-	Instance.new("UICorner", ab).CornerRadius = UDim.new(0, 6)
-	Instance.new("UIStroke", ab).Color = Color3.fromRGB(60, 60, 80)
-
-	ab.MouseButton1Click:Connect(function()
+	local ab = x5.b(c, "Advanced Settings", function()
 		am.Visible = not am.Visible
-		ab.TextColor3 = am.Visible and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 255)
-		ab.BackgroundColor3 = am.Visible and Color3.fromRGB(60, 60, 150) or Color3.fromRGB(30, 30, 35)
 	end)
-	c.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
-	c.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	c.CanvasSize = UDim2.new(0, 0, 0, 0)
-	local l = Instance.new("UIListLayout", c)
-	l.Padding = UDim.new(0, 8)
-	l.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	local p = Instance.new("UIPadding", c)
-	p.PaddingLeft = UDim.new(0, 15)
-	p.PaddingRight = UDim.new(0, 15)
-	p.PaddingTop = UDim.new(0, 5)
-	p.PaddingBottom = UDim.new(0, 20)
+	ab.Size = UDim2.new(1, 0, 0, 36)
+	
+	-- Mode Display
+	local mode_f = Instance.new("Frame", c)
+	mode_f.BackgroundTransparency = 1
+	mode_f.Size = UDim2.new(1, 0, 0, 44)
+	local db = Instance.new("TextButton", mode_f)
+	db.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+	db.Size = UDim2.new(1, 0, 1, 0)
+	db.Text = "  " .. x1.k6:upper()
+	db.TextColor3 = Color3.fromRGB(255, 255, 255)
+	db.Font = Enum.Font.GothamBold
+	db.TextSize = 13
+	db.TextXAlignment = 0
+	Instance.new("UICorner", db).CornerRadius = UDim.new(0, 6)
+	local dst = Instance.new("UIStroke", db)
+	dst.Color = Color3.fromRGB(40, 40, 45)
+	
+	local arr = Instance.new("TextLabel", db)
+	arr.BackgroundTransparency = 1
+	arr.Position = UDim2.new(1, -30, 0, 0)
+	arr.Size = UDim2.new(0, 30, 1, 0)
+	arr.Text = "▼"
+	arr.TextColor3 = Color3.fromRGB(150, 150, 160)
+	arr.TextSize = 10
+
+	db.MouseButton1Click:Connect(function()
+		if x6.dlst_container then
+			x6.dlst_container.Visible = not x6.dlst_container.Visible
+			if x6.dlst_container.Visible and x6.populate_modes then
+				x6.populate_modes("")
+			end
+		end
+	end)
+
 	local gsc = Instance.new("Frame", c)
 	gsc.BackgroundTransparency = 1
 	gsc.Size = UDim2.new(1, 0, 0, 0)
@@ -708,286 +738,195 @@ function x5.mw(sg)
 		sc:ClearAllChildren()
 		gsc:ClearAllChildren()
 		local gscl = Instance.new("UIListLayout", gsc)
-		gscl.Padding = UDim.new(0, 8)
+		gscl.Padding = UDim.new(0, 10)
 		gscl.HorizontalAlignment = Enum.HorizontalAlignment.Center
 		local scl = Instance.new("UIListLayout", sc)
-		scl.Padding = UDim.new(0, 8)
+		scl.Padding = UDim.new(0, 10)
 		scl.HorizontalAlignment = Enum.HorizontalAlignment.Center
 		local s = x3()
-		x5.h(gsc, "- GLOBAL SETTINGS -")
+		
+		x5.h(gsc, "Control")
+		x5.t(gsc, "Simplified Interface", x1.SimpleMode, function(v)
+			x1.SimpleMode = v
+			save_settings()
+			f1() -- Refresh to show/hide shits
+		end)
+		
 		x5.t(gsc, "Anchor to Self", x1.AnchorSelf, function(v)
 			x1.AnchorSelf = v
 			save_settings()
 		end)
 
-		x5.t(gsc, "Anti-Fling", x1.AntiFling, function(v)
-			x1.AntiFling = v
-			save_settings()
-		end)
+		if not x1.SimpleMode then
+			x5.t(gsc, "Anti-Fling", x1.AntiFling, function(v)
+				x1.AntiFling = v
+				save_settings()
+			end)
+		end
 
-		x6.disable_btn = x5.t(gsc, "Disable Script", x1.Disabled, function(v)
+		x6.disable_btn = x5.t(gsc, "Disable Gravity", x1.Disabled, function(v)
 			x1.Disabled = v
 			save_settings()
 			if x6.b then
-				x6.b.Transparency = v and 1 or x9.c7
-				if x6.b:FindFirstChild("Visual") then
-					x6.b.Visual.Enabled = not v
-				end
+				x6.b.Transparency = v and 1 or 0.8
+				if x6.b:FindFirstChild("Visual") then x6.b.Visual.Enabled = not v end
 			end
 			for _, d in pairs(x6.a) do
-				if d.lv then
-					d.lv.MaxForce = v and 0 or x1.k4
-				end
-				if d.av then
-					d.av.MaxTorque = v and 0 or math.huge
-				end
+				if d.lv then d.lv.MaxForce = v and 0 or x1.k4 end
 			end
 		end)
 
-		x5.t(gsc, "Impact All", x1.PI_All, function(v)
-			x1.PI_All = v
-			save_settings()
-		end)
+		if not x1.SimpleMode then
+			x5.t(gsc, "Target Everyone", x1.PI_All, function(v)
+				x1.PI_All = v
+				save_settings()
+			end)
+		end
 
 		local l_btn = Instance.new("TextButton", gsc)
-		l_btn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-		l_btn.Size = UDim2.new(1, 0, 0, 30)
-		l_btn.Text = "LAUNCH"
+		l_btn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+		l_btn.Size = UDim2.new(1, 0, 0, 36)
+		l_btn.Text = "FORCE LAUNCH"
 		l_btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-		l_btn.Font = Enum.Font.GothamBlack
-		l_btn.TextSize = 14
+		l_btn.Font = Enum.Font.GothamBold
+		l_btn.TextSize = 13
 		Instance.new("UICorner", l_btn).CornerRadius = UDim.new(0, 6)
-		l_btn.Visible = x1.ImpactManual
+		l_btn.Visible = x1.ImpactManual or (x1.k6 == "Slingshot" and x1.SlingshotManual)
 
 		l_btn.MouseButton1Click:Connect(function()
 			x1.IsLaunching = not x1.IsLaunching
-			l_btn.Text = x1.IsLaunching and "RESET" or "LAUNCH"
-			l_btn.BackgroundColor3 = x1.IsLaunching and Color3.fromRGB(60, 180, 255) or Color3.fromRGB(255, 60, 60)
+			l_btn.Text = x1.IsLaunching and "RESET SYSTEM" or "FORCE LAUNCH"
+			l_btn.BackgroundColor3 = x1.IsLaunching and Color3.fromRGB(50, 150, 200) or Color3.fromRGB(200, 50, 50)
 		end)
-		table.insert(
-			x6.c,
-			v3.Heartbeat:Connect(function()
-				if x1.ImpactManual then
-					l_btn.Text = x1.IsLaunching and "RESET" or "LAUNCH"
-					l_btn.BackgroundColor3 = x1.IsLaunching and Color3.fromRGB(60, 180, 255)
-						or Color3.fromRGB(255, 60, 60)
-				elseif x1.k6 == "Slingshot" and x1.SlingshotManual then
-					l_btn.Visible = true
-					l_btn.Text = x1.IsLaunching and "RESET" or "LAUNCH"
-					l_btn.BackgroundColor3 = x1.IsLaunching and Color3.fromRGB(60, 180, 255)
-						or Color3.fromRGB(255, 60, 60)
-				else
-					l_btn.Visible = false
-				end
-			end)
-		)
-		local tn = "Select Target >"
-		if x1.Tgt then
-			tn = "Target: " .. (x1.Tgt.DisplayName or x1.Tgt.Name)
-		end
-		x5.t(gsc, "Performance Mode", false, function(v)
-			if v then
-				pcall(function()
-					local Lighting = game:GetService("Lighting")
-					Lighting.GlobalShadows = false
-					Lighting.FogEnd = 9e9
-					Lighting.Brightness = 0
-					if sethiddenproperty then
-						sethiddenproperty(Lighting, "Technology", Enum.Technology.Compatibility)
-					end
-					for _, d in ipairs(game:GetDescendants()) do
-						if d:IsA("BasePart") then
-							d.Material = Enum.Material.SmoothPlastic
-							d.Reflectance = 0
-						elseif d:IsA("Decal") or d:IsA("Texture") then
-							d.Transparency = 1
-						elseif d:IsA("ParticleEmitter") or d:IsA("Trail") then
-							d.Lifetime = NumberRange.new(0)
-						end
-					end
-				end)
+		
+		table.insert(x6.c, v3.Heartbeat:Connect(function()
+			if x1.ImpactManual or (x1.k6 == "Slingshot" and x1.SlingshotManual) then
+				l_btn.Visible = true
+				l_btn.Text = x1.IsLaunching and "RESET SYSTEM" or "FORCE LAUNCH"
+				l_btn.BackgroundColor3 = x1.IsLaunching and Color3.fromRGB(50, 150, 200) or Color3.fromRGB(200, 50, 50)
+			else
+				l_btn.Visible = false
 			end
-		end)
+		end))
 
+		local tn = x1.Tgt and "Target: " .. (x1.Tgt.DisplayName or x1.Tgt.Name) or "Select Target"
+		
 		local tdb = Instance.new("TextButton", gsc)
-		tdb.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
-		tdb.Size = UDim2.new(1, 0, 0, 36)
-		tdb.Text = tn
+		tdb.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+		tdb.Size = UDim2.new(1, 0, 0, 38)
+		tdb.Text = "  " .. tn:upper()
 		tdb.TextColor3 = Color3.fromRGB(255, 255, 255)
 		tdb.Font = Enum.Font.GothamBold
-		tdb.TextSize = 14
-		tdb.AutoButtonColor = false
+		tdb.TextSize = 12
+		tdb.TextXAlignment = 0
 		Instance.new("UICorner", tdb).CornerRadius = UDim.new(0, 6)
+		local dst2 = Instance.new("UIStroke", tdb)
+		dst2.Color = Color3.fromRGB(40, 40, 45)
+		
+		if x1.Tgt then
+			local ctb = Instance.new("TextButton", tdb)
+			ctb.BackgroundTransparency = 1
+			ctb.Position = UDim2.new(1, -30, 0, 0)
+			ctb.Size = UDim2.new(0, 30, 1, 0)
+			ctb.Text = "×"
+			ctb.TextColor3 = Color3.fromRGB(200, 80, 80)
+			ctb.TextSize = 20
+			ctb.MouseButton1Click:Connect(function()
+				x1.Tgt = nil
+				x1.TgtActive = false
+				f1()
+			end)
+		end
+
 		local tdlst = Instance.new("Frame", m)
 		tdlst.Visible = false
-		tdlst.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-		tdlst.Position = UDim2.new(1, 10, 0, 0)
-		tdlst.Size = UDim2.new(0, 200, 1, 0)
-		tdlst.BorderSizePixel = 0
-		tdlst.ZIndex = 25
-		Instance.new("UICorner", tdlst).CornerRadius = UDim.new(0, 8)
+		tdlst.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+		tdlst.Position = UDim2.new(1, 15, 0, 0)
+		tdlst.Size = UDim2.new(0, 220, 1, 0)
+		Instance.new("UICorner", tdlst).CornerRadius = UDim.new(0, 10)
+		local ts = Instance.new("UIStroke", tdlst)
+		ts.Color = Color3.fromRGB(40, 40, 45)
 
 		local search_bar = Instance.new("TextBox", tdlst)
-		search_bar.BackgroundTransparency = 1
-		search_bar.Position = UDim2.new(0, 10, 0, 5)
-		search_bar.Size = UDim2.new(1, -20, 0, 30)
-		search_bar.Font = Enum.Font.Gotham
-		search_bar.PlaceholderText = "Search..."
+		search_bar.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+		search_bar.Position = UDim2.new(0, 10, 0, 10)
+		search_bar.Size = UDim2.new(1, -20, 0, 34)
+		search_bar.PlaceholderText = "Search players..."
 		search_bar.Text = ""
 		search_bar.TextColor3 = Color3.fromRGB(255, 255, 255)
-		search_bar.TextSize = 14
-		search_bar.TextXAlignment = Enum.TextXAlignment.Left
-		search_bar.ZIndex = 26
-		local sb_line = Instance.new("Frame", search_bar)
-		sb_line.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-		sb_line.BorderSizePixel = 0
-		sb_line.Position = UDim2.new(0, 0, 1, 0)
-		sb_line.Size = UDim2.new(1, 0, 0, 1)
+		search_bar.Font = Enum.Font.Gotham
+		search_bar.TextSize = 13
+		Instance.new("UICorner", search_bar).CornerRadius = UDim.new(0, 6)
 
 		local scroll_frame = Instance.new("ScrollingFrame", tdlst)
 		scroll_frame.BackgroundTransparency = 1
-		scroll_frame.Position = UDim2.new(0, 0, 0, 40)
-		scroll_frame.Size = UDim2.new(1, 0, 1, -45)
-		scroll_frame.CanvasSize = UDim2.new(0, 0, 0, 0)
-		scroll_frame.ScrollBarThickness = 2
+		scroll_frame.Position = UDim2.new(0, 0, 0, 55)
+		scroll_frame.Size = UDim2.new(1, 0, 1, -65)
+		scroll_frame.ScrollBarThickness = 0
 		scroll_frame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-		scroll_frame.ZIndex = 26
-
 		local tdll = Instance.new("UIListLayout", scroll_frame)
-		tdll.Padding = UDim.new(0, 4)
+		tdll.Padding = UDim.new(0, 5)
 		tdll.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 		local active_highlight = nil
 		local function clear_highlight()
-			if active_highlight then
-				active_highlight:Destroy()
-				active_highlight = nil
-			end
+			if active_highlight then active_highlight:Destroy() active_highlight = nil end
 		end
 
 		local function update_list(filter_text)
-			clear_highlight() -- Clean up any existing highlight when refreshing
+			clear_highlight()
 			scroll_frame:ClearAllChildren()
 			local tdll = Instance.new("UIListLayout", scroll_frame)
-			tdll.Padding = UDim.new(0, 4)
+			tdll.Padding = UDim.new(0, 5)
 			tdll.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 			for _, pl in ipairs(v2:GetPlayers()) do
-				local show = true
-				if filter_text and filter_text ~= "" then
-					filter_text = filter_text:lower()
-					local dn = (pl.DisplayName or ""):lower()
-					local nm = (pl.Name or ""):lower()
-					if not (dn:find(filter_text) or nm:find(filter_text)) then
-						show = false
+				if pl == v8 then continue end
+				if filter_text ~= "" and not (pl.DisplayName:lower():find(filter_text:lower()) or pl.Name:lower():find(filter_text:lower())) then continue end
+
+				local ib = Instance.new("TextButton", scroll_frame)
+				ib.Size = UDim2.new(1, -16, 0, 44)
+				ib.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+				ib.Text = "  " .. pl.DisplayName
+				ib.TextColor3 = Color3.fromRGB(255, 255, 255)
+				ib.Font = Enum.Font.GothamBold
+				ib.TextSize = 12
+				ib.TextXAlignment = 0
+				Instance.new("UICorner", ib).CornerRadius = UDim.new(0, 6)
+
+				ib.MouseEnter:Connect(function()
+					ib.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+					if pl.Character then
+						local h = Instance.new("Highlight", pl.Character)
+						h.FillColor = Color3.fromRGB(255, 255, 255)
+						h.OutlineColor = Color3.fromRGB(255, 255, 255)
+						active_highlight = h
 					end
-				end
+				end)
+				ib.MouseLeave:Connect(function()
+					ib.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+					clear_highlight()
+				end)
 
-				if show then
-					local ib = Instance.new("TextButton", scroll_frame)
-					ib.Size = UDim2.new(1, -10, 0, 50)
-					ib.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
-					ib.Text = ""
-					ib.AutoButtonColor = false
-					Instance.new("UICorner", ib).CornerRadius = UDim.new(0, 6)
-					ib.ZIndex = 27
-
-					local icon = Instance.new("ImageLabel", ib)
-					icon.BackgroundTransparency = 1
-					icon.Position = UDim2.new(0, 5, 0.5, -20)
-					icon.Size = UDim2.new(0, 40, 0, 40)
-					icon.ZIndex = 28
-					Instance.new("UICorner", icon).CornerRadius = UDim.new(1, 0)
-
-					task.spawn(function()
-						local content, isReady = v2:GetUserThumbnailAsync(
-							pl.UserId,
-							Enum.ThumbnailType.HeadShot,
-							Enum.ThumbnailSize.Size48x48
-						)
-						if isReady then
-							icon.Image = content
-						end
-					end)
-
-					local dname = Instance.new("TextLabel", ib)
-					dname.BackgroundTransparency = 1
-					dname.Position = UDim2.new(0, 55, 0, 8)
-					dname.Size = UDim2.new(1, -60, 0, 16)
-					dname.Font = Enum.Font.GothamBold
-					dname.Text = pl.DisplayName
-					dname.TextColor3 = Color3.fromRGB(255, 255, 255)
-					dname.TextSize = 14
-					dname.TextXAlignment = Enum.TextXAlignment.Left
-					dname.ZIndex = 28
-
-					local uname = Instance.new("TextLabel", ib)
-					uname.BackgroundTransparency = 1
-					uname.Position = UDim2.new(0, 55, 0, 26)
-					uname.Size = UDim2.new(1, -60, 0, 14)
-					uname.Font = Enum.Font.Gotham
-					uname.Text = "@" .. pl.Name
-					uname.TextColor3 = Color3.fromRGB(180, 180, 180)
-					uname.TextSize = 12
-					uname.TextXAlignment = Enum.TextXAlignment.Left
-					uname.ZIndex = 28
-
-					ib.MouseEnter:Connect(function()
-						clear_highlight()
-						if pl.Character then
-							local h = Instance.new("Highlight")
-							h.Adornee = pl.Character
-							h.FillColor = Color3.fromRGB(255, 0, 0)
-							h.FillTransparency = 0.5
-							h.OutlineColor = Color3.fromRGB(255, 255, 255)
-							h.OutlineTransparency = 0
-							h.Parent = pl.Character
-							active_highlight = h
-						end
-					end)
-
-					ib.MouseLeave:Connect(function()
-						clear_highlight()
-					end)
-
-					ib.MouseButton1Click:Connect(function()
-						x1.Tgt = pl
-						x1.TgtActive = true -- Auto-enable anchor
-						tdb.Text = "Target: " .. (pl.DisplayName or pl.Name)
-						tdlst.Visible = false
-						clear_highlight()
-					end)
-				end
+				ib.MouseButton1Click:Connect(function()
+					x1.Tgt = pl
+					x1.TgtActive = true
+					tdlst.Visible = false
+					f1()
+				end)
 			end
 		end
 
-		search_bar:GetPropertyChangedSignal("Text"):Connect(function()
-			update_list(search_bar.Text)
-		end)
-
+		search_bar:GetPropertyChangedSignal("Text"):Connect(function() update_list(search_bar.Text) end)
 		tdb.MouseButton1Click:Connect(function()
 			tdlst.Visible = not tdlst.Visible
-			if tdlst.Visible then
-				search_bar.Text = ""
-				update_list("")
-			end
+			if tdlst.Visible then update_list("") end
 		end)
-		local ctb = Instance.new("TextButton", gsc)
-		ctb.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
-		ctb.Size = UDim2.new(1, 0, 0, 30)
-		ctb.Text = "Clear Target"
-		ctb.TextColor3 = Color3.fromRGB(255, 255, 255)
-		ctb.Font = Enum.Font.GothamBold
-		ctb.TextSize = 13
-		ctb.AutoButtonColor = false
-		Instance.new("UICorner", ctb).CornerRadius = UDim.new(0, 6)
-		ctb.MouseButton1Click:Connect(function()
-			x1.Tgt = nil
-			x1.TgtActive = false -- Auto-disable anchor
-			tdb.Text = "Select Target >"
-		end)
-		x5.h(sc, "- SHAPE SETTINGS -")
+
+		if not x1.SimpleMode then
+		x5.h(sc, "Shape")
 		if x1.k6 == "Big Ring Things" then
+
 			x5.s(sc, "Ring Count", 1, 20, s.k11, function(v)
 				s.k11 = v
 			end)
@@ -1448,113 +1387,51 @@ function x5.mw(sg)
 				s.k14 = v
 			end)
 		end
+		end -- end SimpleMode check for Shape section
 	end
 	x5.up = f1
-	local db = Instance.new("TextButton", c)
-	db.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
-	db.Size = UDim2.new(1, 0, 0, 36)
-	db.Text = x1.k6
-	db.TextColor3 = Color3.fromRGB(255, 255, 255)
-	db.Font = Enum.Font.GothamBold
-	db.TextSize = 14
-	db.AutoButtonColor = false
-	Instance.new("UICorner", db).CornerRadius = UDim.new(0, 6)
-	local dst = Instance.new("UIStroke", db)
-	dst.Color = Color3.fromRGB(80, 80, 90)
-	dst.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	-- Modernized mode list with search
+	-- Modernized mode list
 	local dlst_container = Instance.new("Frame", m)
+	dlst_container.Name = "ModeSelector"
 	dlst_container.Visible = false
-	dlst_container.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-	dlst_container.Position = UDim2.new(1, 10, 0, 0)
-	dlst_container.Size = UDim2.new(0, 180, 1, 0)
-	dlst_container.BorderSizePixel = 0
-	dlst_container.ZIndex = 20
-	Instance.new("UICorner", dlst_container).CornerRadius = UDim.new(0, 8)
-
-	local dlst_h = Instance.new("Frame", dlst_container)
-	dlst_h.Size = UDim2.new(1, 0, 0, 40)
-	dlst_h.BackgroundTransparency = 1
-	dlst_h.ZIndex = 21
-
-	local msb = Instance.new("TextBox", dlst_h)
-	msb.Size = UDim2.new(1, -20, 0, 30)
-	msb.Position = UDim2.new(0, 10, 0, 5)
-	msb.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+	dlst_container.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+	dlst_container.Position = UDim2.new(1, 15, 0, 0)
+	dlst_container.Size = UDim2.new(0, 220, 1, 0)
+	Instance.new("UICorner", dlst_container).CornerRadius = UDim.new(0, 10)
+	local dls = Instance.new("UIStroke", dlst_container)
+	dls.Color = Color3.fromRGB(40, 40, 45)
+	
+	local msb = Instance.new("TextBox", dlst_container)
+	msb.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+	msb.Position = UDim2.new(0, 10, 0, 10)
+	msb.Size = UDim2.new(1, -20, 0, 34)
+	msb.PlaceholderText = "Search modes..."
 	msb.Text = ""
-	msb.PlaceholderText = "Search Modes..."
 	msb.TextColor3 = Color3.fromRGB(255, 255, 255)
-	msb.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
 	msb.Font = Enum.Font.Gotham
-	msb.TextSize = 12
-	msb.ZIndex = 22
+	msb.TextSize = 13
 	Instance.new("UICorner", msb).CornerRadius = UDim.new(0, 6)
 
 	local dlst = Instance.new("ScrollingFrame", dlst_container)
 	dlst.BackgroundTransparency = 1
-	dlst.Position = UDim2.new(0, 0, 0, 40)
-	dlst.Size = UDim2.new(1, 0, 1, -45)
-	dlst.ZIndex = 21
+	dlst.Position = UDim2.new(0, 0, 0, 55)
+	dlst.Size = UDim2.new(1, 0, 1, -65)
+	dlst.ScrollBarThickness = 0
 	dlst.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	dlst.CanvasSize = UDim2.new(0, 0, 0, 0)
-	dlst.ScrollBarThickness = 2
-	dlst.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
 
-	db.MouseButton1Click:Connect(function()
-		dlst_container.Visible = not dlst_container.Visible
-	end)
+	x6.dlst_container = dlst_container
 
 	local function populate_modes(filter)
 		dlst:ClearAllChildren()
 		local dll = Instance.new("UIListLayout", dlst)
-		dll.Padding = UDim.new(0, 4)
+		dll.Padding = UDim.new(0, 5)
 		dll.HorizontalAlignment = Enum.HorizontalAlignment.Center
-		local up = Instance.new("UIPadding", dlst)
-		up.PaddingTop = UDim.new(0, 2)
-		up.PaddingBottom = UDim.new(0, 5)
 
-		local modes = {
-			"Big Ring Things",
-			"Celestial Ribbon",
-			"Hollow Worm",
-			"Cosmic Comet",
-			"Point Impact",
-			"Orbital Shell",
-			"Vortex Funnel",
-			"Quantum Atoms",
-			"Halo Ring",
-			"Slingshot",
-			"Gods Call",
-			"Deflect",
-			"Shield Wall",
-			"Sculptor",
-			"Torus Knot",
-			"Möbius Strip",
-			"DNA Helix",
-			"Black Hole",
-			"Tesseract",
-			"Klein Bottle",
-			"Space Station",
-			"Supernova",
-			"Dyson Sphere",
-			"Seraphim",
-			"Alien Mothership",
-			"Quantum Core",
-			"Galactic Web",
-			"Meteor Shower",
-			"World Serpent",
-			"Aurora Borealis",
-			"Arcane Orrery",
-			"Maelstrom Spire",
-			"Eldritch Binding",
-			"Graviton Engine",
-			"Fractal Web",
-			"Leviathan Coil",
-		}
+		local modes = { "Big Ring Things", "Celestial Ribbon", "Hollow Worm", "Cosmic Comet", "Point Impact", "Orbital Shell", "Vortex Funnel", "Quantum Atoms", "Halo Ring", "Slingshot", "Gods Call", "Deflect", "Shield Wall", "Sculptor", "Torus Knot", "Möbius Strip", "DNA Helix", "Black Hole", "Tesseract", "Klein Bottle", "Space Station", "Supernova", "Dyson Sphere", "Seraphim", "Alien Mothership", "Quantum Core", "Galactic Web", "Meteor Shower", "World Serpent", "Aurora Borealis", "Arcane Orrery", "Maelstrom Spire", "Eldritch Binding", "Graviton Engine", "Fractal Web", "Leviathan Coil" }
 
 		table.sort(modes, function(a, b)
-			local fa = favorites[a] and 1 or 0
-			local fb = favorites[b] and 1 or 0
+			local fa, fb = favorites[a] and 1 or 0, favorites[b] and 1 or 0
 			if fa ~= fb then
 				return fa > fb
 			end
@@ -1562,36 +1439,30 @@ function x5.mw(sg)
 		end)
 
 		for _, mn in ipairs(modes) do
-			if filter and filter ~= "" and not mn:lower():find(filter:lower()) then
-				continue
-			end
+			if filter ~= "" and not mn:lower():find(filter:lower()) then continue end
 
 			local f = Instance.new("Frame", dlst)
-			f.Size = UDim2.new(1, -16, 0, 36)
-			f.BackgroundColor3 = mn == x1.k6 and Color3.fromRGB(60, 60, 80) or Color3.fromRGB(45, 45, 50)
-			f.BorderSizePixel = 0
-			f.ZIndex = 22
+			f.Size = UDim2.new(1, -16, 0, 40)
+			f.BackgroundColor3 = mn == x1.k6 and Color3.fromRGB(40, 40, 180) or Color3.fromRGB(25, 25, 30)
 			Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
 
 			local ib = Instance.new("TextButton", f)
-			ib.Size = UDim2.new(1, -30, 1, 0)
+			ib.Size = UDim2.new(1, -40, 1, 0)
 			ib.BackgroundTransparency = 1
 			ib.Text = "  " .. mn
-			ib.TextColor3 = mn == x1.k6 and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
-			ib.Font = Enum.Font.GothamMedium
-			ib.TextSize = 13
-			ib.TextXAlignment = Enum.TextXAlignment.Left
-			ib.ZIndex = 23
+			ib.TextColor3 = Color3.fromRGB(255, 255, 255)
+			ib.Font = Enum.Font.GothamBold
+			ib.TextSize = 12
+			ib.TextXAlignment = 0
 
 			local sb = Instance.new("TextButton", f)
-			sb.Position = UDim2.new(1, -25, 0.5, -10)
-			sb.Size = UDim2.new(0, 20, 0, 20)
+			sb.Position = UDim2.new(1, -35, 0, 0)
+			sb.Size = UDim2.new(0, 35, 1, 0)
 			sb.BackgroundTransparency = 1
 			sb.Text = favorites[mn] and "★" or "☆"
-			sb.TextColor3 = favorites[mn] and Color3.fromRGB(255, 200, 50) or Color3.fromRGB(100, 100, 100)
+			sb.TextColor3 = favorites[mn] and Color3.fromRGB(255, 200, 50) or Color3.fromRGB(80, 80, 85)
 			sb.Font = Enum.Font.GothamBold
-			sb.TextSize = 16
-			sb.ZIndex = 23
+			sb.TextSize = 14
 
 			sb.MouseButton1Click:Connect(function()
 				favorites[mn] = not favorites[mn]
@@ -1600,39 +1471,16 @@ function x5.mw(sg)
 			end)
 
 			ib.MouseButton1Click:Connect(function()
-				if x1.k6 == "Sculptor" then
-					for part, highlight in pairs(x6.sculptor_highlights) do
-						if highlight and highlight.Parent then
-							highlight:Destroy()
-						end
-					end
-					x6.sculptor_highlights = {}
-					x6.sculptor_selected = {}
-					x6.sculptor_dragging = false
-					if x6.sculptor_box then
-						x6.sculptor_box:Destroy()
-						x6.sculptor_box = nil
-					end
-					x6.sculptor_box_start = nil
-				end
+				x1.k6 = mn
+				-- Clear per-part mode state so new mode re-initializes positions
 				for _, d in pairs(x6.a) do
-					d.v1 = nil
-					d.v2 = nil
-					d.v3 = nil
-					d.v4 = nil
-					d.v5 = nil
-					d.v6 = nil
-					d.v7 = nil
-					d.v8 = nil
-					d.v9 = nil
-					d.rot_axis = nil
+					d.v1, d.v2, d.v3, d.v4, d.v5, d.v6, d.v7, d.v8, d.v9 = nil, nil, nil, nil, nil, nil, nil, nil, nil
 					d.integral = Vector3.zero
 				end
-				x1.k6 = mn
-				db.Text = mn
+				if db then db.Text = "  " .. mn:upper() end
 				dlst_container.Visible = false
 				save_settings()
-				x5.st()
+				if x5.up then x5.up() end
 			end)
 		end
 	end
@@ -1641,44 +1489,32 @@ function x5.mw(sg)
 		populate_modes(msb.Text)
 	end)
 
+	x6.populate_modes = populate_modes
 	populate_modes("")
-	x5.s(c, "Tween Speed", 1, 50, x1.k10, function(v)
-		x1.k10 = v
-	end)
-	f1()
 
-	-- Storage logic moved to top
 
 	local minb = Instance.new("TextButton", h)
-	minb.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-	minb.Position = UDim2.new(1, -65, 0, 10)
+	minb.BackgroundColor3 = Color3.fromRGB(60, 200, 100)
+	minb.Position = UDim2.new(1, -60, 0.5, -10)
 	minb.Size = UDim2.new(0, 20, 0, 20)
 	minb.Text = ""
-	minb.AutoButtonColor = false
 	Instance.new("UICorner", minb).CornerRadius = UDim.new(1, 0)
+	
+	local closeb = Instance.new("TextButton", h)
+	closeb.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+	closeb.Position = UDim2.new(1, -30, 0.5, -10)
+	closeb.Size = UDim2.new(0, 20, 0, 20)
+	closeb.Text = ""
+	Instance.new("UICorner", closeb).CornerRadius = UDim.new(1, 0)
+	
 	local im = false
 	minb.MouseButton1Click:Connect(function()
 		im = not im
 		c.Visible = not im
-		dlst_container.Visible = false
-		if im then
-			m:TweenSize(UDim2.new(0, 300, 0, 40), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.3, true)
-			minb.BackgroundColor3 = Color3.fromRGB(100, 255, 100)
-		else
-			m:TweenSize(UDim2.new(0, 300, 0, 520), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.3, true)
-			minb.BackgroundColor3 = Color3.fromRGB(255, 200, 50)
-		end
+		m:TweenSize(im and UDim2.new(0, 320, 0, 50) or UDim2.new(0, 320, 0, 500), "Out", "Quart", 0.3, true)
 	end)
-	local clb = Instance.new("TextButton", h)
-	clb.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-	clb.Position = UDim2.new(1, -30, 0, 10)
-	clb.Size = UDim2.new(0, 20, 0, 20)
-	clb.Text = ""
-	clb.AutoButtonColor = false
-	Instance.new("UICorner", clb).CornerRadius = UDim.new(1, 0)
-	clb.MouseButton1Click:Connect(function()
-		x5.g:Destroy()
-	end)
+	
+	closeb.MouseButton1Click:Connect(function() sg:Destroy() end)
 end
 local function f2(p, cen, d, md, t)
 	local wp, wc = p.Position, cen
@@ -3033,6 +2869,7 @@ local function f2(p, cen, d, md, t)
 	end
 	return ANTI_SLEEP
 end
+local no_damp = { ["Slingshot"] = true, ["Point Impact"] = true, ["Deflect"] = true }
 local function f3()
 	if not x6.b or x1.Disabled then
 		return
@@ -3067,7 +2904,7 @@ local function f3()
 			end
 		end
 		px(x1.k6, ft, x3())
-		local no_damp = { ["Slingshot"] = true, ["Point Impact"] = true, ["Deflect"] = true }
+		local cur_no_damp = no_damp[x1.k6]
 		for _, p in ipairs(x6.active_array) do
 			local d = x6.a[p]
 			if not d then
@@ -3077,6 +2914,14 @@ local function f3()
 			if not p.Parent then
 				x4.f2(p)
 				continue
+			end
+			-- Skip parts we lost network ownership of
+			if isnetworkowner then
+				local ok, owned = pcall(isnetworkowner, p)
+				if ok and not owned then
+					if d.lv then d.lv.VectorVelocity = Vector3.zero end
+					continue
+				end
 			end
 			local p_vel = p.AssemblyLinearVelocity
 			i = i + 1
@@ -3093,10 +2938,11 @@ local function f3()
 				end
 			end
 			local tc = active_c - p.Position
-			if tc.Magnitude > x1.k1 then
+			local tc_mag = tc.Magnitude
+			if tc_mag > x1.k1 then
 				continue
 			end
-			if tc.Magnitude > x9.c7 then
+			if tc_mag > x9.c7 then
 				local target_pos_delta = f2(p, active_c, d, x1.k6, ft)
 				if x1.VerticalStiffness and x1.VerticalStiffness ~= 1 then
 					target_pos_delta =
@@ -3111,12 +2957,12 @@ local function f3()
 					target_pos_delta = target_pos_delta + (d.integral * x1.Ki)
 				end
 				local tv = target_pos_delta
-				if x1.Damping and x1.Damping > 0 and not no_damp[x1.k6] then
+				if x1.Damping and x1.Damping > 0 and not cur_no_damp then
 					tv = tv - (p_vel * x1.Damping)
 				end
 
 				-- Energy-Aware Scaling
-				if x1.MaxSpeed and not no_damp[x1.k6] then
+				if x1.MaxSpeed and not cur_no_damp then
 					local spd = p_vel.Magnitude
 					local s_factor = math.clamp(1 - (spd / x1.MaxSpeed), 0.2, 1)
 					tv = tv * s_factor
@@ -3127,7 +2973,7 @@ local function f3()
 					smoothing = 1
 				end
 				d.vl = d.vl and d.vl:Lerp(tv, smoothing) or tv
-				if x1.MaxSpeed and not no_damp[x1.k6] then
+				if x1.MaxSpeed and not cur_no_damp then
 					if d.vl.Magnitude > x1.MaxSpeed then
 						d.vl = d.vl.Unit * x1.MaxSpeed
 					end
@@ -3146,15 +2992,31 @@ local function f3()
 	end)
 end
 function x4.ProcessQueue()
+	local queue = x6.claim_queue
+	local qi = x6.queue_idx or 1
+	local qn = #queue
+	if qi > qn then
+		if qn > 0 then
+			table.clear(queue)
+			x6.queue_idx = 1
+		end
+		return
+	end
 	local start = os.clock()
-	while #x6.claim_queue > 0 do
+	while qi <= qn do
 		if os.clock() - start > 0.0015 then
 			break
 		end
-		local p = table.remove(x6.claim_queue, 1)
+		local p = queue[qi]
+		qi = qi + 1
 		if p and p:IsA("BasePart") and p:IsDescendantOf(v4) then
 			x4.f1(p)
 		end
+	end
+	x6.queue_idx = qi
+	if qi > qn then
+		table.clear(queue)
+		x6.queue_idx = 1
 	end
 end
 local function f4()
@@ -3186,6 +3048,13 @@ function x4.f1(p)
 	if not p:IsA("BasePart") or x7.e(p) or x6.a[p] then
 		return
 	end
+	-- Skip parts we don't have network ownership of
+	if isnetworkowner then
+		local ok, owned = pcall(isnetworkowner, p)
+		if ok and not owned then
+			return
+		end
+	end
 	for _, c in ipairs(p:GetChildren()) do
 		if
 			c:IsA("BodyAngularVelocity")
@@ -3201,6 +3070,17 @@ function x4.f1(p)
 		if c:IsA("Attachment") or c:IsA("AlignPosition") or c:IsA("Torque") then
 			c:Destroy()
 		end
+	end
+	-- Strip anti-exploit Touched/TouchEnded connections
+	if getconnections then
+		pcall(function()
+			for _, conn in ipairs(getconnections(p.Touched)) do
+				pcall(function() conn:Disable() end)
+			end
+			for _, conn in ipairs(getconnections(p.TouchEnded)) do
+				pcall(function() conn:Disable() end)
+			end
+		end)
 	end
 	if p:FindFirstChild("BHAtt") then
 		p.BHAtt:Destroy()
