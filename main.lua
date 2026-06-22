@@ -1,0 +1,200 @@
+--!native
+
+local function safe_service(name)
+	local service = game:GetService(name)
+	if cloneref then
+		return cloneref(service)
+	end
+	return service
+end
+
+local v1, v2, v3, v4, v5, v6, v7 =
+	safe_service("UserInputService"),
+	safe_service("Players"),
+	safe_service("RunService"),
+	safe_service("Workspace"),
+	safe_service("StarterGui"),
+	safe_service("TweenService"),
+	safe_service("ContextActionService")
+local HttpService = safe_service("HttpService")
+
+if setthreadidentity then
+	pcall(function()
+		setthreadidentity(8)
+	end)
+end
+
+local v8, v9 = v2.LocalPlayer, v2.LocalPlayer:GetMouse()
+local is_mobile = v1.TouchEnabled and not v1.KeyboardEnabled
+local SUB_DIR = is_mobile and "mobilever/" or ""
+
+local x9 = { c1 = 0.15, c2 = 0.05, c3 = 0.01, c4 = 0.2, c5 = 0.6, c6 = 0.8, c7 = 0.1, c8 = 0.25 }
+local ANTI_SLEEP = Vector3.new(0, 0.01, 0)
+local BASE_URL = "https://raw.githubusercontent.com/CarlDV/projectgravity/main/"
+
+local function load_module(path)
+	return loadstring(game:HttpGet(BASE_URL .. path))()
+end
+
+local config = load_module("config.lua")
+local x1 = config.x1
+local x2 = config.x2
+x1.S = x2
+
+local serialization = load_module("math/serialization.lua")
+local sanitize = serialization.sanitize
+local desanitize = serialization.desanitize
+
+local favorites = {}
+local function save_favs()
+	if writefile then
+		pcall(function()
+			writefile("GravityFavorites.json", HttpService:JSONEncode(favorites))
+		end)
+	end
+end
+local function load_favs()
+	if isfile and isfile("GravityFavorites.json") then
+		pcall(function()
+			favorites = HttpService:JSONDecode(readfile("GravityFavorites.json"))
+		end)
+	end
+end
+load_favs()
+
+local function save_settings()
+	if not writefile then
+		return
+	end
+	local data = { x1 = sanitize(x1), x2 = sanitize(x2) }
+	data.x1.Tgt = nil
+	data.x1.IsLaunching = nil
+	local success, json = pcall(function()
+		return HttpService:JSONEncode(data)
+	end)
+	if success then
+		pcall(function()
+			writefile("GravitySettings_Auto.json", json)
+		end)
+	end
+end
+
+local function load_settings()
+	if isfile and isfile("GravitySettings_Auto.json") then
+		local success, data = pcall(function()
+			return HttpService:JSONDecode(readfile("GravitySettings_Auto.json"))
+		end)
+		if success and data then
+			local cx1 = desanitize(data.x1)
+			local cx2 = desanitize(data.x2)
+			for k, v in pairs(cx1) do
+				if k ~= "S" and x1[k] ~= nil and typeof(x1[k]) == typeof(v) then
+					x1[k] = v
+				end
+			end
+			for mk, mv in pairs(cx2) do
+				if x2[mk] and type(mv) == "table" then
+					for sk, sv in pairs(mv) do
+						x2[mk][sk] = sv
+					end
+				end
+			end
+		end
+	end
+end
+load_settings()
+
+local loaded_shapes = {}
+local function get_shape(name)
+	if not loaded_shapes[name] then
+		local url = BASE_URL .. "shapes/" .. HttpService:UrlEncode(name) .. ".lua"
+		local success, result = pcall(function()
+			return loadstring(game:HttpGet(url))()
+		end)
+		if success and result then
+			loaded_shapes[name] = result
+		else
+			warn("Failed to load shape: " .. tostring(name) .. " Error: " .. tostring(result))
+		end
+	end
+	return loaded_shapes[name]
+end
+
+local x6 = {
+	b = nil,
+	c = {},
+	a = {},
+	o = false,
+	d = false,
+	p = 0,
+	f = 0,
+	n = 0,
+	pi_targets = {},
+	pi_timer = 0,
+	ex_nodes = {},
+	ex_timer = 0,
+	esp_timer = 0,
+	claim_queue = {},
+	active_array = {},
+	pre = {},
+	pre_buffer = table.create(200),
+	sculptor_selected = {},
+	sculptor_dragging = false,
+	sculptor_drag_start = nil,
+	sculptor_box_start = nil,
+	sculptor_box = nil,
+	sculptor_highlights = {},
+	sculptor_preset_ui = nil,
+	transition_time = 0,
+	transition_dur = 2,
+}
+
+get_shape(x1.k6)
+
+coroutine.wrap(function()
+	for mn, _ in pairs(x2) do
+		if mn ~= x1.k6 then
+			get_shape(mn)
+			if task and task.wait then
+				task.wait(0.05)
+			end
+		end
+	end
+end)()
+
+local context = {
+	v1 = v1,
+	v2 = v2,
+	v3 = v3,
+	v4 = v4,
+	v5 = v5,
+	v6 = v6,
+	v7 = v7,
+	v8 = v8,
+	v9 = v9,
+	x1 = x1,
+	x2 = x2,
+	x6 = x6,
+	x9 = x9,
+	favorites = favorites,
+	save_favs = save_favs,
+	save_settings = save_settings,
+	get_shape = get_shape,
+	load_module = load_module,
+	is_mobile = is_mobile,
+	SUB_DIR = SUB_DIR,
+}
+
+local UI_builder = load_module(SUB_DIR .. "UI.lua")
+local x5 = UI_builder(context)
+context.x5 = x5
+
+local system_builder = load_module(SUB_DIR .. "System.lua")
+local sys = system_builder(context)
+local x4 = sys.x4
+local x8 = sys.x8
+context.x4 = x4
+
+x4.f3()
+x8.i()
+x5.st()
