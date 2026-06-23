@@ -28,6 +28,48 @@ local v8, v9 = v2.LocalPlayer, v2.LocalPlayer:GetMouse()
 local is_mobile = v1.TouchEnabled and not v1.KeyboardEnabled
 local SUB_DIR = is_mobile and "mobilever/" or ""
 
+local loading_sg = Instance.new("ScreenGui")
+loading_sg.Name = "GravityLoading"
+loading_sg.DisplayOrder = 99999
+loading_sg.IgnoreGuiInset = true
+if gethui then
+	loading_sg.Parent = gethui()
+elseif syn and syn.protect_gui then
+	syn.protect_gui(loading_sg)
+	loading_sg.Parent = game:GetService("CoreGui")
+else
+	loading_sg.Parent = v8:WaitForChild("PlayerGui")
+end
+local spinner = Instance.new("Frame", loading_sg)
+spinner.Size = UDim2.new(0, 36, 0, 36)
+spinner.Position = UDim2.new(0.5, -18, 0.5, -18)
+spinner.BackgroundTransparency = 1
+local uic = Instance.new("UICorner", spinner)
+uic.CornerRadius = UDim.new(1, 0)
+local uis = Instance.new("UIStroke", spinner)
+uis.Thickness = 3
+uis.Color = Color3.fromRGB(255, 255, 255)
+local uig = Instance.new("UIGradient", uis)
+uig.Transparency = NumberSequence.new({
+	NumberSequenceKeypoint.new(0, 0),
+	NumberSequenceKeypoint.new(0.5, 0),
+	NumberSequenceKeypoint.new(1, 1)
+})
+local spin_t = 0
+local spin_conn = v3.RenderStepped:Connect(function(dt)
+	spin_t = spin_t + dt
+	spinner.Rotation = spin_t * 400
+end)
+
+local loading_text = Instance.new("TextLabel", loading_sg)
+loading_text.Size = UDim2.new(0, 100, 0, 20)
+loading_text.Position = UDim2.new(0.5, -50, 0.5, 25)
+loading_text.BackgroundTransparency = 1
+loading_text.Text = "LOADING..."
+loading_text.TextColor3 = Color3.fromRGB(200, 200, 200)
+loading_text.Font = Enum.Font.GothamMedium
+loading_text.TextSize = 12
+
 local x9 = { c1 = 0.15, c2 = 0.05, c3 = 0.01, c4 = 0.2, c5 = 0.6, c6 = 0.8, c7 = 0.1, c8 = 0.25 }
 local ANTI_SLEEP = Vector3.new(0, 0.01, 0)
 local BASE_URL = "https://raw.githubusercontent.com/CarlDV/projectgravity/main/"
@@ -198,3 +240,6 @@ context.x4 = x4
 x4.f3()
 x8.i()
 x5.st()
+
+spin_conn:Disconnect()
+loading_sg:Destroy()

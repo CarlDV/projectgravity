@@ -332,7 +332,11 @@ return function(context)
 				end)
 			end
 
+			if m:FindFirstChild("TargetListContainer") then
+				m.TargetListContainer:Destroy()
+			end
 			local tdlst = Instance.new("Frame", m)
+			tdlst.Name = "TargetListContainer"
 			tdlst.Visible = false
 			tdlst.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
 			tdlst.Position = UDim2.new(1, 15, 0, 0)
@@ -438,7 +442,7 @@ return function(context)
 				if x1.k6 == "Big Ring Things" then
 					es(sc, "Ring Count", 1, 20, s.k11, function(v)
 						s.k11 = v
-					end)
+					end, true)
 					es(sc, "Ring Gap", 50, 300, s.k12, function(v)
 						s.k12 = v
 					end)
@@ -996,6 +1000,7 @@ return function(context)
 
 				local ib = Instance.new("TextButton", f)
 				ib.Size = UDim2.new(1, -40, 1, 0)
+				ib.Position = UDim2.new(0, 8, 0, 0)
 				ib.BackgroundTransparency = 1
 				ib.Text = "  " .. mn
 				ib.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1066,6 +1071,15 @@ return function(context)
 		minb.MouseButton1Click:Connect(function()
 			im = not im
 			c.Visible = not im
+			if im then
+				am.Visible = false
+				if x6.dlst_container then
+					x6.dlst_container.Visible = false
+				end
+				if m:FindFirstChild("TargetListContainer") then
+					m.TargetListContainer.Visible = false
+				end
+			end
 			m:TweenSize(im and UDim2.new(0, 320, 0, 50) or UDim2.new(0, 320, 0, 500), "Out", "Quart", 0.3, true)
 		end)
 
