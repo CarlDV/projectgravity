@@ -17,44 +17,39 @@ function M.px(t, c, x6, x9)
 	for i = 1, res do
 		local pc = (i - 1) / (res - 1)
 		local ph = (t * s) - (pc * (l * x9.c2))
-		local px, pz, py = math.cos(ph) * R, math.sin(ph * 1.618) * R, math.sin(ph * 0.577) * h
-		local T = Vector3.new(px, py, pz).Unit
-		local Rv = T:Cross(Vector3.yAxis)
-		if Rv.Magnitude < 0.01 then
-			Rv = Vector3.xAxis
+		
+		local function get_pos(phi)
+			return Vector3.new(math.cos(phi) * R, math.sin(phi * 0.577) * h, math.sin(phi * 1.618) * R)
 		end
+		
+		local p_cur = get_pos(ph)
+		local p_next = get_pos(ph - 0.05)
+		local T = (p_next - p_cur).Unit
+		if T.Magnitude ~= T.Magnitude then T = Vector3.xAxis end
+
+		local Rv = T:Cross(Vector3.yAxis)
+		if Rv.Magnitude < 0.001 then Rv = Vector3.xAxis end
 		Rv = Rv.Unit
+		
 		local trn = Rv * math.cos(ph * 0.5) + (T:Cross(Rv)) * math.sin(ph * 0.5)
-		r[i] = { p = Vector3.new(px, py, pz), t = trn, ph = ph }
+		r[i] = { p = p_cur, t = trn.Unit, ph = ph }
 
 		local ph2 = ph + 2.37
-		local px2 = math.cos(ph2 * 1.247) * R
-		local pz2 = math.sin(ph2 * 0.831) * R
-		local py2 = math.sin(ph2 * 0.693) * h
-		local T2 = Vector3.new(px2, py2, pz2).Unit
+		local function get_pos2(phi)
+			return Vector3.new(math.cos(phi * 1.247) * R, math.sin(phi * 0.693) * h, math.sin(phi * 0.831) * R)
+		end
+		
+		local p_cur2 = get_pos2(ph2)
+		local p_next2 = get_pos2(ph2 - 0.05)
+		local T2 = (p_next2 - p_cur2).Unit
+		if T2.Magnitude ~= T2.Magnitude then T2 = Vector3.xAxis end
+
 		local Rv2 = T2:Cross(Vector3.yAxis)
-		if Rv2.Magnitude < 0.01 then
-			Rv2 = Vector3.xAxis
-		end
+		if Rv2.Magnitude < 0.001 then Rv2 = Vector3.xAxis end
 		Rv2 = Rv2.Unit
+		
 		local trn2 = Rv2 * math.cos(ph2 * 0.5) + (T2:Cross(Rv2)) * math.sin(ph2 * 0.5)
-		r2[i] = { p = Vector3.new(px2, py2, pz2), t = trn2, ph = ph2 }
-	end
-	for _ = 1, 3 do
-		for i = 2, res - 1 do
-			r[i].p = (r[i - 1].p + r[i].p + r[i + 1].p) / 3
-			r2[i].p = (r2[i - 1].p + r2[i].p + r2[i + 1].p) / 3
-		end
-	end
-	for i = 2, res - 1 do
-		local dir = (r[i + 1].p - r[i - 1].p).Unit
-		local rv = dir:Cross(Vector3.yAxis)
-		if rv.Magnitude < 0.01 then rv = Vector3.xAxis end
-		r[i].t = rv.Unit
-		local dir2 = (r2[i + 1].p - r2[i - 1].p).Unit
-		local rv2 = dir2:Cross(Vector3.yAxis)
-		if rv2.Magnitude < 0.01 then rv2 = Vector3.xAxis end
-		r2[i].t = rv2.Unit
+		r2[i] = { p = p_cur2, t = trn2.Unit, ph = ph2 }
 	end
 end
 
@@ -88,24 +83,29 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 		local isB = c.k19 and d.v9 == 1
 		local ph = (t * s) - (d.v6 * (l * x9.c2)) + (isB and 2.37 or 0)
 		local R = (c.k17 or 150)
-		local px, pz, py
-		if isB then
-			px = math.cos(ph * 1.247) * R
-			pz = math.sin(ph * 0.831) * R
-			py = math.sin(ph * 0.693) * h
-		else
-			px, pz, py = math.cos(ph) * R, math.sin(ph * 1.618) * R, math.sin(ph * 0.577) * h
+		local function get_pos_fallback(phi, is_b)
+			if is_b then
+				return Vector3.new(math.cos(phi * 1.247) * R, math.sin(phi * 0.693) * h, math.sin(phi * 0.831) * R)
+			else
+				return Vector3.new(math.cos(phi) * R, math.sin(phi * 0.577) * h, math.sin(phi * 1.618) * R)
+			end
 		end
-		local T = Vector3.new(px, py, pz).Unit
+
+		local p_cur = get_pos_fallback(ph, isB)
+		local p_next = get_pos_fallback(ph - 0.05, isB)
+		local T = (p_next - p_cur).Unit
+		if T.Magnitude ~= T.Magnitude then T = Vector3.xAxis end
+
 		local Rvec = T:Cross(Vector3.yAxis)
-		if Rvec.Magnitude < 0.01 then
+		if Rvec.Magnitude < 0.001 then
 			Rvec = Vector3.xAxis
 		end
 		Rvec = Rvec.Unit
 		local trn = Rvec * math.cos(ph * 0.5) + (T:Cross(Rvec)) * math.sin(ph * 0.5)
-		fin = Vector3.new(px, py, pz)
-			+ (trn * (d.v7 * w))
-			+ (c.k18 and (trn * math.sin(ph * 8)) * (w * 2.0) or Vector3.zero)
+		
+		fin = p_cur
+			+ (trn.Unit * (d.v7 * w))
+			+ (c.k18 and (trn.Unit * math.sin(ph * 8)) * (w * 2.0) or Vector3.zero)
 	end
 	return ((cen + fin) - wp) * (x1.k10 * x9.c1)
 end
