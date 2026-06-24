@@ -74,8 +74,36 @@ local x9 = { c1 = 0.15, c2 = 0.05, c3 = 0.01, c4 = 0.2, c5 = 0.6, c6 = 0.8, c7 =
 local ANTI_SLEEP = Vector3.new(0, 0.01, 0)
 local BASE_URL = "https://raw.githubusercontent.com/CarlDV/projectgravity/main/"
 
+local function safe_http_get(url)
+	local success, result = pcall(function()
+		return game:HttpGet(url)
+	end)
+	if success and result then
+		return result
+	end
+	local req = (type(request) == "function" and request) or (type(http) == "table" and http.request) or (type(syn) == "table" and syn.request)
+	if req then
+		local s, r = pcall(function()
+			return req({Url = url, Method = "GET"})
+		end)
+		if s and type(r) == "table" and r.Body then
+			return r.Body
+		end
+	end
+	return nil
+end
+
 local function load_module(path)
-	return loadstring(game:HttpGet(BASE_URL .. path))()
+	local code = safe_http_get(BASE_URL .. path)
+	if code then
+		local func, err = loadstring(code)
+		if func then
+			return func()
+		end
+		warn("Syntax error in module " .. path .. ": " .. tostring(err))
+	end
+	warn("Failed to download module: " .. path)
+	return nil
 end
 
 local config = load_module("config.lua")
@@ -150,9 +178,18 @@ local loaded_shapes = {}
 local function get_shape(name)
 	if not loaded_shapes[name] then
 		local url = BASE_URL .. "shapes/" .. HttpService:UrlEncode(name) .. ".lua"
-		local success, result = pcall(function()
-			return loadstring(game:HttpGet(url))()
-		end)
+		local code = safe_http_get(url)
+		local success, result = false, nil
+		if code then
+			local func = loadstring(code)
+			if func then
+				success, result = pcall(func)
+			else
+				result = "Syntax error in shape source"
+			end
+		else
+			result = "HTTP Request Failed"
+		end
 		if success and result then
 			loaded_shapes[name] = result
 		else
@@ -189,6 +226,7 @@ local x6 = {
 	sculptor_preset_ui = nil,
 	transition_time = 0,
 	transition_dur = 2,
+	f1_connections = {},
 }
 
 get_shape(x1.k6)

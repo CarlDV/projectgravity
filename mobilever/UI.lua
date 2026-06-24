@@ -233,6 +233,14 @@ return function(context)
 		scl.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 		local function f1()
+			if x6.f1_connections then
+				for _, conn in ipairs(x6.f1_connections) do
+					if conn then conn:Disconnect() end
+				end
+				table.clear(x6.f1_connections)
+			else
+				x6.f1_connections = {}
+			end
 			sc:ClearAllChildren()
 			gsc:ClearAllChildren()
 			local gscl = Instance.new("UIListLayout", gsc)
@@ -302,7 +310,7 @@ return function(context)
 			end)
 
 			table.insert(
-				x6.c,
+				x6.f1_connections,
 				v3.Heartbeat:Connect(function()
 					if x1.ImpactManual or (x1.k6 == "Slingshot" and x1.SlingshotManual) then
 						l_btn.Visible = true
@@ -461,9 +469,9 @@ return function(context)
 				end
 			end
 
-			search_bar:GetPropertyChangedSignal("Text"):Connect(function()
+			table.insert(x6.f1_connections, search_bar:GetPropertyChangedSignal("Text"):Connect(function()
 				update_list(search_bar.Text)
-			end)
+			end))
 			tdb.MouseButton1Click:Connect(function()
 				tdlst.Visible = not tdlst.Visible
 				if tdlst.Visible then
@@ -606,7 +614,7 @@ return function(context)
 					end)
 					es(sc, "Orbit Count", 1, 10, s.k15, function(v)
 						s.k15 = v
-					end)
+					end, true)
 					es(sc, "Move Area", 50, 800, s.k17, function(v)
 						s.k17 = v
 					end)
@@ -773,7 +781,7 @@ return function(context)
 					end)
 					es(sc, "Ring Count", 1, 10, s.k12, function(v)
 						s.k12 = v
-					end)
+					end, true)
 					es(sc, "Speed", 1, 100, s.k13 * 10, function(v)
 						s.k13 = v / 10
 					end)
@@ -862,7 +870,7 @@ return function(context)
 					end)
 					es(sc, "Arm Count", 2, 8, s.k12, function(v)
 						s.k12 = v
-					end)
+					end, true)
 					es(sc, "Spin Speed", 1, 50, s.k13, function(v)
 						s.k13 = v
 					end)
@@ -881,7 +889,7 @@ return function(context)
 					end)
 					es(sc, "Jet Count", 3, 12, s.k14, function(v)
 						s.k14 = v
-					end)
+					end, true)
 				elseif x1.k6 == "Eldritch Binding" then
 					es(sc, "Sigil Radius", 30, 250, s.k11, function(v)
 						s.k11 = v
@@ -894,11 +902,11 @@ return function(context)
 					end)
 					es(sc, "Tendril Count", 3, 16, s.k14, function(v)
 						s.k14 = v
-					end)
+					end, true)
 				elseif x1.k6 == "Graviton Engine" then
 					es(sc, "Turbine Count", 2, 8, s.k11, function(v)
 						s.k11 = v
-					end)
+					end, true)
 					es(sc, "Radius", 20, 200, s.k12, function(v)
 						s.k12 = v
 					end)

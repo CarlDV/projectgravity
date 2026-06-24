@@ -98,7 +98,8 @@ return function(context)
 
 	local no_damp = { ["Slingshot"] = true, ["Point Impact"] = true, ["Deflect"] = true }
 
-	local function f3()
+	local function f3(real_dt)
+		real_dt = real_dt or (1/60)
 		if not x6.b or x1.Disabled then
 			return
 		end
@@ -133,7 +134,8 @@ return function(context)
 			end
 			px(x1.k6, ft, x3())
 			local cur_no_damp = no_damp[x1.k6]
-			for _, p in ipairs(x6.active_array) do
+			for k = #x6.active_array, 1, -1 do
+				local p = x6.active_array[k]
 				local d = x6.a[p]
 				if not d then
 					continue
@@ -169,7 +171,7 @@ return function(context)
 							Vector3.new(target_pos_delta.X, target_pos_delta.Y * x1.VerticalStiffness, target_pos_delta.Z)
 					end
 					if x1.Ki and x1.Ki > 0 and d.integral then
-						d.integral = d.integral + (target_pos_delta * dt)
+						d.integral = d.integral + (target_pos_delta * real_dt * 60 * dt)
 						local max_i = 100
 						if d.integral.Magnitude > max_i then
 							d.integral = d.integral.Unit * max_i
@@ -191,7 +193,8 @@ return function(context)
 					if x1.DramaMode and x1.k6 == "Point Impact" then
 						smoothing = 1
 					end
-					d.vl = d.vl and d.vl:Lerp(tv, smoothing) or tv
+					local sm_alpha = smoothing >= 1 and 1 or (1 - math.exp(-60 * real_dt * dt * -math.log(math.max(0.001, 1 - smoothing))))
+					d.vl = d.vl and d.vl:Lerp(tv, sm_alpha) or tv
 					if d.trans_vl and x6.transition_time > 0 then
 						local alpha = math.clamp((ft - x6.transition_time) / x6.transition_dur, 0, 1)
 						if alpha < 1 then
@@ -212,8 +215,9 @@ return function(context)
 					end
 					d.lv.VectorVelocity = d.vl
 					if x1.AngularDamping and x1.AngularDamping > 0 then
+						local damp_rate = -60 * math.log(math.max(0.001, 1 - math.clamp(x1.AngularDamping, 0, 0.99)))
 						p.AssemblyAngularVelocity = p.AssemblyAngularVelocity
-							* math.pow(1 - math.clamp(x1.AngularDamping, 0, 0.99), dt)
+							* math.exp(-damp_rate * real_dt * dt)
 					end
 				end
 			end
@@ -249,7 +253,8 @@ return function(context)
 		end
 	end
 
-	local function f4()
+	local function f4(real_dt)
+		real_dt = real_dt or (1/60)
 		if not x6.b or x1.Disabled then
 			return
 		end
@@ -270,7 +275,8 @@ return function(context)
 			local mp = v1:GetMouseLocation()
 			local r = c:ViewportPointToRay(mp.X, mp.Y)
 			local tp = r.Origin + (r.Direction * x6.p)
-			x6.b.Position = x6.b.Position:Lerp(tp, x9.c8)
+			local alpha = x9.c8 >= 1 and 1 or (1 - math.exp(-60 * real_dt * -math.log(math.max(0.001, 1 - x9.c8))))
+			x6.b.Position = x6.b.Position:Lerp(tp, alpha)
 			x6.b.AssemblyLinearVelocity = Vector3.zero
 		end
 	end
@@ -473,9 +479,9 @@ return function(context)
 		x5.st()
 		table.insert(
 			x6.c,
-			v3.Heartbeat:Connect(function()
-				f3()
-				f4()
+			v3.Heartbeat:Connect(function(real_dt)
+				f3(real_dt)
+				f4(real_dt)
 				x4.ProcessQueue()
 			end)
 		)
@@ -497,6 +503,12 @@ return function(context)
 			c:Disconnect()
 		end
 		x6.c = {}
+		if x6.f1_connections then
+			for _, c in ipairs(x6.f1_connections) do
+				if c then c:Disconnect() end
+			end
+			table.clear(x6.f1_connections)
+		end
 		x6.a = {}
 		x6.o = false
 		v7:UnbindAction("C")
