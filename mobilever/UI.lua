@@ -194,6 +194,13 @@ return function(context)
 			x1.VerticalStiffness = v
 			save_settings()
 		end)
+		if setfpscap then
+			es(ac, "FPS Cap (0=Unc)", 0, 144, x1.FPSCap or 60, function(v)
+				x1.FPSCap = v
+				setfpscap(v)
+				save_settings()
+			end, true)
+		end
 
 		local ab = eb(c, "Advanced Settings", function()
 			am.Visible = not am.Visible

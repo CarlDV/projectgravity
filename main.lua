@@ -182,6 +182,12 @@ local function load_settings()
 end
 load_settings()
 
+if setfpscap then
+	pcall(function()
+		setfpscap(x1.FPSCap or 60)
+	end)
+end
+
 local loaded_shapes = {}
 local function get_shape(name)
 	if not loaded_shapes[name] then
