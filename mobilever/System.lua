@@ -162,11 +162,11 @@ return function(context)
 					x6.n = math.max(0, x6.n - 1)
 					continue
 				end
-				local p_vel = p.AssemblyLinearVelocity
 				i = i + 1
 				if i % et ~= (x6.f % et) then
 					continue
 				end
+				local p_vel = p.AssemblyLinearVelocity
 				local active_c = c
 				if valid_targets > 0 then
 					active_c = target_positions[((i - 1) % valid_targets) + 1]
