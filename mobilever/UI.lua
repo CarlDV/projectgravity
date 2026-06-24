@@ -1158,37 +1158,25 @@ return function(context)
 			end
 		end)
 
-		local ctrl_container = Instance.new("Frame", sg)
-		ctrl_container.BackgroundTransparency = 1
-		ctrl_container.Position = UDim2.new(0, 15, 0.05, 0)
-		ctrl_container.Size = UDim2.new(0, 300, 0, 30)
-		
-		local container_layout = Instance.new("UIListLayout", ctrl_container)
-		container_layout.FillDirection = Enum.FillDirection.Horizontal
-		container_layout.VerticalAlignment = Enum.VerticalAlignment.Center
-		container_layout.Padding = UDim.new(0, 6)
-
-		local hide_btn = Instance.new("TextButton", ctrl_container)
-		hide_btn.Size = UDim2.new(0, 14, 0, 14)
-		hide_btn.BackgroundColor3 = Color3.fromRGB(60, 200, 100)
-		hide_btn.Text = ""
-		Instance.new("UICorner", hide_btn).CornerRadius = UDim.new(1, 0)
-
-		local ctrl = Instance.new("Frame", ctrl_container)
+		local ctrl = Instance.new("Frame", sg)
 		ctrl.BackgroundTransparency = 1
-		ctrl.Size = UDim2.new(1, -20, 1, 0)
+		ctrl.Position = UDim2.new(0, 15, 0.05, 0)
+		ctrl.Size = UDim2.new(0, 300, 0, 30)
 
 		local layout = Instance.new("UIListLayout", ctrl)
 		layout.FillDirection = Enum.FillDirection.Horizontal
 		layout.VerticalAlignment = Enum.VerticalAlignment.Center
-		layout.Padding = UDim.new(0, 4)
+		layout.Padding = UDim.new(0, 6)
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
 
-		hide_btn.MouseButton1Click:Connect(function()
-			ctrl.Visible = not ctrl.Visible
-			hide_btn.BackgroundColor3 = ctrl.Visible and Color3.fromRGB(60, 200, 100) or Color3.fromRGB(200, 60, 60)
-		end)
+		local hide_btn = Instance.new("TextButton", ctrl)
+		hide_btn.Size = UDim2.new(0, 14, 0, 14)
+		hide_btn.BackgroundColor3 = Color3.fromRGB(60, 200, 100)
+		hide_btn.Text = ""
+		hide_btn.LayoutOrder = 1
+		Instance.new("UICorner", hide_btn).CornerRadius = UDim.new(1, 0)
 
-		local function create_btn(txt, col)
+		local function create_btn(txt, col, order)
 			local b = Instance.new("TextButton")
 			b.Size = UDim2.new(0, 26, 0, 26)
 			b.BackgroundColor3 = col
@@ -1196,17 +1184,30 @@ return function(context)
 			b.TextColor3 = Color3.fromRGB(255, 255, 255)
 			b.Font = Enum.Font.GothamBold
 			b.TextSize = 7
+			b.LayoutOrder = order
 			Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
 			b.Parent = ctrl
 			return b
 		end
 
-		local btn_place = create_btn("PLC", Color3.fromRGB(50, 150, 200))
-		local btn_clean = create_btn("CLN", Color3.fromRGB(200, 80, 80))
-		local btn_up = create_btn("UP", Color3.fromRGB(80, 80, 85))
-		local btn_down = create_btn("DWN", Color3.fromRGB(80, 80, 85))
-		local btn_pause = create_btn("PAU", Color3.fromRGB(200, 150, 50))
-		local btn_dis = create_btn("DIS", Color3.fromRGB(60, 60, 60))
+		local btn_place = create_btn("PLC", Color3.fromRGB(50, 150, 200), 2)
+		local btn_clean = create_btn("CLN", Color3.fromRGB(200, 80, 80), 3)
+		local btn_up = create_btn("UP", Color3.fromRGB(80, 80, 85), 4)
+		local btn_down = create_btn("DWN", Color3.fromRGB(80, 80, 85), 5)
+		local btn_pause = create_btn("PAU", Color3.fromRGB(200, 150, 50), 6)
+		local btn_dis = create_btn("DIS", Color3.fromRGB(60, 60, 60), 7)
+
+		local controls_visible = true
+		hide_btn.MouseButton1Click:Connect(function()
+			controls_visible = not controls_visible
+			hide_btn.BackgroundColor3 = controls_visible and Color3.fromRGB(60, 200, 100) or Color3.fromRGB(200, 60, 60)
+			btn_place.Visible = controls_visible
+			btn_clean.Visible = controls_visible
+			btn_up.Visible = controls_visible
+			btn_down.Visible = controls_visible
+			btn_pause.Visible = controls_visible
+			btn_dis.Visible = controls_visible
+		end)
 
 		btn_place.MouseButton1Click:Connect(function()
 			if context.x4 and context.x4.f4 then
