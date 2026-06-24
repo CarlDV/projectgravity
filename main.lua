@@ -265,19 +265,27 @@ local context = {
 	SUB_DIR = SUB_DIR,
 }
 
-local UI_builder = load_module(SUB_DIR .. "UI.lua")
-local x5 = UI_builder(context)
-context.x5 = x5
+local success, err = pcall(function()
+	local UI_builder = load_module(SUB_DIR .. "UI.lua")
+	if not UI_builder then error("Failed to load UI") end
+	local x5 = UI_builder(context)
+	context.x5 = x5
 
-local system_builder = load_module(SUB_DIR .. "System.lua")
-local sys = system_builder(context)
-local x4 = sys.x4
-local x8 = sys.x8
-context.x4 = x4
+	local system_builder = load_module(SUB_DIR .. "System.lua")
+	if not system_builder then error("Failed to load System") end
+	local sys = system_builder(context)
+	local x4 = sys.x4
+	local x8 = sys.x8
+	context.x4 = x4
 
-x4.f3()
-x8.i()
-x5.st()
+	x4.f3()
+	x8.i()
+	x5.st()
+end)
 
 spin_conn:Disconnect()
 loading_sg:Destroy()
+
+if not success then
+	warn("Project Gravity Initialization Failed: " .. tostring(err))
+end

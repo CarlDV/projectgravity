@@ -1158,25 +1158,42 @@ return function(context)
 			end
 		end)
 
-		local ctrl = Instance.new("Frame", sg)
+		local ctrl_container = Instance.new("Frame", sg)
+		ctrl_container.BackgroundTransparency = 1
+		ctrl_container.Position = UDim2.new(0, 15, 0.05, 0)
+		ctrl_container.Size = UDim2.new(0, 40, 0, 220)
+		
+		local hide_btn = Instance.new("TextButton", ctrl_container)
+		hide_btn.Size = UDim2.new(0, 14, 0, 14)
+		hide_btn.Position = UDim2.new(0, 6, 0, 0)
+		hide_btn.BackgroundColor3 = Color3.fromRGB(60, 200, 100)
+		hide_btn.Text = ""
+		Instance.new("UICorner", hide_btn).CornerRadius = UDim.new(1, 0)
+
+		local ctrl = Instance.new("Frame", ctrl_container)
 		ctrl.BackgroundTransparency = 1
-		ctrl.Position = UDim2.new(0, 15, 0.05, 0)
-		ctrl.Size = UDim2.new(0, 40, 0, 180)
+		ctrl.Position = UDim2.new(0, 0, 0, 20)
+		ctrl.Size = UDim2.new(1, 0, 1, -20)
 
 		local layout = Instance.new("UIListLayout", ctrl)
 		layout.FillDirection = Enum.FillDirection.Vertical
 		layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-		layout.Padding = UDim.new(0, 6)
+		layout.Padding = UDim.new(0, 4)
+
+		hide_btn.MouseButton1Click:Connect(function()
+			ctrl.Visible = not ctrl.Visible
+			hide_btn.BackgroundColor3 = ctrl.Visible and Color3.fromRGB(60, 200, 100) or Color3.fromRGB(200, 60, 60)
+		end)
 
 		local function create_btn(txt, col)
 			local b = Instance.new("TextButton")
-			b.Size = UDim2.new(0, 32, 0, 32)
+			b.Size = UDim2.new(0, 26, 0, 26)
 			b.BackgroundColor3 = col
 			b.Text = txt
 			b.TextColor3 = Color3.fromRGB(255, 255, 255)
 			b.Font = Enum.Font.GothamBold
-			b.TextSize = 8
-			Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+			b.TextSize = 7
+			Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
 			b.Parent = ctrl
 			return b
 		end
@@ -1185,6 +1202,8 @@ return function(context)
 		local btn_clean = create_btn("CLN", Color3.fromRGB(200, 80, 80))
 		local btn_up = create_btn("UP", Color3.fromRGB(80, 80, 85))
 		local btn_down = create_btn("DWN", Color3.fromRGB(80, 80, 85))
+		local btn_pause = create_btn("PAU", Color3.fromRGB(200, 150, 50))
+		local btn_dis = create_btn("DIS", Color3.fromRGB(60, 60, 60))
 
 		btn_place.MouseButton1Click:Connect(function()
 			if context.x4 and context.x4.f4 then
@@ -1217,6 +1236,29 @@ return function(context)
 		btn_down.MouseButton1Click:Connect(function()
 			if x6.b then
 				x6.b.Position = x6.b.Position - Vector3.new(0, 3, 0)
+			end
+		end)
+
+		btn_pause.MouseButton1Click:Connect(function()
+			x1.Paused = not x1.Paused
+			btn_pause.BackgroundColor3 = x1.Paused and Color3.fromRGB(255, 200, 80) or Color3.fromRGB(200, 150, 50)
+		end)
+
+		btn_dis.MouseButton1Click:Connect(function()
+			x1.Disabled = not x1.Disabled
+			btn_dis.BackgroundColor3 = x1.Disabled and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(60, 60, 60)
+			if x6.disable_btn then x6.disable_btn.BackgroundColor3 = btn_dis.BackgroundColor3 end
+			
+			local v = x1.Disabled
+			if x6.b then
+				x6.b.Transparency = v and 1 or x9.c7
+				if x6.b:FindFirstChild("Visual") then
+					x6.b.Visual.Enabled = not v
+				end
+			end
+			for _, d in pairs(x6.a) do
+				if d.lv then d.lv.MaxForce = v and 0 or x1.k4 end
+				if d.av then d.av.MaxTorque = v and 0 or math.huge end
 			end
 		end)
 
