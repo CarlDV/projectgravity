@@ -252,11 +252,7 @@ return function(context)
 			local s = x1.S[x1.k6] or {}
 
 			eh(gsc, "Control")
-			et(gsc, "Simplified Interface", x1.SimpleMode, function(v)
-				x1.SimpleMode = v
-				save_settings()
-				f1()
-			end)
+
 
 			et(gsc, "Anchor to Self", x1.AnchorSelf, function(v)
 				x1.AnchorSelf = v
@@ -1005,44 +1001,10 @@ return function(context)
 			dll.Padding = UDim.new(0, 5)
 			dll.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
-			local modes = {
-				"Big Ring Things",
-				"Celestial Ribbon",
-				"Hollow Worm",
-				"Cosmic Comet",
-				"Point Impact",
-				"Orbital Shell",
-				"Vortex Funnel",
-				"Quantum Atoms",
-				"Halo Ring",
-				"Slingshot",
-				"Gods Call",
-				"Deflect",
-				"Shield Wall",
-				"Sculptor",
-				"Torus Knot",
-				"Möbius Strip",
-				"DNA Helix",
-				"Black Hole",
-				"Tesseract",
-				"Klein Bottle",
-				"Space Station",
-				"Supernova",
-				"Dyson Sphere",
-				"Seraphim",
-				"Alien Mothership",
-				"Quantum Core",
-				"Galactic Web",
-				"Meteor Shower",
-				"World Serpent",
-				"Aurora Borealis",
-				"Arcane Orrery",
-				"Maelstrom Spire",
-				"Eldritch Binding",
-				"Graviton Engine",
-				"Fractal Web",
-				"Leviathan Coil",
-			}
+			local modes = {}
+			for mn, _ in pairs(x2) do
+				table.insert(modes, mn)
+			end
 
 			table.sort(modes, function(a, b)
 				local fa, fb = favorites[a] and 1 or 0, favorites[b] and 1 or 0
