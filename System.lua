@@ -145,12 +145,20 @@ return function(context)
 			for k = #x6.active_array, 1, -1 do
 				local p = x6.active_array[k]
 				local d = x6.a[p]
-				if not d then
-					continue
-				end
 
-				if not p.Parent then
-					x4.f2(p)
+				if not d or not p.Parent then
+					if d then
+						if d.at and d.at.Parent then d.at:Destroy() end
+						if d.lv and d.lv.Parent then d.lv:Destroy() end
+						if d.av and d.av.Parent then d.av:Destroy() end
+						x6.a[p] = nil
+					end
+					local last = #x6.active_array
+					if k ~= last then
+						x6.active_array[k] = x6.active_array[last]
+					end
+					table.remove(x6.active_array, last)
+					x6.n = math.max(0, x6.n - 1)
 					continue
 				end
 				local p_vel = p.AssemblyLinearVelocity
@@ -345,14 +353,14 @@ return function(context)
 				d.av:Destroy()
 			end
 			x6.a[p] = nil
-			local idx = table.find(x6.active_array, p)
-			if idx then
-				local last = #x6.active_array
-				if idx ~= last then
-					x6.active_array[idx] = x6.active_array[last]
-				end
-				table.remove(x6.active_array, last)
+		end
+		local idx = table.find(x6.active_array, p)
+		if idx then
+			local last = #x6.active_array
+			if idx ~= last then
+				x6.active_array[idx] = x6.active_array[last]
 			end
+			table.remove(x6.active_array, last)
 			x6.n = math.max(0, x6.n - 1)
 		end
 	end
