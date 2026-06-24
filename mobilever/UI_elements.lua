@@ -3,8 +3,13 @@ return function(context)
 	local save_settings = context.save_settings
 	local M = {}
 
-	function M.s(p, t, mn, mx, df, cb)
+	function M.s(p, t, mn, mx, df, cb, is_int)
 		df = df or mn
+		if is_int or mx - mn > 50 then
+			df = math.floor(df + 0.5)
+		else
+			df = math.floor(df * 10 + 0.5) / 10
+		end
 		local f = Instance.new("Frame", p)
 		f.BackgroundTransparency = 1
 		f.Size = UDim2.new(1, 0, 0, 34)
@@ -42,7 +47,6 @@ return function(context)
 		local fl = Instance.new("Frame", sb)
 		fl.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 		fl.BorderSizePixel = 0
-		df = df or 0
 		fl.Size = UDim2.new((df - mn) / (mx - mn), 0, 1, 0)
 		Instance.new("UICorner", fl).CornerRadius = UDim.new(1, 0)
 
@@ -60,13 +64,14 @@ return function(context)
 			local rp = pos_x - sc.AbsolutePosition.X
 			local pc = math.clamp(rp / sc.AbsoluteSize.X, 0, 1)
 			local v = mn + (mx - mn) * pc
-			if mx - mn > 50 then
+			if is_int or mx - mn > 50 then
 				v = math.floor(v + 0.5)
 			else
 				v = math.floor(v * 10 + 0.5) / 10
 			end
-			v6:Create(fl, TweenInfo.new(0.1), { Size = UDim2.new(pc, 0, 1, 0) }):Play()
-			v6:Create(k, TweenInfo.new(0.1), { Position = UDim2.new(pc, 0, 0.5, 0) }):Play()
+			local snapped_pc = (v - mn) / (mx - mn)
+			v6:Create(fl, TweenInfo.new(0.1), { Size = UDim2.new(snapped_pc, 0, 1, 0) }):Play()
+			v6:Create(k, TweenInfo.new(0.1), { Position = UDim2.new(snapped_pc, 0, 0.5, 0) }):Play()
 			vl.Text = tostring(v)
 			cb(v)
 			if save_settings then
