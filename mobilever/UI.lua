@@ -72,7 +72,7 @@ return function(context)
 		m.Name = "Main"
 		m.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
 		m.Position = UDim2.new(0.5, -110, 0.5, -160)
-		m.Size = UDim2.new(0, 220, 0, 320)
+		m.Size = UDim2.new(0, 200, 0, 280)
 		m.Active = true
 		m.Draggable = true
 		Instance.new("UICorner", m).CornerRadius = UDim.new(0, 10)
@@ -82,7 +82,7 @@ return function(context)
 
 		local h = Instance.new("Frame", m)
 		h.BackgroundTransparency = 1
-		h.Size = UDim2.new(1, 0, 0, 35)
+		h.Size = UDim2.new(1, 0, 0, 30)
 
 		local t = Instance.new("TextLabel", h)
 		t.BackgroundTransparency = 1
@@ -91,7 +91,7 @@ return function(context)
 		t.Text = "PROJECT GRAVITY"
 		t.TextColor3 = Color3.fromRGB(255, 255, 255)
 		t.Font = Enum.Font.GothamBlack
-		t.TextSize = 12
+		t.TextSize = 11
 		t.TextXAlignment = 0
 
 		local c = Instance.new("ScrollingFrame", m)
@@ -113,7 +113,7 @@ return function(context)
 		am.Name = "Advanced"
 		am.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
 		am.Position = UDim2.new(0.5, -90, 0.5, -125)
-		am.Size = UDim2.new(0, 180, 0, 250)
+		am.Size = UDim2.new(0, 160, 0, 220)
 		am.Visible = false
 		am.Active = true
 		am.Draggable = true
@@ -124,7 +124,7 @@ return function(context)
 
 		local ah = Instance.new("Frame", am)
 		ah.BackgroundTransparency = 1
-		ah.Size = UDim2.new(1, 0, 0, 35)
+		ah.Size = UDim2.new(1, 0, 0, 30)
 		local at = Instance.new("TextLabel", ah)
 		at.BackgroundTransparency = 1
 		at.Position = UDim2.new(0, 15, 0, 0)
@@ -132,7 +132,7 @@ return function(context)
 		at.Text = "ADVANCED"
 		at.TextColor3 = Color3.fromRGB(255, 255, 255)
 		at.Font = Enum.Font.GothamBold
-		at.TextSize = 10
+		at.TextSize = 9
 		at.TextXAlignment = 0
 
 		local close_am = Instance.new("TextButton", ah)
@@ -183,18 +183,18 @@ return function(context)
 		local ab = eb(c, "Advanced Settings", function()
 			am.Visible = not am.Visible
 		end)
-		ab.Size = UDim2.new(1, 0, 0, 28)
+		ab.Size = UDim2.new(1, 0, 0, 24)
 
 		local mode_f = Instance.new("Frame", c)
 		mode_f.BackgroundTransparency = 1
-		mode_f.Size = UDim2.new(1, 0, 0, 32)
+		mode_f.Size = UDim2.new(1, 0, 0, 28)
 		local db = Instance.new("TextButton", mode_f)
 		db.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 		db.Size = UDim2.new(1, 0, 1, 0)
 		db.Text = "  " .. x1.k6:upper()
 		db.TextColor3 = Color3.fromRGB(255, 255, 255)
 		db.Font = Enum.Font.GothamBold
-		db.TextSize = 11
+		db.TextSize = 10
 		db.TextXAlignment = 0
 		Instance.new("UICorner", db).CornerRadius = UDim.new(0, 6)
 		local dst = Instance.new("UIStroke", db)
@@ -295,11 +295,11 @@ return function(context)
 
 			local l_btn = Instance.new("TextButton", gsc)
 			l_btn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-			l_btn.Size = UDim2.new(1, 0, 0, 28)
+			l_btn.Size = UDim2.new(1, 0, 0, 24)
 			l_btn.Text = "FORCE LAUNCH"
 			l_btn.TextColor3 = Color3.fromRGB(255, 255, 255)
 			l_btn.Font = Enum.Font.GothamBold
-			l_btn.TextSize = 11
+			l_btn.TextSize = 10
 			Instance.new("UICorner", l_btn).CornerRadius = UDim.new(0, 6)
 			l_btn.Visible = x1.ImpactManual or (x1.k6 == "Slingshot" and x1.SlingshotManual)
 
@@ -327,11 +327,11 @@ return function(context)
 
 			local tdb = Instance.new("TextButton", gsc)
 			tdb.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-			tdb.Size = UDim2.new(1, 0, 0, 30)
+			tdb.Size = UDim2.new(1, 0, 0, 26)
 			tdb.Text = "  " .. tn:upper()
 			tdb.TextColor3 = Color3.fromRGB(255, 255, 255)
 			tdb.Font = Enum.Font.GothamBold
-			tdb.TextSize = 10
+			tdb.TextSize = 9
 			tdb.TextXAlignment = 0
 			Instance.new("UICorner", tdb).CornerRadius = UDim.new(0, 6)
 			local dst2 = Instance.new("UIStroke", tdb)
@@ -387,12 +387,12 @@ return function(context)
 			local search_bar = Instance.new("TextBox", tdlst)
 			search_bar.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 			search_bar.Position = UDim2.new(0, 10, 0, 35)
-			search_bar.Size = UDim2.new(1, -20, 0, 28)
+			search_bar.Size = UDim2.new(1, -20, 0, 24)
 			search_bar.PlaceholderText = "Search players..."
 			search_bar.Text = ""
 			search_bar.TextColor3 = Color3.fromRGB(255, 255, 255)
 			search_bar.Font = Enum.Font.Gotham
-			search_bar.TextSize = 11
+			search_bar.TextSize = 10
 			search_bar.ZIndex = 11
 			Instance.new("UICorner", search_bar).CornerRadius = UDim.new(0, 6)
 
@@ -436,12 +436,12 @@ return function(context)
 					end
 
 					local ib = Instance.new("TextButton", scroll_frame)
-					ib.Size = UDim2.new(1, -16, 0, 34)
+					ib.Size = UDim2.new(1, -16, 0, 30)
 					ib.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 					ib.Text = "  " .. pl.DisplayName
 					ib.TextColor3 = Color3.fromRGB(255, 255, 255)
 					ib.Font = Enum.Font.GothamBold
-					ib.TextSize = 11
+					ib.TextSize = 10
 					ib.TextXAlignment = 0
 					ib.ZIndex = 12
 					Instance.new("UICorner", ib).CornerRadius = UDim.new(0, 6)
@@ -979,12 +979,12 @@ return function(context)
 		local msb = Instance.new("TextBox", dlst_container)
 		msb.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 		msb.Position = UDim2.new(0, 10, 0, 35)
-		msb.Size = UDim2.new(1, -20, 0, 28)
+		msb.Size = UDim2.new(1, -20, 0, 24)
 		msb.PlaceholderText = "Search modes..."
 		msb.Text = ""
 		msb.TextColor3 = Color3.fromRGB(255, 255, 255)
 		msb.Font = Enum.Font.Gotham
-		msb.TextSize = 11
+		msb.TextSize = 10
 		msb.ZIndex = 11
 		Instance.new("UICorner", msb).CornerRadius = UDim.new(0, 6)
 
@@ -1058,7 +1058,7 @@ return function(context)
 				end
 
 				local f = Instance.new("Frame", dlst)
-				f.Size = UDim2.new(1, -16, 0, 32)
+				f.Size = UDim2.new(1, -16, 0, 28)
 				f.BackgroundColor3 = mn == x1.k6 and Color3.fromRGB(40, 40, 180) or Color3.fromRGB(25, 25, 30)
 				f.ZIndex = 12
 				Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
@@ -1070,7 +1070,7 @@ return function(context)
 				ib.Text = "  " .. mn
 				ib.TextColor3 = Color3.fromRGB(255, 255, 255)
 				ib.Font = Enum.Font.GothamBold
-				ib.TextSize = 11
+				ib.TextSize = 10
 				ib.TextXAlignment = 0
 				ib.ZIndex = 13
 
@@ -1147,7 +1147,7 @@ return function(context)
 					m.TargetListContainer.Visible = false
 				end
 			end
-			m:TweenSize(im and UDim2.new(0, 220, 0, 35) or UDim2.new(0, 220, 0, 320), "Out", "Quart", 0.3, true)
+			m:TweenSize(im and UDim2.new(0, 200, 0, 30) or UDim2.new(0, 200, 0, 280), "Out", "Quart", 0.3, true)
 		end)
 
 		closeb.MouseButton1Click:Connect(function()

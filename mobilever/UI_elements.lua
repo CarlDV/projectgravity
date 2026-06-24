@@ -12,30 +12,30 @@ return function(context)
 		end
 		local f = Instance.new("Frame", p)
 		f.BackgroundTransparency = 1
-		f.Size = UDim2.new(1, 0, 0, 34)
+		f.Size = UDim2.new(1, 0, 0, 28)
 
 		local l = Instance.new("TextLabel", f)
 		l.BackgroundTransparency = 1
-		l.Size = UDim2.new(1, 0, 0, 16)
+		l.Size = UDim2.new(1, 0, 0, 14)
 		l.Text = t
 		l.TextColor3 = Color3.fromRGB(180, 180, 180)
 		l.TextXAlignment = 0
 		l.Font = Enum.Font.Gotham
-		l.TextSize = 10
+		l.TextSize = 9
 
 		local vl = Instance.new("TextLabel", f)
 		vl.BackgroundTransparency = 1
 		vl.Position = UDim2.new(1, -50, 0, 0)
-		vl.Size = UDim2.new(0, 50, 0, 16)
+		vl.Size = UDim2.new(0, 50, 0, 14)
 		vl.Text = tostring(df)
 		vl.TextColor3 = Color3.fromRGB(255, 255, 255)
 		vl.TextXAlignment = 1
 		vl.Font = Enum.Font.GothamBold
-		vl.TextSize = 10
+		vl.TextSize = 9
 
 		local sc = Instance.new("Frame", f)
 		sc.BackgroundTransparency = 1
-		sc.Position = UDim2.new(0, 0, 0, 20)
+		sc.Position = UDim2.new(0, 0, 0, 16)
 		sc.Size = UDim2.new(1, 0, 0, 4)
 
 		local sb = Instance.new("Frame", sc)
@@ -106,7 +106,7 @@ return function(context)
 	function M.t(p, t, df, cb)
 		local f = Instance.new("Frame", p)
 		f.BackgroundTransparency = 1
-		f.Size = UDim2.new(1, 0, 0, 26)
+		f.Size = UDim2.new(1, 0, 0, 22)
 
 		local l = Instance.new("TextLabel", f)
 		l.BackgroundTransparency = 1
@@ -115,18 +115,18 @@ return function(context)
 		l.TextColor3 = Color3.fromRGB(180, 180, 180)
 		l.TextXAlignment = 0
 		l.Font = Enum.Font.Gotham
-		l.TextSize = 10
+		l.TextSize = 9
 
 		local bg = Instance.new("Frame", f)
 		bg.BackgroundColor3 = df and Color3.fromRGB(60, 200, 100) or Color3.fromRGB(40, 40, 45)
-		bg.Position = UDim2.new(1, -30, 0.5, -8)
-		bg.Size = UDim2.new(0, 30, 0, 16)
+		bg.Position = UDim2.new(1, -26, 0.5, -7)
+		bg.Size = UDim2.new(0, 26, 0, 14)
 		Instance.new("UICorner", bg).CornerRadius = UDim.new(1, 0)
 
 		local toggle = Instance.new("Frame", bg)
 		toggle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		toggle.Position = df and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6)
-		toggle.Size = UDim2.new(0, 12, 0, 12)
+		toggle.Position = df and UDim2.new(1, -12, 0.5, -5) or UDim2.new(0, 2, 0.5, -5)
+		toggle.Size = UDim2.new(0, 10, 0, 10)
 		Instance.new("UICorner", toggle).CornerRadius = UDim.new(1, 0)
 
 		local b = Instance.new("TextButton", f)
@@ -144,7 +144,7 @@ return function(context)
 			v6:Create(
 				toggle,
 				TweenInfo.new(0.2),
-				{ Position = df and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6) }
+				{ Position = df and UDim2.new(1, -12, 0.5, -5) or UDim2.new(0, 2, 0.5, -5) }
 			):Play()
 			cb(df)
 			if save_settings then
@@ -157,12 +157,12 @@ return function(context)
 	function M.b(p, t, cb)
 		local b = Instance.new("TextButton", p)
 		b.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-		b.Size = UDim2.new(1, 0, 0, 28)
+		b.Size = UDim2.new(1, 0, 0, 24)
 		b.AutoButtonColor = false
 		b.Text = t
 		b.TextColor3 = Color3.fromRGB(220, 220, 220)
 		b.Font = Enum.Font.GothamMedium
-		b.TextSize = 11
+		b.TextSize = 10
 		Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
 
 		local str = Instance.new("UIStroke", b)
