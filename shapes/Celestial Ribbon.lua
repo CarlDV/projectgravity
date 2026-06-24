@@ -28,9 +28,9 @@ function M.px(t, c, x6, x9)
 		r[i] = { p = Vector3.new(px, py, pz), t = trn, ph = ph }
 
 		local ph2 = ph + 2.37
-		local px2 = (math.sin(ph2 * 0.73) + math.cos(ph2 * 1.87) * 0.7 + math.sin(ph2 * 3.1) * 0.3) * R * 0.5
-		local pz2 = (math.cos(ph2 * 0.91) + math.sin(ph2 * 2.33) * 0.6 + math.cos(ph2 * 3.7) * 0.4) * R * 0.5
-		local py2 = (math.sin(ph2 * 0.53) + math.cos(ph2 * 1.71) * 0.5 + math.sin(ph2 * 2.9) * 0.5) * h * 0.7
+		local px2 = (math.sin(ph2 * 0.73) + math.cos(ph2 * 1.31) * 0.6) * R * 0.6
+		local pz2 = (math.cos(ph2 * 0.59) + math.sin(ph2 * 1.17) * 0.6) * R * 0.6
+		local py2 = (math.sin(ph2 * 0.41) + math.cos(ph2 * 0.89) * 0.5) * h * 0.8
 		local T2 = Vector3.new(px2, py2, pz2).Unit
 		local Rv2 = T2:Cross(Vector3.yAxis)
 		if Rv2.Magnitude < 0.01 then
@@ -74,9 +74,9 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 		local R = (c.k17 or 150)
 		local px, pz, py
 		if isB then
-			px = (math.sin(ph * 0.73) + math.cos(ph * 1.87) * 0.7 + math.sin(ph * 3.1) * 0.3) * R * 0.5
-			pz = (math.cos(ph * 0.91) + math.sin(ph * 2.33) * 0.6 + math.cos(ph * 3.7) * 0.4) * R * 0.5
-			py = (math.sin(ph * 0.53) + math.cos(ph * 1.71) * 0.5 + math.sin(ph * 2.9) * 0.5) * h * 0.7
+			px = (math.sin(ph * 0.73) + math.cos(ph * 1.31) * 0.6) * R * 0.6
+			pz = (math.cos(ph * 0.59) + math.sin(ph * 1.17) * 0.6) * R * 0.6
+			py = (math.sin(ph * 0.41) + math.cos(ph * 0.89) * 0.5) * h * 0.8
 		else
 			px, pz, py = math.cos(ph) * R, math.sin(ph * 1.618) * R, math.sin(ph * 0.577) * h
 		end
