@@ -63,4 +63,12 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 			return ((cen + Vector3.new(rotated.X, final_y, rotated.Z)) - wp) * (x1.k10 * x9.c1)
 end
 
+M.Controls = {
+	{ Type = "Slider", Name = "Radius Spread", Min = 50, Max = 1500, Key = "k11" },
+	{ Type = "Slider", Name = "Spin Speed", Min = 1, Max = 100, Key = "k12", Div = 10 },
+	{ Type = "Slider", Name = "Drift Speed", Min = 1, Max = 50, Key = "k13" },
+	{ Type = "Slider", Name = "Web Height Limit", Min = 0, Max = 1500, Key = "k24" },
+	{ Type = "Toggle", Name = "Cut In Half", Key = "k23" }
+}
+
 return M

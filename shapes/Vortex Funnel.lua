@@ -17,4 +17,13 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 				* (x1.k10 * x9.c1)
 end
 
+M.Controls = {
+	{ Type = "Slider", Name = "Swirl Speed", Min = 1, Max = 300, Key = "k13", Div = 10 },
+	{ Type = "Slider", Name = "Base Radius", Min = 10, Max = 300, Key = "k11" },
+	{ Type = "Slider", Name = "Top Radius", Min = 50, Max = 1000, Key = "k12" },
+	{ Type = "Slider", Name = "Funnel Height", Min = 50, Max = 1000, Key = "k14" },
+	{ Type = "Slider", Name = "Suction Power", Min = 1, Max = 20, Key = "k15" },
+	{ Type = "Slider", Name = "Move Area", Min = 50, Max = 1500, Key = "k17" }
+}
+
 return M

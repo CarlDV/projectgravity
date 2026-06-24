@@ -78,4 +78,11 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 			return ((cen + Vector3.new(tx, ty, tz)) - wp) * (x1.k10 * x9.c1)
 end
 
+M.Controls = {
+	{ Type = "Slider", Name = "Base Radius", Min = 10, Max = 150, Key = "k11" },
+	{ Type = "Slider", Name = "Tower Height", Min = 50, Max = 500, Key = "k12" },
+	{ Type = "Slider", Name = "Vortex Speed", Min = 1, Max = 50, Key = "k13" },
+	{ Type = "Slider", Name = "Jet Count", Min = 3, Max = 12, Key = "k14", IntOnly = true }
+}
+
 return M

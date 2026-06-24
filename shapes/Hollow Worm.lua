@@ -43,4 +43,13 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 			return ((cen + center_pos + (rd * r)) - wp) * (x1.k10 * x9.c1)
 end
 
+M.Controls = {
+	{ Type = "Slider", Name = "Worm Speed", Min = 1, Max = 300, Key = "k13", Div = 10 },
+	{ Type = "Slider", Name = "Worm Length", Min = 10, Max = 500, Key = "k16", Div = 100 },
+	{ Type = "Slider", Name = "Tube Radius", Min = 1, Max = 100, Key = "k11", Div = 2 },
+	{ Type = "Slider", Name = "Height Limit", Min = 0, Max = 200, Key = "k14" },
+	{ Type = "Slider", Name = "Wavelength", Min = 1, Max = 50, Key = "k15" },
+	{ Type = "Slider", Name = "Move Area", Min = 50, Max = 800, Key = "k17" }
+}
+
 return M

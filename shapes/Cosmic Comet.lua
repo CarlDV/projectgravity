@@ -42,4 +42,13 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 			return ((cen + center_pos + (d.v4 * (d.v8 * (hr + (d.v6 * d.v6 * 30 * ts))))) - wp) * (x1.k10 * x9.c1)
 end
 
+M.Controls = {
+	{ Type = "Slider", Name = "Comet Speed", Min = 1, Max = 300, Key = "k13", Div = 10 },
+	{ Type = "Slider", Name = "Tail Length", Min = 10, Max = 500, Key = "k16", Div = 100 },
+	{ Type = "Slider", Name = "Head Radius", Min = 1, Max = 50, Key = "k11", Div = 2 },
+	{ Type = "Slider", Name = "Tail Spread", Min = 0, Max = 200, Key = "k12" },
+	{ Type = "Slider", Name = "Height Limit", Min = 0, Max = 200, Key = "k14" },
+	{ Type = "Slider", Name = "Move Area", Min = 50, Max = 800, Key = "k17" }
+}
+
 return M

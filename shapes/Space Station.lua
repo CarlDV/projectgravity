@@ -40,4 +40,11 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 			return ((cen + Vector3.new(tx, ty, tz)) - wp) * (x1.k10 * x9.c1)
 end
 
+M.Controls = {
+	{ Type = "Slider", Name = "Ring Radius", Min = 20, Max = 400, Key = "k11" },
+	{ Type = "Slider", Name = "Ring Thickness", Min = 5, Max = 100, Key = "k12" },
+	{ Type = "Slider", Name = "Orbit Speed", Min = 1, Max = 100, Key = "k13", Div = 10 },
+	{ Type = "Slider", Name = "Spindle Length", Min = 20, Max = 500, Key = "k14" }
+}
+
 return M

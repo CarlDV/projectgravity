@@ -10,4 +10,9 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 			end
 end
 
+M.Controls = {
+	{ Type = "Slider", Name = "Range", Min = 10, Max = 500, Key = "k11" },
+	{ Type = "Slider", Name = "Force", Min = 50, Max = 5000, Key = "k12" }
+}
+
 return M

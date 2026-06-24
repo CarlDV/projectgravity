@@ -21,4 +21,11 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 			) * (x1.k10 * x9.c1)
 end
 
+M.Controls = {
+	{ Type = "Slider", Name = "Orbit Speed", Min = 1, Max = 300, Key = "k13", Div = 10 },
+	{ Type = "Slider", Name = "Atom Radius", Min = 20, Max = 500, Key = "k11" },
+	{ Type = "Slider", Name = "Orbit Count", Min = 1, Max = 10, Key = "k15", IntOnly = true },
+	{ Type = "Slider", Name = "Move Area", Min = 50, Max = 800, Key = "k17" }
+}
+
 return M

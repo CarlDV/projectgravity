@@ -31,4 +31,10 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 			return (target_pos - wp) * 5000
 end
 
+M.Controls = {
+	{ Type = "Slider", Name = "Spin Speed", Min = 1, Max = 500, Key = "k13", Div = 10 },
+	{ Type = "Slider", Name = "Closeness", Min = 1, Max = 50, Key = "k11", Div = 2 },
+	{ Type = "Slider", Name = "Move Area", Min = 50, Max = 800, Key = "k17" }
+}
+
 return M

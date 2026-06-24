@@ -21,4 +21,10 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 			return ((cen + current_pos) - wp) * (x1.k10 * x9.c1)
 end
 
+M.Controls = {
+	{ Type = "Slider", Name = "Core Radius", Min = 5, Max = 100, Key = "k11" },
+	{ Type = "Slider", Name = "Blast Radius", Min = 50, Max = 800, Key = "k12" },
+	{ Type = "Slider", Name = "Pulse Speed", Min = 1, Max = 200, Key = "k13", Div = 10 }
+}
+
 return M

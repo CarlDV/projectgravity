@@ -60,4 +60,10 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 			end
 end
 
+M.Controls = {
+	{ Type = "Slider", Name = "Radius", Min = 50, Max = 400, Key = "k11" },
+	{ Type = "Slider", Name = "Grid Density", Min = 2, Max = 50, Key = "k12" },
+	{ Type = "Slider", Name = "Speed", Min = 1, Max = 100, Key = "k13", Div = 10 }
+}
+
 return M

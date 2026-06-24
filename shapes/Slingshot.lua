@@ -26,4 +26,10 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 			end
 end
 
+M.Controls = {
+	{ Type = "Slider", Name = "Charge Dist", Min = 10, Max = 200, Key = "k11" },
+	{ Type = "Slider", Name = "Cycle Time", Min = 1, Max = 10, Key = "k12" },
+	{ Type = "Slider", Name = "Fling Speed", Min = 1, Max = 500, Key = "k13" }
+}
+
 return M

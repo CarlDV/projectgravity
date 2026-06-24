@@ -28,4 +28,10 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 			return ((cen + Vector3.new(x_pos, y_pos, z_pos)) - wp) * (x1.k10 * x9.c1)
 end
 
+M.Controls = {
+	{ Type = "Slider", Name = "XZ Spread", Min = 100, Max = 1500, Key = "k11" },
+	{ Type = "Slider", Name = "Spawn Height", Min = 50, Max = 1500, Key = "k12" },
+	{ Type = "Slider", Name = "Fall Speed", Min = 50, Max = 2000, Key = "k13" }
+}
+
 return M

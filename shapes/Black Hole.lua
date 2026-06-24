@@ -21,4 +21,11 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 			return ((cen + Vector3.new(tx, thickness, tz)) - wp) * (x1.k10 * x9.c1)
 end
 
+M.Controls = {
+	{ Type = "Slider", Name = "Event Horizon", Min = 10, Max = 200, Key = "k11" },
+	{ Type = "Slider", Name = "Disk Radius", Min = 50, Max = 2000, Key = "k12" },
+	{ Type = "Slider", Name = "Spin Speed", Min = 1, Max = 200, Key = "k13", Div = 10 },
+	{ Type = "Slider", Name = "Disk Height", Min = 5, Max = 200, Key = "k14" }
+}
+
 return M

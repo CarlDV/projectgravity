@@ -12,4 +12,10 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 				* (x1.k10 * x9.c1)
 end
 
+M.Controls = {
+	{ Type = "Slider", Name = "Spin Speed", Min = 0, Max = 200, Key = "k13", Div = 10 },
+	{ Type = "Slider", Name = "Halo Radius", Min = 20, Max = 300, Key = "k11" },
+	{ Type = "Slider", Name = "Height Offset", Min = 20, Max = 200, Key = "k14" }
+}
+
 return M

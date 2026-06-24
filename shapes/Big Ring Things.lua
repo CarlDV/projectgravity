@@ -39,4 +39,13 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 			return (tp - wp) * (x1.k10 * x9.c1)
 end
 
+M.Controls = {
+	{ Type = "Slider", Name = "Ring Count", Min = 1, Max = 20, Key = "k11", IntOnly = true },
+	{ Type = "Slider", Name = "Ring Gap", Min = 50, Max = 300, Key = "k12" },
+	{ Type = "Slider", Name = "Ring Speed", Min = 0, Max = 200, Key = "k13", Div = 10 },
+	{ Type = "Slider", Name = "Height Offset", Min = 0, Max = 100, Key = "k14" },
+	{ Type = "Slider", Name = "Tilt Angle", Min = 0, Max = 90, Key = "k15" },
+	{ Type = "Slider", Name = "Tilt Speed", Min = 0, Max = 50, Key = "k16", Div = 10 }
+}
+
 return M
