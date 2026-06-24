@@ -773,15 +773,39 @@ return function(context)
 			end
 		end)
 
-		btn_up.MouseButton1Click:Connect(function()
-			if x6.b then
-				x6.b.Position = x6.b.Position + Vector3.new(0, 3, 0)
+		local holding_up = false
+		btn_up.InputBegan:Connect(function(i)
+			if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+				holding_up = true
+				task.spawn(function()
+					while holding_up and x6.b do
+						x6.b.Position = x6.b.Position + Vector3.new(0, 1, 0)
+						task.wait()
+					end
+				end)
+			end
+		end)
+		btn_up.InputEnded:Connect(function(i)
+			if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+				holding_up = false
 			end
 		end)
 
-		btn_down.MouseButton1Click:Connect(function()
-			if x6.b then
-				x6.b.Position = x6.b.Position - Vector3.new(0, 3, 0)
+		local holding_down = false
+		btn_down.InputBegan:Connect(function(i)
+			if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+				holding_down = true
+				task.spawn(function()
+					while holding_down and x6.b do
+						x6.b.Position = x6.b.Position - Vector3.new(0, 1, 0)
+						task.wait()
+					end
+				end)
+			end
+		end)
+		btn_down.InputEnded:Connect(function(i)
+			if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+				holding_down = false
 			end
 		end)
 
