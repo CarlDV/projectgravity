@@ -447,7 +447,24 @@ return function(context)
 
 			if not x1.SimpleMode then
 				eh(sc, "Shape")
-				if x1.k6 == "Big Ring Things" then
+				local shape_mod = get_shape(x1.k6)
+				if shape_mod and shape_mod.Controls then
+					for _, ctrl in ipairs(shape_mod.Controls) do
+						local current_val = s[ctrl.Key]
+						local p_frame = ctrl.Parent == "gsc" and gsc or sc
+						if ctrl.Type == "Slider" then
+							if current_val == nil then current_val = ctrl.Min end
+							if ctrl.Div then current_val = current_val * ctrl.Div end
+							es(p_frame, ctrl.Name, ctrl.Min, ctrl.Max, current_val, function(v)
+								if ctrl.Div then s[ctrl.Key] = v / ctrl.Div else s[ctrl.Key] = v end
+							end, ctrl.IntOnly)
+						elseif ctrl.Type == "Toggle" then
+							et(p_frame, ctrl.Name, current_val, function(v)
+								s[ctrl.Key] = v
+							end)
+						end
+					end
+				elseif x1.k6 == "Big Ring Things" then
 					es(sc, "Ring Count", 1, 20, s.k11, function(v)
 						s.k11 = v
 					end, true)
@@ -906,19 +923,6 @@ return function(context)
 					end)
 					es(sc, "Tower Height", 50, 500, s.k14, function(v)
 						s.k14 = v
-					end)
-				elseif x1.k6 == "Pulsar Vortex" then
-					es(sc, "Spread", 50, 800, s.k11, function(v)
-						s.k11 = v
-					end)
-					es(sc, "Speed", 1, 30, s.k12, function(v)
-						s.k12 = v
-					end)
-					es(sc, "Torsion Twist", 1, 50, s.k13, function(v)
-						s.k13 = v
-					end)
-					et(gsc, "Cut in Half", s.k23, function(v)
-						s.k23 = v
 					end)
 				end
 			end
