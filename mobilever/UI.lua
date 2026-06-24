@@ -1158,23 +1158,28 @@ return function(context)
 			end
 		end)
 
-		local ctrl = Instance.new("Frame", sg)
-		ctrl.BackgroundTransparency = 1
-		ctrl.Position = UDim2.new(0, 15, 0.05, 0)
-		ctrl.Size = UDim2.new(0, 300, 0, 30)
+		local ctrl_container = Instance.new("Frame", sg)
+		ctrl_container.BackgroundTransparency = 1
+		ctrl_container.Position = UDim2.new(0, 15, 0.25, 0)
+		ctrl_container.Size = UDim2.new(0, 60, 0, 220)
 
-		local layout = Instance.new("UIListLayout", ctrl)
-		layout.FillDirection = Enum.FillDirection.Horizontal
-		layout.VerticalAlignment = Enum.VerticalAlignment.Center
-		layout.Padding = UDim.new(0, 6)
-		layout.SortOrder = Enum.SortOrder.LayoutOrder
-
-		local hide_btn = Instance.new("TextButton", ctrl)
+		local hide_btn = Instance.new("TextButton", ctrl_container)
 		hide_btn.Size = UDim2.new(0, 14, 0, 14)
+		hide_btn.Position = UDim2.new(0, 0, 0, 6)
 		hide_btn.BackgroundColor3 = Color3.fromRGB(60, 200, 100)
 		hide_btn.Text = ""
-		hide_btn.LayoutOrder = 1
 		Instance.new("UICorner", hide_btn).CornerRadius = UDim.new(1, 0)
+
+		local ctrl = Instance.new("Frame", ctrl_container)
+		ctrl.BackgroundTransparency = 1
+		ctrl.Position = UDim2.new(0, 22, 0, 0)
+		ctrl.Size = UDim2.new(1, -22, 1, 0)
+
+		local layout = Instance.new("UIListLayout", ctrl)
+		layout.FillDirection = Enum.FillDirection.Vertical
+		layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+		layout.Padding = UDim.new(0, 6)
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
 
 		local function create_btn(txt, col, order)
 			local b = Instance.new("TextButton")
