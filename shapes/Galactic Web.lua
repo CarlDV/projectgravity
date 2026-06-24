@@ -30,17 +30,11 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 			end
 
 			local phase = t * SpinSpeed + d.v4
-			local drift_phase = (t / DriftTime) + d.v4
+			local drift_phase = (t * DriftTime) + d.v4
 
-
-			local drift_x = math.sin(drift_phase) * d.v5 * (Spread * 0.25)
-			local drift_y = math.cos(drift_phase * 0.8) * d.v5 * (Spread * 0.25)
-			local drift_z = math.sin(drift_phase * 1.2) * d.v5 * (Spread * 0.25)
-
-			local px = d.v1 * Spread + drift_x
-			local py = d.v2 * Spread + drift_y
-			local pz = d.v3 * Spread + drift_z
-
+			local px = d.v1 * Spread
+			local py = d.v2 * Spread
+			local pz = d.v3 * Spread
 
 			local p_vec = Vector3.new(px, py, pz)
 			local k = d.rot_axis
@@ -51,16 +45,22 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 			local dot = k:Dot(p_vec)
 			local rotated = p_vec * cos_p + cross * sin_p + k * (dot * (1 - cos_p))
 
+			local drift_x = math.sin(drift_phase) * d.v5 * (Spread * 0.25)
+			local drift_y = math.cos(drift_phase * 0.8) * d.v5 * (Spread * 0.25)
+			local drift_z = math.sin(drift_phase * 1.2) * d.v5 * (Spread * 0.25)
+
+			local rx = rotated.X + drift_x
+			local rz = rotated.Z + drift_z
 
 			local h_lim = c.k24 or 200
 			local vertical_scale = h_lim / math.max(1, Spread)
-			local final_y = rotated.Y * vertical_scale
+			local final_y = rotated.Y * vertical_scale + drift_y
 
 			if c.k23 then
 				final_y = math.abs(final_y)
 			end
 
-			return ((cen + Vector3.new(rotated.X, final_y, rotated.Z)) - wp) * (x1.k10 * x9.c1)
+			return ((cen + Vector3.new(rx, final_y, rz)) - wp) * (x1.k10 * x9.c1)
 end
 
 M.Controls = {
