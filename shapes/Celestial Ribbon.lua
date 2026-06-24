@@ -36,17 +36,21 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 			if c.k19 and not d.v9 then
 				d.v9 = math.random(0, 1)
 			end
+			local spine_pos = d.v6
+			if c.k19 and d.v9 == 1 then
+				spine_pos = (d.v6 + 0.5) % 1
+			end
 			local p_data = x6.pre and x6.pre[md]
 			local fin
 			if p_data and #p_data > 0 then
-				local idx = math.floor(d.v6 * (#p_data - 1)) + 1
+				local idx = math.floor(spine_pos * (#p_data - 1)) + 1
 				local node = p_data[idx]
 				fin = node.p
 					+ (node.t * (d.v7 * w))
 					+ (c.k18 and (node.t * math.sin(node.ph * 8)) * (w * 2.0) or Vector3.zero)
 			else
 				local s, h, l = (c.k13 or 10) * x9.c2, c.k14 or 50, (c.k16 or x9.c5) * 100
-				local ph = (t * s) - (d.v6 * (l * x9.c2))
+				local ph = (t * s) - (spine_pos * (l * x9.c2))
 				local R = (c.k17 or 150)
 				local px, pz, py = math.cos(ph) * R, math.sin(ph * 1.618) * R, math.sin(ph * 0.577) * h
 				local T = Vector3.new(px, py, pz).Unit
@@ -59,9 +63,6 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 				fin = Vector3.new(px, py, pz)
 					+ (trn * (d.v7 * w))
 					+ (c.k18 and (trn * math.sin(ph * 8)) * (w * 2.0) or Vector3.zero)
-			end
-			if c.k19 and d.v9 == 1 then
-				fin = -fin
 			end
 			return ((cen + fin) - wp) * (x1.k10 * x9.c1)
 end
