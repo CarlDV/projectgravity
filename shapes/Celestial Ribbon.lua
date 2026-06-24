@@ -28,9 +28,9 @@ function M.px(t, c, x6, x9)
 		r[i] = { p = Vector3.new(px, py, pz), t = trn, ph = ph }
 
 		local ph2 = ph + 2.37
-		local px2 = (math.sin(ph2 * 0.73) + math.cos(ph2 * 1.31) * 0.6) * R * 0.6
-		local pz2 = (math.cos(ph2 * 0.59) + math.sin(ph2 * 1.17) * 0.6) * R * 0.6
-		local py2 = (math.sin(ph2 * 0.41) + math.cos(ph2 * 0.89) * 0.5) * h * 0.8
+		local px2 = math.cos(ph2 * 1.247) * R
+		local pz2 = math.sin(ph2 * 0.831) * R
+		local py2 = math.sin(ph2 * 0.693) * h
 		local T2 = Vector3.new(px2, py2, pz2).Unit
 		local Rv2 = T2:Cross(Vector3.yAxis)
 		if Rv2.Magnitude < 0.01 then
@@ -39,6 +39,22 @@ function M.px(t, c, x6, x9)
 		Rv2 = Rv2.Unit
 		local trn2 = Rv2 * math.cos(ph2 * 0.5) + (T2:Cross(Rv2)) * math.sin(ph2 * 0.5)
 		r2[i] = { p = Vector3.new(px2, py2, pz2), t = trn2, ph = ph2 }
+	end
+	for _ = 1, 3 do
+		for i = 2, res - 1 do
+			r[i].p = (r[i - 1].p + r[i].p + r[i + 1].p) / 3
+			r2[i].p = (r2[i - 1].p + r2[i].p + r2[i + 1].p) / 3
+		end
+	end
+	for i = 2, res - 1 do
+		local dir = (r[i + 1].p - r[i - 1].p).Unit
+		local rv = dir:Cross(Vector3.yAxis)
+		if rv.Magnitude < 0.01 then rv = Vector3.xAxis end
+		r[i].t = rv.Unit
+		local dir2 = (r2[i + 1].p - r2[i - 1].p).Unit
+		local rv2 = dir2:Cross(Vector3.yAxis)
+		if rv2.Magnitude < 0.01 then rv2 = Vector3.xAxis end
+		r2[i].t = rv2.Unit
 	end
 end
 
@@ -74,9 +90,9 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 		local R = (c.k17 or 150)
 		local px, pz, py
 		if isB then
-			px = (math.sin(ph * 0.73) + math.cos(ph * 1.31) * 0.6) * R * 0.6
-			pz = (math.cos(ph * 0.59) + math.sin(ph * 1.17) * 0.6) * R * 0.6
-			py = (math.sin(ph * 0.41) + math.cos(ph * 0.89) * 0.5) * h * 0.8
+			px = math.cos(ph * 1.247) * R
+			pz = math.sin(ph * 0.831) * R
+			py = math.sin(ph * 0.693) * h
 		else
 			px, pz, py = math.cos(ph) * R, math.sin(ph * 1.618) * R, math.sin(ph * 0.577) * h
 		end
