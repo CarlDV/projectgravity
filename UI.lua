@@ -907,6 +907,19 @@ return function(context)
 					es(sc, "Tower Height", 50, 500, s.k14, function(v)
 						s.k14 = v
 					end)
+				elseif x1.k6 == "Pulsar Vortex" then
+					es(sc, "Spread", 50, 800, s.k11, function(v)
+						s.k11 = v
+					end)
+					es(sc, "Speed", 1, 30, s.k12, function(v)
+						s.k12 = v
+					end)
+					es(sc, "Torsion Twist", 1, 50, s.k13, function(v)
+						s.k13 = v
+					end)
+					et(gsc, "Cut in Half", s.k23, function(v)
+						s.k23 = v
+					end)
 				end
 			end
 		end
