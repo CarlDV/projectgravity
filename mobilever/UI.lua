@@ -1160,7 +1160,7 @@ return function(context)
 
 		local ctrl_container = Instance.new("Frame", sg)
 		ctrl_container.BackgroundTransparency = 1
-		ctrl_container.Position = UDim2.new(0, 15, 0.25, 0)
+		ctrl_container.Position = UDim2.new(0, 15, 0.05, 0)
 		ctrl_container.Size = UDim2.new(0, 60, 0, 220)
 
 		local hide_btn = Instance.new("TextButton", ctrl_container)
