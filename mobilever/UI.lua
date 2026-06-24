@@ -1161,23 +1161,26 @@ return function(context)
 		local ctrl_container = Instance.new("Frame", sg)
 		ctrl_container.BackgroundTransparency = 1
 		ctrl_container.Position = UDim2.new(0, 15, 0.05, 0)
-		ctrl_container.Size = UDim2.new(0, 40, 0, 220)
+		ctrl_container.Size = UDim2.new(0, 300, 0, 30)
 		
+		local container_layout = Instance.new("UIListLayout", ctrl_container)
+		container_layout.FillDirection = Enum.FillDirection.Horizontal
+		container_layout.VerticalAlignment = Enum.VerticalAlignment.Center
+		container_layout.Padding = UDim.new(0, 6)
+
 		local hide_btn = Instance.new("TextButton", ctrl_container)
 		hide_btn.Size = UDim2.new(0, 14, 0, 14)
-		hide_btn.Position = UDim2.new(0, 6, 0, 0)
 		hide_btn.BackgroundColor3 = Color3.fromRGB(60, 200, 100)
 		hide_btn.Text = ""
 		Instance.new("UICorner", hide_btn).CornerRadius = UDim.new(1, 0)
 
 		local ctrl = Instance.new("Frame", ctrl_container)
 		ctrl.BackgroundTransparency = 1
-		ctrl.Position = UDim2.new(0, 0, 0, 20)
-		ctrl.Size = UDim2.new(1, 0, 1, -20)
+		ctrl.Size = UDim2.new(1, -20, 1, 0)
 
 		local layout = Instance.new("UIListLayout", ctrl)
-		layout.FillDirection = Enum.FillDirection.Vertical
-		layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		layout.FillDirection = Enum.FillDirection.Horizontal
+		layout.VerticalAlignment = Enum.VerticalAlignment.Center
 		layout.Padding = UDim.new(0, 4)
 
 		hide_btn.MouseButton1Click:Connect(function()
