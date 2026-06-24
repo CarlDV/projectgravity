@@ -75,8 +75,10 @@ local ANTI_SLEEP = Vector3.new(0, 0.01, 0)
 local BASE_URL = "https://raw.githubusercontent.com/CarlDV/projectgravity/main/"
 
 local function safe_http_get(url)
+	local cache_buster = "?cb=" .. tostring(math.random(1000000, 9999999))
+	local fetch_url = url .. cache_buster
 	local success, result = pcall(function()
-		return game:HttpGet(url)
+		return game:HttpGet(fetch_url)
 	end)
 	if success and result then
 		return result
@@ -84,7 +86,7 @@ local function safe_http_get(url)
 	local req = (type(request) == "function" and request) or (type(http) == "table" and http.request) or (type(syn) == "table" and syn.request)
 	if req then
 		local s, r = pcall(function()
-			return req({Url = url, Method = "GET"})
+			return req({Url = fetch_url, Method = "GET"})
 		end)
 		if s and type(r) == "table" and r.Body then
 			return r.Body
