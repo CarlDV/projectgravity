@@ -134,21 +134,27 @@ local function load_favs()
 end
 load_favs()
 
+local save_pending = false
 local function save_settings()
 	if not writefile then
 		return
 	end
-	local data = { x1 = sanitize(x1), x2 = sanitize(x2) }
-	data.x1.Tgt = nil
-	data.x1.IsLaunching = nil
-	local success, json = pcall(function()
-		return HttpService:JSONEncode(data)
-	end)
-	if success then
-		pcall(function()
-			writefile("GravitySettings_Auto.json", json)
+	if save_pending then return end
+	save_pending = true
+	task.delay(0.5, function()
+		save_pending = false
+		local data = { x1 = sanitize(x1), x2 = sanitize(x2) }
+		data.x1.Tgt = nil
+		data.x1.IsLaunching = nil
+		local success, json = pcall(function()
+			return HttpService:JSONEncode(data)
 		end)
-	end
+		if success then
+			pcall(function()
+				writefile("GravitySettings_Auto.json", json)
+			end)
+		end
+	end)
 end
 
 local function load_settings()
@@ -204,7 +210,7 @@ end
 local x6 = {
 	b = nil,
 	c = {},
-	a = {},
+	a = setmetatable({}, {__mode = "k"}),
 	o = false,
 	d = false,
 	p = 0,
@@ -219,12 +225,12 @@ local x6 = {
 	active_array = {},
 	pre = {},
 	pre_buffer = table.create(200),
-	sculptor_selected = {},
+	sculptor_selected = setmetatable({}, {__mode = "k"}),
 	sculptor_dragging = false,
 	sculptor_drag_start = nil,
 	sculptor_box_start = nil,
 	sculptor_box = nil,
-	sculptor_highlights = {},
+	sculptor_highlights = setmetatable({}, {__mode = "k"}),
 	sculptor_preset_ui = nil,
 	transition_time = 0,
 	transition_dur = 2,

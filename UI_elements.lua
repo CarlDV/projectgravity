@@ -89,14 +89,21 @@ return function(context)
 				u(i)
 			end
 		end)
-		v1.InputEnded:Connect(function(i)
+		local c1 = v1.InputEnded:Connect(function(i)
 			if i.UserInputType == Enum.UserInputType.MouseButton1 then
 				d = false
 			end
 		end)
-		v1.InputChanged:Connect(function(i)
+		local c2 = v1.InputChanged:Connect(function(i)
 			if d and i.UserInputType == Enum.UserInputType.MouseMovement then
 				u(i)
+			end
+		end)
+
+		f.AncestryChanged:Connect(function(_, parent)
+			if not parent then
+				c1:Disconnect()
+				c2:Disconnect()
 			end
 		end)
 	end

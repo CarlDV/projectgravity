@@ -91,14 +91,21 @@ return function(context)
 				u(i.Position.X)
 			end
 		end)
-		v1.InputEnded:Connect(function(i)
+		local c1 = v1.InputEnded:Connect(function(i)
 			if i == active_input then
 				active_input = nil
 			end
 		end)
-		v1.InputChanged:Connect(function(i)
+		local c2 = v1.InputChanged:Connect(function(i)
 			if i == active_input then
 				u(i.Position.X)
+			end
+		end)
+
+		f.AncestryChanged:Connect(function(_, parent)
+			if not parent then
+				c1:Disconnect()
+				c2:Disconnect()
 			end
 		end)
 	end

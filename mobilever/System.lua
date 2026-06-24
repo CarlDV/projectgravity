@@ -89,13 +89,7 @@ return function(context)
 		end
 	end
 
-	local function f2(p, cen, d, md, t)
-		local shape = get_shape(md)
-		if shape then
-			return shape.f2(p, cen, d, t, x1.S[md] or {}, x1, x6, x9)
-		end
-		return Vector3.new(0, 0.01, 0)
-	end
+
 
 	local no_damp = { ["Slingshot"] = true, ["Point Impact"] = true, ["Deflect"] = true }
 
@@ -135,6 +129,20 @@ return function(context)
 			end
 			px(x1.k6, ft, x3())
 			local cur_no_damp = no_damp[x1.k6]
+			
+			local target_positions = {}
+			local valid_targets = 0
+			if #x6.pi_targets > 0 then
+				for _, tgt in ipairs(x6.pi_targets) do
+					if tgt and tgt.Character and tgt.Character:FindFirstChild("HumanoidRootPart") then
+						table.insert(target_positions, tgt.Character.HumanoidRootPart.Position)
+						valid_targets = valid_targets + 1
+					end
+				end
+			end
+			local cur_shape_mod = get_shape(x1.k6)
+			local cur_shape_cfg = x1.S[x1.k6] or {}
+
 			for k = #x6.active_array, 1, -1 do
 				local p = x6.active_array[k]
 				local d = x6.a[p]
@@ -152,13 +160,8 @@ return function(context)
 					continue
 				end
 				local active_c = c
-				if #x6.pi_targets > 0 then
-					local t_idx = ((i - 1) % #x6.pi_targets) + 1
-					local tgt = x6.pi_targets[t_idx]
-
-					if tgt and tgt.Character and tgt.Character:FindFirstChild("HumanoidRootPart") then
-						active_c = tgt.Character.HumanoidRootPart.Position
-					end
+				if valid_targets > 0 then
+					active_c = target_positions[((i - 1) % valid_targets) + 1]
 				end
 				local tc = active_c - p.Position
 				local tc_mag = tc.Magnitude
@@ -166,7 +169,10 @@ return function(context)
 					continue
 				end
 				if tc_mag > x9.c7 then
-					local target_pos_delta = f2(p, active_c, d, x1.k6, ft)
+					local target_pos_delta = Vector3.new(0, 0.01, 0)
+					if cur_shape_mod then
+						target_pos_delta = cur_shape_mod.f2(p, active_c, d, ft, cur_shape_cfg, x1, x6, x9)
+					end
 					if x1.VerticalStiffness and x1.VerticalStiffness ~= 1 then
 						target_pos_delta =
 							Vector3.new(target_pos_delta.X, target_pos_delta.Y * x1.VerticalStiffness, target_pos_delta.Z)
@@ -462,7 +468,7 @@ return function(context)
 			if v:IsA("BasePart") then
 				table.insert(x6.claim_queue, v)
 			end
-			if i % 500 == 0 then
+			if i % 5000 == 0 then
 				task.wait()
 			end
 		end

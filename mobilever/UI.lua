@@ -40,6 +40,21 @@ return function(context)
 	end
 
 	function x5.mw(sg)
+		local function toggle_window(win, state)
+			if state then
+				win.Visible = true
+				v6:Create(win, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 0}):Play()
+			else
+				local tw = v6:Create(win, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {GroupTransparency = 1})
+				local conn
+				conn = tw.Completed:Connect(function() 
+					if win.GroupTransparency >= 0.99 then win.Visible = false end 
+					if conn then conn:Disconnect() end
+				end)
+				tw:Play()
+			end
+		end
+
 		local hud = Instance.new("Frame", sg)
 		hud.Name = "StatusHUD"
 		hud.BackgroundTransparency = 1
@@ -210,8 +225,12 @@ return function(context)
 
 		db.MouseButton1Click:Connect(function()
 			if x6.dlst_container then
-				x6.dlst_container.Visible = not x6.dlst_container.Visible
-				if x6.dlst_container.Visible and x6.populate_modes then
+				local new_state = not x6.dlst_container.Visible
+				if x6.tdlst_container and x6.tdlst_container.Visible then
+					toggle_window(x6.tdlst_container, false)
+				end
+				toggle_window(x6.dlst_container, new_state)
+				if new_state and x6.populate_modes then
 					x6.populate_modes("")
 				end
 			end
@@ -348,130 +367,16 @@ return function(context)
 				end)
 			end
 
-			if m:FindFirstChild("TargetListContainer") then
-				m.TargetListContainer:Destroy()
-			end
-			local tdlst = Instance.new("Frame", m)
-			tdlst.Name = "TargetListContainer"
-			tdlst.Visible = false
-			tdlst.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
-			tdlst.Position = UDim2.new(0, 0, 0, 45)
-			tdlst.Size = UDim2.new(1, 0, 1, -45)
-			tdlst.ZIndex = 10
-			Instance.new("UICorner", tdlst).CornerRadius = UDim.new(0, 10)
-			local ts = Instance.new("UIStroke", tdlst)
-			ts.Color = Color3.fromRGB(40, 40, 45)
-
-			local top_tdlst = Instance.new("Frame", tdlst)
-			top_tdlst.BackgroundTransparency = 1
-			top_tdlst.Size = UDim2.new(1, 0, 0, 30)
-			top_tdlst.ZIndex = 11
-
-			local back_tdlst = Instance.new("TextButton", top_tdlst)
-			back_tdlst.BackgroundTransparency = 1
-			back_tdlst.Position = UDim2.new(0, 10, 0, 5)
-			back_tdlst.Size = UDim2.new(0, 50, 0, 30)
-			back_tdlst.Text = "◄ Back"
-			back_tdlst.TextColor3 = Color3.fromRGB(150, 150, 155)
-			back_tdlst.Font = Enum.Font.GothamBold
-			back_tdlst.TextSize = 12
-			back_tdlst.ZIndex = 12
-			back_tdlst.MouseButton1Click:Connect(function()
-				tdlst.Visible = false
-			end)
-
-			local search_bar = Instance.new("TextBox", tdlst)
-			search_bar.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-			search_bar.Position = UDim2.new(0, 10, 0, 35)
-			search_bar.Size = UDim2.new(1, -20, 0, 20)
-			search_bar.PlaceholderText = "Search players..."
-			search_bar.Text = ""
-			search_bar.TextColor3 = Color3.fromRGB(255, 255, 255)
-			search_bar.Font = Enum.Font.Gotham
-			search_bar.TextSize = 9
-			search_bar.ZIndex = 11
-			Instance.new("UICorner", search_bar).CornerRadius = UDim.new(0, 6)
-
-			local scroll_frame = Instance.new("ScrollingFrame", tdlst)
-			scroll_frame.BackgroundTransparency = 1
-			scroll_frame.Position = UDim2.new(0, 0, 0, 70)
-			scroll_frame.Size = UDim2.new(1, 0, 1, -80)
-			scroll_frame.ScrollBarThickness = 0
-			scroll_frame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-			scroll_frame.ZIndex = 11
-			local tdll = Instance.new("UIListLayout", scroll_frame)
-			tdll.Padding = UDim.new(0, 5)
-			tdll.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-			local active_highlight = nil
-			local function clear_highlight()
-				if active_highlight then
-					active_highlight:Destroy()
-					active_highlight = nil
-				end
-			end
-
-			local function update_list(filter_text)
-				clear_highlight()
-				scroll_frame:ClearAllChildren()
-				local tdll = Instance.new("UIListLayout", scroll_frame)
-				tdll.Padding = UDim.new(0, 5)
-				tdll.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-				for _, pl in ipairs(v2:GetPlayers()) do
-					if pl == v8 then
-						continue
-					end
-					if
-						filter_text ~= ""
-						and not (
-							pl.DisplayName:lower():find(filter_text:lower()) or pl.Name:lower():find(filter_text:lower())
-						)
-					then
-						continue
-					end
-
-					local ib = Instance.new("TextButton", scroll_frame)
-					ib.Size = UDim2.new(1, -16, 0, 26)
-					ib.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-					ib.Text = "  " .. pl.DisplayName
-					ib.TextColor3 = Color3.fromRGB(255, 255, 255)
-					ib.Font = Enum.Font.GothamBold
-					ib.TextSize = 9
-					ib.TextXAlignment = 0
-					ib.ZIndex = 12
-					Instance.new("UICorner", ib).CornerRadius = UDim.new(0, 6)
-
-					ib.MouseEnter:Connect(function()
-						ib.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-						if pl.Character then
-							local h = Instance.new("Highlight", pl.Character)
-							h.FillColor = Color3.fromRGB(255, 255, 255)
-							h.OutlineColor = Color3.fromRGB(255, 255, 255)
-							active_highlight = h
-						end
-					end)
-					ib.MouseLeave:Connect(function()
-						ib.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-						clear_highlight()
-					end)
-
-					ib.MouseButton1Click:Connect(function()
-						x1.Tgt = pl
-						x1.TgtActive = true
-						tdlst.Visible = false
-						f1()
-					end)
-				end
-			end
-
-			table.insert(x6.f1_connections, search_bar:GetPropertyChangedSignal("Text"):Connect(function()
-				update_list(search_bar.Text)
-			end))
 			tdb.MouseButton1Click:Connect(function()
-				tdlst.Visible = not tdlst.Visible
-				if tdlst.Visible then
-					update_list("")
+				if x6.tdlst_container then
+					local new_state = not x6.tdlst_container.Visible
+					if x6.dlst_container and x6.dlst_container.Visible then
+						toggle_window(x6.dlst_container, false)
+					end
+					toggle_window(x6.tdlst_container, new_state)
+					if new_state and x6.update_targets then
+						x6.update_targets("")
+					end
 				end
 			end)
 
@@ -499,13 +404,15 @@ return function(context)
 		end
 		x5.up = f1
 
-		local dlst_container = Instance.new("Frame", m)
+		local dlst_container = Instance.new("CanvasGroup", sg)
 		dlst_container.Name = "ModeSelector"
 		dlst_container.Visible = false
+		dlst_container.GroupTransparency = 1
 		dlst_container.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
-		dlst_container.Position = UDim2.new(0, 0, 0, 45)
-		dlst_container.Size = UDim2.new(1, 0, 1, -45)
-		dlst_container.ZIndex = 10
+		dlst_container.Position = UDim2.new(0.5, 90, 0.5, -160)
+		dlst_container.Size = UDim2.new(0, 180, 0, 250)
+		dlst_container.Active = true
+		dlst_container.Draggable = true
 		Instance.new("UICorner", dlst_container).CornerRadius = UDim.new(0, 10)
 		local dls = Instance.new("UIStroke", dlst_container)
 		dls.Color = Color3.fromRGB(40, 40, 45)
@@ -525,7 +432,7 @@ return function(context)
 		back_dlst.TextSize = 12
 		back_dlst.ZIndex = 12
 		back_dlst.MouseButton1Click:Connect(function()
-			dlst_container.Visible = false
+			toggle_window(dlst_container, false)
 		end)
 
 		local msb = Instance.new("TextBox", dlst_container)
@@ -621,7 +528,7 @@ return function(context)
 						if db then
 							db.Text = "  " .. mn:upper()
 						end
-						dlst_container.Visible = false
+						toggle_window(dlst_container, false)
 						save_settings()
 						if x5.up then
 							x5.up()
@@ -637,6 +544,118 @@ return function(context)
 
 		x6.populate_modes = populate_modes
 		populate_modes("")
+
+		local tdlst = Instance.new("CanvasGroup", sg)
+		tdlst.Name = "TargetListContainer"
+		tdlst.Visible = false
+		tdlst.GroupTransparency = 1
+		tdlst.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+		tdlst.Position = UDim2.new(0.5, 90, 0.5, -160)
+		tdlst.Size = UDim2.new(0, 180, 0, 250)
+		tdlst.Active = true
+		tdlst.Draggable = true
+		x6.tdlst_container = tdlst
+		Instance.new("UICorner", tdlst).CornerRadius = UDim.new(0, 10)
+		local ts = Instance.new("UIStroke", tdlst)
+		ts.Color = Color3.fromRGB(40, 40, 45)
+
+		local top_tdlst = Instance.new("Frame", tdlst)
+		top_tdlst.BackgroundTransparency = 1
+		top_tdlst.Size = UDim2.new(1, 0, 0, 30)
+		top_tdlst.ZIndex = 11
+
+		local back_tdlst = Instance.new("TextButton", top_tdlst)
+		back_tdlst.BackgroundTransparency = 1
+		back_tdlst.Position = UDim2.new(0, 10, 0, 5)
+		back_tdlst.Size = UDim2.new(0, 50, 0, 30)
+		back_tdlst.Text = "◄ Back"
+		back_tdlst.TextColor3 = Color3.fromRGB(150, 150, 155)
+		back_tdlst.Font = Enum.Font.GothamBold
+		back_tdlst.TextSize = 12
+		back_tdlst.ZIndex = 12
+		back_tdlst.MouseButton1Click:Connect(function()
+			toggle_window(tdlst, false)
+		end)
+
+		local target_search = Instance.new("TextBox", tdlst)
+		target_search.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+		target_search.Position = UDim2.new(0, 10, 0, 35)
+		target_search.Size = UDim2.new(1, -20, 0, 20)
+		target_search.PlaceholderText = "Search players..."
+		target_search.Text = ""
+		target_search.TextColor3 = Color3.fromRGB(255, 255, 255)
+		target_search.Font = Enum.Font.Gotham
+		target_search.TextSize = 9
+		target_search.ZIndex = 11
+		Instance.new("UICorner", target_search).CornerRadius = UDim.new(0, 6)
+
+		local t_scroll = Instance.new("ScrollingFrame", tdlst)
+		t_scroll.BackgroundTransparency = 1
+		t_scroll.Position = UDim2.new(0, 0, 0, 70)
+		t_scroll.Size = UDim2.new(1, 0, 1, -80)
+		t_scroll.ScrollBarThickness = 0
+		t_scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		t_scroll.ZIndex = 11
+
+		local active_highlight = nil
+		local function clear_highlight()
+			if active_highlight then
+				active_highlight:Destroy()
+				active_highlight = nil
+			end
+		end
+
+		local function update_targets(filter_text)
+			clear_highlight()
+			t_scroll:ClearAllChildren()
+			local tdll = Instance.new("UIListLayout", t_scroll)
+			tdll.Padding = UDim.new(0, 5)
+			tdll.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+			for _, pl in ipairs(v2:GetPlayers()) do
+				if pl == v8 then continue end
+				if filter_text ~= "" and not (pl.DisplayName:lower():find(filter_text:lower()) or pl.Name:lower():find(filter_text:lower())) then
+					continue
+				end
+
+				local ib = Instance.new("TextButton", t_scroll)
+				ib.Size = UDim2.new(1, -16, 0, 26)
+				ib.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+				ib.Text = "  " .. pl.DisplayName
+				ib.TextColor3 = Color3.fromRGB(255, 255, 255)
+				ib.Font = Enum.Font.GothamBold
+				ib.TextSize = 9
+				ib.TextXAlignment = 0
+				ib.ZIndex = 12
+				Instance.new("UICorner", ib).CornerRadius = UDim.new(0, 6)
+
+				ib.MouseEnter:Connect(function()
+					ib.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+					if pl.Character then
+						local h = Instance.new("Highlight", pl.Character)
+						h.FillColor = Color3.fromRGB(255, 255, 255)
+						h.OutlineColor = Color3.fromRGB(255, 255, 255)
+						active_highlight = h
+					end
+				end)
+				ib.MouseLeave:Connect(function()
+					ib.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+					clear_highlight()
+				end)
+
+				ib.MouseButton1Click:Connect(function()
+					x1.Tgt = pl
+					x1.TgtActive = true
+					toggle_window(tdlst, false)
+					if x5.up then x5.up() end
+				end)
+			end
+		end
+		x6.update_targets = update_targets
+
+		target_search:GetPropertyChangedSignal("Text"):Connect(function()
+			update_targets(target_search.Text)
+		end)
 
 		local minb = Instance.new("TextButton", h)
 		minb.BackgroundColor3 = Color3.fromRGB(60, 200, 100)
@@ -658,11 +677,11 @@ return function(context)
 			c.Visible = not im
 			if im then
 				am.Visible = false
-				if x6.dlst_container then
-					x6.dlst_container.Visible = false
+				if x6.dlst_container and x6.dlst_container.Visible then
+					toggle_window(x6.dlst_container, false)
 				end
-				if m:FindFirstChild("TargetListContainer") then
-					m.TargetListContainer.Visible = false
+				if x6.tdlst_container and x6.tdlst_container.Visible then
+					toggle_window(x6.tdlst_container, false)
 				end
 			end
 			m:TweenSize(im and UDim2.new(0, 180, 0, 26) or UDim2.new(0, 180, 0, 250), "Out", "Quart", 0.3, true)
