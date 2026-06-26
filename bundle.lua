@@ -5944,15 +5944,21 @@ local function safe_http_get(url)
 	return nil
 end
 
+local __LOADED_MODULES = {}
 local function load_module(path)
+    if __LOADED_MODULES[path] ~= nil then return __LOADED_MODULES[path] end
     local normalizedPath = string.gsub(path, "^mobilever/", "")
+    local res = nil
     if __MODULES[path] then
-        return __MODULES[path]()
+        res = __MODULES[path]()
     elseif __MODULES[normalizedPath] then
-        return __MODULES[normalizedPath]()
+        res = __MODULES[normalizedPath]()
+    else
+        warn("Failed to find bundled module: " .. tostring(path))
+        return nil
     end
-    warn("Failed to find bundled module: " .. tostring(path))
-    return nil
+    __LOADED_MODULES[path] = res
+    return res
 end
 
 local config = load_module("config.lua")
