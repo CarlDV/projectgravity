@@ -38,13 +38,13 @@ return function(context)
 		
 		local outer = Instance.new("Frame", toast_container)
 		outer.BackgroundTransparency = 1
-		outer.Size = UDim2.new(0, 300, 0, 0)
+		outer.Size = UDim2.new(0, 250, 0, 0)
 		outer.ClipsDescendants = false
 		
 		local frame = Instance.new("Frame", outer)
-		frame.BackgroundColor3 = Color3.fromRGB(18, 20, 28)
-		frame.Size = UDim2.new(1, 0, 0, 60)
-		frame.Position = UDim2.new(1, 350, 0, 0)
+		frame.BackgroundColor3 = Color3.fromRGB(17, 20, 30)
+		frame.Size = UDim2.new(1, 0, 0, 48)
+		frame.Position = UDim2.new(1, 300, 0, 0)
 		frame.ClipsDescendants = true
 		local corner = Instance.new("UICorner", frame)
 		corner.CornerRadius = UDim.new(0, 8)
@@ -57,37 +57,37 @@ return function(context)
 		
 		local title_txt = Instance.new("TextLabel", frame)
 		title_txt.BackgroundTransparency = 1
-		title_txt.Size = UDim2.new(1, -24, 0, 20)
-		title_txt.Position = UDim2.new(0, 16, 0, 10)
+		title_txt.Size = UDim2.new(1, -24, 0, 16)
+		title_txt.Position = UDim2.new(0, 16, 0, 8)
 		title_txt.Text = title
 		title_txt.TextColor3 = Color3.fromRGB(255, 255, 255)
 		title_txt.Font = Enum.Font.GothamBold
-		title_txt.TextSize = 14
+		title_txt.TextSize = 13
 		title_txt.TextXAlignment = Enum.TextXAlignment.Left
 		
 		local desc_txt = Instance.new("TextLabel", frame)
 		desc_txt.BackgroundTransparency = 1
-		desc_txt.Size = UDim2.new(1, -24, 0, 16)
-		desc_txt.Position = UDim2.new(0, 16, 0, 32)
+		desc_txt.Size = UDim2.new(1, -24, 0, 14)
+		desc_txt.Position = UDim2.new(0, 16, 0, 26)
 		desc_txt.Text = desc
 		desc_txt.TextColor3 = Color3.fromRGB(160, 165, 175)
 		desc_txt.Font = Enum.Font.GothamMedium
-		desc_txt.TextSize = 12
+		desc_txt.TextSize = 11
 		desc_txt.TextXAlignment = Enum.TextXAlignment.Left
 		
 		-- Smooth expand to push older notifications
-		v6:Create(outer, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Size = UDim2.new(0, 300, 0, 60) }):Play()
-		-- Crazy good slide anim with overshoot
-		v6:Create(frame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.new(0, 0, 0, 0) }):Play()
+		v6:Create(outer, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2.new(0, 250, 0, 48) }):Play()
+		-- Proper slide anim without bounce
+		v6:Create(frame, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Position = UDim2.new(0, 0, 0, 0) }):Play()
 		
 		task.delay(duration, function()
 			if not outer.Parent then return end
 			-- Quick slide out
-			v6:Create(frame, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.In), { Position = UDim2.new(1, 350, 0, 0) }):Play()
+			v6:Create(frame, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), { Position = UDim2.new(1, 300, 0, 0) }):Play()
 			
 			task.delay(0.3, function()
 				-- Smooth collapse
-				local tOut = v6:Create(outer, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Size = UDim2.new(0, 300, 0, 0) })
+				local tOut = v6:Create(outer, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Size = UDim2.new(0, 250, 0, 0) })
 				tOut.Completed:Connect(function()
 					outer:Destroy()
 				end)
