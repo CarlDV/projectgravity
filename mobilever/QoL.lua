@@ -27,18 +27,24 @@ return function(context)
 			
 			toast_container = Instance.new("Frame", toast_gui)
 			toast_container.BackgroundTransparency = 1
-			toast_container.Position = UDim2.new(0.5, 0, 1, -150)
-			toast_container.Size = UDim2.new(0, 300, 0, 0)
+			toast_container.Position = UDim2.new(1, -20, 1, -150)
+			toast_container.Size = UDim2.new(0, 250, 0, 0)
+			toast_container.AnchorPoint = Vector2.new(1, 1)
 			local layout = Instance.new("UIListLayout", toast_container)
-			layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			layout.HorizontalAlignment = Enum.HorizontalAlignment.Right
 			layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
 			layout.Padding = UDim.new(0, 8)
 		end
 		
-		local frame = Instance.new("Frame", toast_container)
+		local outer = Instance.new("Frame", toast_container)
+		outer.BackgroundTransparency = 1
+		outer.Size = UDim2.new(0, 250, 0, 0)
+		
+		local frame = Instance.new("Frame", outer)
 		frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-		frame.Size = UDim2.new(0, 0, 0, 36)
-		frame.BackgroundTransparency = 1
+		frame.Size = UDim2.new(1, 0, 0, 36)
+		frame.Position = UDim2.new(1, 300, 0, 0)
+		frame.BackgroundTransparency = 0.1
 		frame.ClipsDescendants = true
 		local corner = Instance.new("UICorner", frame)
 		corner.CornerRadius = UDim.new(0, 6)
@@ -57,25 +63,24 @@ return function(context)
 		txt.TextSize = 13
 		txt.TextTransparency = 1
 		
-		v6:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-			Size = UDim2.new(0, 250, 0, 36),
-			BackgroundTransparency = 0.1
-		}):Play()
+		v6:Create(outer, TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), { Size = UDim2.new(0, 250, 0, 36) }):Play()
+		v6:Create(frame, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), { Position = UDim2.new(0, 0, 0, 0) }):Play()
 		v6:Create(stroke, TweenInfo.new(0.3), { Transparency = 0 }):Play()
 		v6:Create(txt, TweenInfo.new(0.3), { TextTransparency = 0 }):Play()
 		
 		task.delay(duration, function()
-			if not frame.Parent then return end
-			local tOut = v6:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {
-				Size = UDim2.new(0, 0, 0, 36),
-				BackgroundTransparency = 1
-			})
+			if not outer.Parent then return end
+			v6:Create(frame, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.In), { Position = UDim2.new(1, 300, 0, 0) }):Play()
 			v6:Create(stroke, TweenInfo.new(0.3), { Transparency = 1 }):Play()
 			v6:Create(txt, TweenInfo.new(0.3), { TextTransparency = 1 }):Play()
-			tOut.Completed:Connect(function()
-				frame:Destroy()
+			
+			task.delay(0.2, function()
+				local tOut = v6:Create(outer, TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.In), { Size = UDim2.new(0, 250, 0, 0) })
+				tOut.Completed:Connect(function()
+					outer:Destroy()
+				end)
+				tOut:Play()
 			end)
-			tOut:Play()
 		end)
 	end
 	
