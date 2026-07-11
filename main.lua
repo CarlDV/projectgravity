@@ -107,7 +107,7 @@ loading_text.TextSize = 12
 
 local x9 = { c1 = 0.15, c2 = 0.05, c3 = 0.01, c4 = 0.2, c5 = 0.6, c6 = 0.8, c7 = 0.1, c8 = 0.25 }
 local ANTI_SLEEP = Vector3.new(0, 0.01, 0)
-local BASE_URL = "https://raw.githubusercontent.com/CarlDV/Project-Gravity-02/main/"
+local BASE_URL = "https://raw.githubusercontent.com/CarlDV/projectgravity/main/"
 
 local function safe_http_get(url)
 	local cache_buster = "?cb=" .. tostring(math.random(1000000, 9999999))
