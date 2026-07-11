@@ -756,7 +756,7 @@ return function(context)
 							end
 						end
 						if QoL and QoL.Toast then
-							QoL.Toast("Settings Reset!", 3, Color3.fromRGB(255, 100, 100))
+							QoL.Toast("System Reset", "All settings reverted to default", 3, Color3.fromRGB(255, 100, 100))
 						end
 					end
 					v6:Create(confirm, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.In), { GroupTransparency = 1 }):Play()
@@ -916,7 +916,7 @@ return function(context)
 						toggle_window(dlst_container, false)
 						save_settings()
 						if QoL and QoL.Toast then
-							QoL.Toast("Shape: " .. mn, 2, Color3.fromRGB(100, 200, 255))
+							QoL.Toast("Mode Changed", "Switched to " .. mn, 2, Color3.fromRGB(100, 200, 255))
 						end
 						if x5.up then
 							x5.up()
@@ -1077,7 +1077,7 @@ return function(context)
 						x1.AnchorSelf = false
 						x1.PI_All = false
 						if QoL and QoL.Toast then
-							QoL.Toast("Targeting " .. pl.DisplayName, 2, Color3.fromRGB(255, 60, 60))
+							QoL.Toast("Target Locked", "Now focusing on " .. pl.DisplayName, 2, Color3.fromRGB(255, 60, 60))
 						end
 					end
 					x1.TgtActive = (#x1.Targets > 0)
