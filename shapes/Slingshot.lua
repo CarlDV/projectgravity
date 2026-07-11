@@ -32,4 +32,6 @@ M.Controls = {
 	{ Type = "Slider", Name = "Fling Speed", Min = 1, Max = 500, Key = "k13" }
 }
 
+
+
 return M

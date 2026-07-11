@@ -39,4 +39,6 @@ M.Controls = {
 	{ Type = "Slider", Name = "Frequency", Min = 10, Max = 200, Key = "k14" }
 }
 
+
+
 return M

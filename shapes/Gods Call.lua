@@ -12,4 +12,6 @@ M.Controls = {
 	{ Type = "Slider", Name = "Ascent Speed", Min = 1, Max = 100, Key = "k11" }
 }
 
+
+
 return M

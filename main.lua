@@ -1,5 +1,13 @@
 --!native
 
+local SESSION_ID = tostring(math.random(1000000, 9999999)) .. tostring(time())
+
+if getgenv()._GRAVITY_SESSION_ID ~= nil and getgenv()._GRAVITY_DESTROY then
+	pcall(getgenv()._GRAVITY_DESTROY)
+end
+
+getgenv()._GRAVITY_SESSION_ID = SESSION_ID
+
 local function safe_service(name)
 	local service = game:GetService(name)
 	if cloneref then
@@ -23,6 +31,33 @@ if setthreadidentity then
 		setthreadidentity(8)
 	end)
 end
+
+local function cleanup_previous()
+	if gethui then
+		for _, gui in ipairs(gethui():GetChildren()) do
+			if gui:IsA("ScreenGui") and (gui.Name == "GravityLoading" or string.sub(gui.Name, 1, 2) == "G_") then
+				pcall(function() gui:Destroy() end)
+			end
+		end
+	elseif syn and syn.protect_gui then
+		local core = game:GetService("CoreGui")
+		for _, gui in ipairs(core:GetChildren()) do
+			if gui:IsA("ScreenGui") and (gui.Name == "GravityLoading" or string.sub(gui.Name, 1, 2) == "G_") then
+				pcall(function() gui:Destroy() end)
+			end
+		end
+	else
+		local pg = v2.LocalPlayer:FindFirstChild("PlayerGui")
+		if pg then
+			for _, gui in ipairs(pg:GetChildren()) do
+				if gui:IsA("ScreenGui") and (gui.Name == "GravityLoading" or string.sub(gui.Name, 1, 2) == "G_") then
+					pcall(function() gui:Destroy() end)
+				end
+			end
+		end
+	end
+end
+cleanup_previous()
 
 local v8, v9 = v2.LocalPlayer, v2.LocalPlayer:GetMouse()
 local is_mobile = v1.TouchEnabled and not v1.KeyboardEnabled
@@ -72,7 +107,7 @@ loading_text.TextSize = 12
 
 local x9 = { c1 = 0.15, c2 = 0.05, c3 = 0.01, c4 = 0.2, c5 = 0.6, c6 = 0.8, c7 = 0.1, c8 = 0.25 }
 local ANTI_SLEEP = Vector3.new(0, 0.01, 0)
-local BASE_URL = "https://raw.githubusercontent.com/CarlDV/projectgravity/main/"
+local BASE_URL = "https://raw.githubusercontent.com/CarlDV/Project-Gravity-02/main/"
 
 local function safe_http_get(url)
 	local cache_buster = "?cb=" .. tostring(math.random(1000000, 9999999))
@@ -97,12 +132,13 @@ end
 
 local function load_module(path)
 	local code = safe_http_get(BASE_URL .. path)
-	if code then
+	if code and not string.match(code, "^404: Not Found") then
 		local func, err = loadstring(code)
 		if func then
 			return func()
 		end
 		warn("Syntax error in module " .. path .. ": " .. tostring(err))
+		return nil
 	end
 	warn("Failed to download module: " .. path)
 	return nil
@@ -112,6 +148,48 @@ local config = load_module("config.lua")
 local x1 = config.x1
 local x2 = config.x2
 x1.S = x2
+
+local default_x1 = {}
+for k, v in pairs(x1) do
+	if typeof(v) == "table" then
+		default_x1[k] = {}
+		for sk, sv in pairs(v) do
+			default_x1[k][sk] = sv
+		end
+	else
+		default_x1[k] = v
+	end
+end
+local default_x2 = {}
+for mk, mv in pairs(x2) do
+	default_x2[mk] = {}
+	for sk, sv in pairs(mv) do
+		default_x2[mk][sk] = sv
+	end
+end
+
+local function reset_config()
+	for k, v in pairs(default_x1) do
+		if k ~= "S" and k ~= "Targets" then
+			if typeof(v) == "table" then
+				x1[k] = {}
+				for sk, sv in pairs(v) do
+					x1[k][sk] = sv
+				end
+			else
+				x1[k] = v
+			end
+		end
+	end
+	for mk, mv in pairs(default_x2) do
+		if x2[mk] then
+			for sk, sv in pairs(mv) do
+				x2[mk][sk] = sv
+			end
+		end
+	end
+	x1.S = x2
+end
 
 local serialization = load_module("math/serialization.lua")
 local sanitize = serialization.sanitize
@@ -248,7 +326,9 @@ get_shape(x1.k6)
 coroutine.wrap(function()
 	for mn, _ in pairs(x2) do
 		if mn ~= x1.k6 then
-			get_shape(mn)
+			pcall(function()
+				get_shape(mn)
+			end)
 			if task and task.wait then
 				task.wait(0.05)
 			end
@@ -277,7 +357,41 @@ local context = {
 	load_module = load_module,
 	is_mobile = is_mobile,
 	SUB_DIR = SUB_DIR,
+	reset_config = reset_config,
 }
+
+local function destroy()
+	if spin_conn then
+		pcall(function() spin_conn:Disconnect() end)
+		spin_conn = nil
+	end
+	if loading_sg then
+		pcall(function() loading_sg:Destroy() end)
+		loading_sg = nil
+	end
+	for i = #x6.c, 1, -1 do
+		pcall(function() x6.c[i]:Disconnect() end)
+		x6.c[i] = nil
+	end
+	for _, d in pairs(x6.a) do
+		if d and d.lv then
+			pcall(function() d.lv:Destroy() end)
+		end
+	end
+	x6.a = setmetatable({}, {__mode = "k"})
+	if x6.b then
+		pcall(function() x6.b:Destroy() end)
+		x6.b = nil
+	end
+	if x6.sg then
+		pcall(function() x6.sg:Destroy() end)
+		x6.sg = nil
+	end
+	getgenv()._GRAVITY_SESSION_ID = nil
+	getgenv()._GRAVITY_DESTROY = nil
+end
+
+getgenv()._GRAVITY_DESTROY = destroy
 
 local success, err = pcall(function()
 	local UI_builder = load_module(SUB_DIR .. "UI.lua")
@@ -299,7 +413,12 @@ end)
 
 spin_conn:Disconnect()
 loading_sg:Destroy()
+spin_conn = nil
+loading_sg = nil
 
 if not success then
+	destroy()
 	warn("Project Gravity Initialization Failed: " .. tostring(err))
+else
+	getgenv()._GRAVITY_SESSION_ID = SESSION_ID
 end

@@ -4,7 +4,6 @@ return function(context)
 	local x5 = context.x5
 	local get_shape = context.get_shape
 	local load_module = context.load_module
-	local SUB_DIR = context.SUB_DIR or "mobilever/"
 
 	local x4, x8 = {}, {}
 	local x7 = {}
@@ -89,7 +88,16 @@ return function(context)
 		end
 	end
 
-
+	local function get_predicted_pos(root, factor)
+		local pos = root.Position
+		local vel = root.AssemblyLinearVelocity
+		if vel.Magnitude > 250 then
+			vel = vel.Unit * 250
+		end
+		local y_vel = math.clamp(vel.Y, -50, 15)
+		vel = Vector3.new(vel.X, y_vel, vel.Z)
+		return pos + (vel * (factor / 1000))
+	end
 
 	local no_damp = { ["Slingshot"] = true, ["Point Impact"] = true, ["Deflect"] = true }
 
@@ -111,6 +119,10 @@ return function(context)
 			x6.f = x6.f + 1
 			local dt = x6.n > 5000 and 10 or (x6.n > 2500 and 6 or (x6.n > 1000 and 3 or 1))
 			local et, ft = x1.k7 or dt, time()
+			if x1["SM(ps.lag)"] then
+				dt = 1
+				et = 1
+			end
 			local i = 0
 			if ft > x6.pi_timer then
 				x6.pi_timer = ft + 1
@@ -122,8 +134,43 @@ return function(context)
 						end
 					end
 				else
-					if x1.Tgt and x1.Tgt.Character and x1.Tgt.Character:FindFirstChild("HumanoidRootPart") then
-						table.insert(x6.pi_targets, x1.Tgt)
+					if x1.Targets and #x1.Targets > 0 then
+						for _, tgt in ipairs(x1.Targets) do
+							if tgt and tgt.Parent and tgt.Character and tgt.Character:FindFirstChild("HumanoidRootPart") then
+								table.insert(x6.pi_targets, tgt)
+							end
+						end
+					end
+				end
+
+				for _, pl in ipairs(v2:GetPlayers()) do
+					if pl.Character and pl.Character:FindFirstChild("Head") then
+						local head = pl.Character.Head
+						local is_tgt = table.find(x6.pi_targets, pl) ~= nil
+						local marker = head:FindFirstChild("GravityTargetMarker")
+						
+						if is_tgt and not marker then
+							local bg = Instance.new("BillboardGui")
+							bg.Name = "GravityTargetMarker"
+							bg.Size = UDim2.new(1.5, 0, 1.5, 0)
+							bg.StudsOffset = Vector3.new(0, 2.5, 0)
+							bg.AlwaysOnTop = true
+							
+							local txt = Instance.new("TextLabel", bg)
+							txt.BackgroundTransparency = 1
+							txt.Size = UDim2.new(1, 0, 1, 0)
+							txt.Text = "▼"
+							txt.TextColor3 = Color3.fromRGB(255, 60, 60)
+							txt.TextScaled = true
+							txt.Font = Enum.Font.GothamBlack
+							
+							local str = Instance.new("UIStroke", txt)
+							str.Color = Color3.fromRGB(0, 0, 0)
+							str.Thickness = 2
+							bg.Parent = head
+						elseif not is_tgt and marker then
+							marker:Destroy()
+						end
 					end
 				end
 			end
@@ -135,13 +182,52 @@ return function(context)
 			if #x6.pi_targets > 0 then
 				for _, tgt in ipairs(x6.pi_targets) do
 					if tgt and tgt.Character and tgt.Character:FindFirstChild("HumanoidRootPart") then
-						table.insert(target_positions, tgt.Character.HumanoidRootPart.Position)
+						local root = tgt.Character.HumanoidRootPart
+						local pos = root.Position
+						if x1.PredictiveTracking then
+							pos = get_predicted_pos(root, x1.PredictionFactor or 150)
+						end
+						table.insert(target_positions, pos)
 						valid_targets = valid_targets + 1
 					end
 				end
 			end
 			local cur_shape_mod = get_shape(x1.k6)
 			local cur_shape_cfg = x1.S[x1.k6] or {}
+
+			local k1 = x1.k1
+			local c7 = x9.c7
+			local ki = x1.Ki or 0
+			local damping = x1.Damping or 0
+			local max_speed = x1.MaxSpeed
+			local vert_stiff = x1.VerticalStiffness or 1
+			local vert_mult = vert_stiff ~= 1 and Vector3.new(1, vert_stiff, 1) or nil
+			local dt_mult = real_dt * 60 * dt
+
+			local smoothing = (x1.k6 == "Point Impact" and 1) or x1.k8
+			if x1.DramaMode and x1.k6 == "Point Impact" then
+				smoothing = 1
+			end
+			local sm_alpha = smoothing >= 1 and 1 or (1 - math.exp(-dt_mult * -math.log(math.max(0.001, 1 - smoothing))))
+
+			local ang_damp_mult = 1
+			if x1.AngularDamping and x1.AngularDamping > 0 then
+				local damp_rate = -60 * math.log(math.max(0.001, 1 - math.clamp(x1.AngularDamping, 0, 0.99)))
+				ang_damp_mult = math.exp(-damp_rate * real_dt * dt)
+			end
+
+			local trans_ease = 1
+			local in_transition = false
+			if x6.transition_time and x6.transition_time > 0 then
+				in_transition = true
+				local alpha = math.clamp((ft - x6.transition_time) / x6.transition_dur, 0, 1)
+				if alpha < 1 then
+					trans_ease = alpha * alpha * (3 - 2 * alpha)
+				else
+					x6.transition_time = 0
+					in_transition = false
+				end
+			end
 
 			for k = #x6.active_array, 1, -1 do
 				local p = x6.active_array[k]
@@ -173,55 +259,43 @@ return function(context)
 				end
 				local tc = active_c - p.Position
 				local tc_mag = tc.Magnitude
-				if tc_mag > x1.k1 then
+				if tc_mag > k1 then
 					continue
 				end
-				if tc_mag > x9.c7 then
+				if tc_mag > c7 then
 					local target_pos_delta = Vector3.new(0, 0.01, 0)
 					if cur_shape_mod then
 						target_pos_delta = cur_shape_mod.f2(p, active_c, d, ft, cur_shape_cfg, x1, x6, x9)
 					end
-					if x1.VerticalStiffness and x1.VerticalStiffness ~= 1 then
-						target_pos_delta =
-							Vector3.new(target_pos_delta.X, target_pos_delta.Y * x1.VerticalStiffness, target_pos_delta.Z)
+					if vert_mult then
+						target_pos_delta = target_pos_delta * vert_mult
 					end
-					if x1.Ki and x1.Ki > 0 and d.integral then
-						d.integral = d.integral + (target_pos_delta * real_dt * 60 * dt)
-						local max_i = 100
-						if d.integral.Magnitude > max_i then
-							d.integral = d.integral.Unit * max_i
+					if ki > 0 and d.integral then
+						d.integral = d.integral + (target_pos_delta * dt_mult)
+						if d.integral.Magnitude > 100 then
+							d.integral = d.integral.Unit * 100
 						end
-						target_pos_delta = target_pos_delta + (d.integral * x1.Ki)
+						target_pos_delta = target_pos_delta + (d.integral * ki)
 					end
 					local tv = target_pos_delta
-					if x1.Damping and x1.Damping > 0 and not cur_no_damp then
-						tv = tv - (p_vel * x1.Damping)
+					if damping > 0 and not cur_no_damp then
+						tv = tv - (p_vel * damping)
 					end
 
-					if x1.MaxSpeed and not cur_no_damp then
-						local spd = p_vel.Magnitude
-						local s_factor = math.clamp(1 - (spd / x1.MaxSpeed), 0.2, 1)
-						tv = tv * s_factor
-					end
 
-					local smoothing = (x1.k6 == "Point Impact" and 1) or x1.k8
-					if x1.DramaMode and x1.k6 == "Point Impact" then
-						smoothing = 1
-					end
-					local sm_alpha = smoothing >= 1 and 1 or (1 - math.exp(-60 * real_dt * dt * -math.log(math.max(0.001, 1 - smoothing))))
+
 					d.vl = d.vl and d.vl:Lerp(tv, sm_alpha) or tv
-					if d.trans_vl and x6.transition_time > 0 then
-						local alpha = math.clamp((ft - x6.transition_time) / x6.transition_dur, 0, 1)
-						if alpha < 1 then
-							local ease = alpha * alpha * (3 - 2 * alpha)
-							d.vl = d.trans_vl:Lerp(d.vl, ease)
+					if in_transition and d.trans_vl then
+						if trans_ease < 1 then
+							d.vl = d.trans_vl:Lerp(d.vl, trans_ease)
 						else
 							d.trans_vl = nil
 						end
 					end
-					if x1.MaxSpeed and not cur_no_damp then
-						if d.vl.Magnitude > x1.MaxSpeed then
-							d.vl = d.vl.Unit * x1.MaxSpeed
+					
+					if max_speed and not cur_no_damp then
+						if d.vl.Magnitude > max_speed then
+							d.vl = d.vl.Unit * max_speed
 						end
 					else
 						if d.vl.Magnitude > 3000 then
@@ -229,10 +303,9 @@ return function(context)
 						end
 					end
 					d.lv.VectorVelocity = d.vl
-					if x1.AngularDamping and x1.AngularDamping > 0 then
-						local damp_rate = -60 * math.log(math.max(0.001, 1 - math.clamp(x1.AngularDamping, 0, 0.99)))
-						p.AssemblyAngularVelocity = p.AssemblyAngularVelocity
-							* math.exp(-damp_rate * real_dt * dt)
+					
+					if ang_damp_mult ~= 1 then
+						p.AssemblyAngularVelocity = p.AssemblyAngularVelocity * ang_damp_mult
 					end
 				end
 			end
@@ -273,12 +346,25 @@ return function(context)
 		if not x6.b or x1.Disabled then
 			return
 		end
-		if x1.TgtActive and x1.Tgt and x1.Tgt.Character and x1.Tgt.Character:FindFirstChild("HumanoidRootPart") then
-			x6.b.Position = x1.Tgt.Character.HumanoidRootPart.Position
-			x6.b.AssemblyLinearVelocity = Vector3.zero
-			return
+		if x1.TgtActive and x1.Targets and #x1.Targets > 0 then
+			local tgt = x1.Targets[1]
+			if tgt and tgt.Character and tgt.Character:FindFirstChild("HumanoidRootPart") then
+				local root = tgt.Character.HumanoidRootPart
+				local pos = root.Position
+				if x1.PredictiveTracking then
+					pos = get_predicted_pos(root, x1.PredictionFactor or 150)
+				end
+				x6.b.Position = pos
+				x6.b.AssemblyLinearVelocity = Vector3.zero
+				return
+			end
 		elseif x1.AnchorSelf and v8.Character and v8.Character:FindFirstChild("HumanoidRootPart") then
-			x6.b.Position = v8.Character.HumanoidRootPart.Position
+			local root = v8.Character.HumanoidRootPart
+			local pos = root.Position
+			if x1.PredictiveTracking then
+				pos = get_predicted_pos(root, x1.PredictionFactor or 150)
+			end
+			x6.b.Position = pos
 			x6.b.AssemblyLinearVelocity = Vector3.zero
 			return
 		elseif x6.d then
@@ -534,61 +620,62 @@ return function(context)
 		x7.n("Sys", "Stopped", 2)
 	end
 
-	function x4.clean_physics()
-		if x6.b then
-			x6.b.Parent:Destroy()
-			x6.b = nil
-		end
-		for p, _ in pairs(x6.a) do
-			x4.f2(p)
-		end
-		x6.a = {}
-		x6.o = false
-		x7.n("Sys", "Cleared", 2)
-	end
-
 	function x8.h(n, s, o)
 		if s ~= Enum.UserInputState.Begin then
 			return Enum.ContextActionResult.Pass
 		end
 		if n == "C" then
-			local pos
-			local cam = v4.CurrentCamera
-			if cam then
-				local viewportSize = cam.ViewportSize
-				local ray = cam:ViewportPointToRay(viewportSize.X / 2, viewportSize.Y / 2)
-				local rp = RaycastParams.new()
-				rp.FilterType = Enum.RaycastFilterType.Exclude
-				rp.FilterDescendantsInstances = { v8.Character }
-				local result = workspace:Raycast(ray.Origin, ray.Direction * 1000, rp)
-				if result then
-					pos = result.Position
-				else
-					pos = ray.Origin + ray.Direction * 20
-				end
-			else
-				pos = v9.Hit.p
-			end
-			x4.f4(pos)
+			x4.f4(v9.Hit.p)
 			return Enum.ContextActionResult.Sink
 		elseif n == "R" then
-			x4.clean_physics()
+			x4.f5()
 			return Enum.ContextActionResult.Sink
 		end
 		return Enum.ContextActionResult.Pass
 	end
 
 	function x8.i()
+		v7:BindAction("C", x8.h, false, Enum.KeyCode.E)
+		v7:BindAction("R", x8.h, false, Enum.KeyCode.Q)
+		v7:BindAction("P", function(_, s)
+			if s == Enum.UserInputState.Begin then
+				x1.Paused = not x1.Paused
+				x7.n("Sys", x1.Paused and "Paused" or "Resumed", 2)
+			end
+		end, false, Enum.KeyCode.P)
+		v7:BindAction("Disable", function(_, s)
+			if s == Enum.UserInputState.Begin then
+				x1.Disabled = not x1.Disabled
+				local state = x1.Disabled and "Disabled" or "Enabled"
+				x7.n("Sys", "Script " .. state, 2)
+				if x6.disable_btn then
+					x6.disable_btn.BackgroundColor3 = x1.Disabled and Color3.fromRGB(100, 255, 100)
+						or Color3.fromRGB(60, 60, 60)
+					local v = x1.Disabled
+					if x6.b then
+						x6.b.Transparency = v and 1 or x9.c7
+						if x6.b:FindFirstChild("Visual") then
+							x6.b.Visual.Enabled = not v
+						end
+					end
+					for _, d in pairs(x6.a) do
+						if d.lv then
+							d.lv.MaxForce = v and 0 or x1.k4
+						end
+						if d.av then
+							d.av.MaxTorque = v and 0 or math.huge
+						end
+					end
+				end
+			end
+		end, false, Enum.KeyCode.L)
 		table.insert(
 			x6.c,
 			v1.InputBegan:Connect(function(i, p)
 				if p or not x6.b then
 					return
 				end
-				if
-					(i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch)
-					and v9.Target == x6.b
-				then
+				if i.UserInputType == Enum.UserInputType.MouseButton1 and v9.Target == x6.b then
 					x6.d = true
 					x6.p = (v4.CurrentCamera and (x6.b.Position - v4.CurrentCamera.CFrame.Position).Magnitude) or 50
 				end
@@ -597,16 +684,16 @@ return function(context)
 		table.insert(
 			x6.c,
 			v1.InputEnded:Connect(function(i)
-				if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+				if i.UserInputType == Enum.UserInputType.MouseButton1 then
 					x6.d = false
 				end
 			end)
 		)
 
-		local sculptor_binder = load_module(SUB_DIR .. "System_sculptor.lua")(context, x7)
+		local sculptor_binder = load_module("System_sculptor.lua")(context, x7)
 		sculptor_binder()
 
-		x7.n("Rdy", "Ready", 5)
+		x7.n("Rdy", "Press 'E'", 5)
 	end
 
 	return { x4 = x4, x8 = x8 }

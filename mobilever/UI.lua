@@ -4,8 +4,119 @@ return function(context)
 	local favorites, save_favs, save_settings = context.favorites, context.save_favs, context.save_settings
 	local get_shape = context.get_shape
 	local load_module = context.load_module
+	local reset_config = context.reset_config
 	local SUB_DIR = context.SUB_DIR or "mobilever/"
 
+	local Lighting = game:GetService("Lighting")
+	
+	local PerfOriginals = {
+		Shadows = nil,
+		FX = {},
+		Materials = {},
+		Particles = {}
+	}
+	
+	local function RestorePerfShadows()
+		if PerfOriginals.Shadows ~= nil then
+			Lighting.GlobalShadows = PerfOriginals.Shadows
+			PerfOriginals.Shadows = nil
+		end
+	end
+	
+	local function ApplyPerfShadows(disable)
+		if disable then
+			if PerfOriginals.Shadows == nil then
+				PerfOriginals.Shadows = Lighting.GlobalShadows
+			end
+			Lighting.GlobalShadows = false
+		else
+			RestorePerfShadows()
+		end
+	end
+	
+	local function RestorePerfPostFX()
+		for fx, was_enabled in pairs(PerfOriginals.FX) do
+			if fx.Parent then fx.Enabled = was_enabled end
+		end
+		table.clear(PerfOriginals.FX)
+	end
+	
+	local function ApplyPerfPostFX(disable)
+		if disable then
+			for _, effect in pairs(Lighting:GetDescendants()) do
+				if effect:IsA("PostEffect") then
+					if PerfOriginals.FX[effect] == nil then
+						PerfOriginals.FX[effect] = effect.Enabled
+					end
+					effect.Enabled = false
+				end
+			end
+			local camera = workspace.CurrentCamera
+			if camera then
+				for _, effect in pairs(camera:GetDescendants()) do
+					if effect:IsA("PostEffect") then
+						if PerfOriginals.FX[effect] == nil then
+							PerfOriginals.FX[effect] = effect.Enabled
+						end
+						effect.Enabled = false
+					end
+				end
+			end
+		else
+			RestorePerfPostFX()
+		end
+	end
+	
+	local function RestorePerfMaterials()
+		for part, mat in pairs(PerfOriginals.Materials) do
+			if part.Parent then part.Material = mat end
+		end
+		table.clear(PerfOriginals.Materials)
+	end
+	
+	local function ApplyPerfMaterials(disable)
+		if disable then
+			for _, part in pairs(workspace:GetDescendants()) do
+				if part:IsA("BasePart") then
+					if not PerfOriginals.Materials[part] then
+						PerfOriginals.Materials[part] = part.Material
+					end
+					part.Material = Enum.Material.SmoothPlastic
+				end
+			end
+		else
+			RestorePerfMaterials()
+		end
+	end
+	
+	local function RestorePerfParticles()
+		for p, enabled in pairs(PerfOriginals.Particles) do
+			if p.Parent then p.Enabled = enabled end
+		end
+		table.clear(PerfOriginals.Particles)
+	end
+	
+	local function ApplyPerfParticles(disable)
+		if disable then
+			for _, obj in pairs(workspace:GetDescendants()) do
+				if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Fire") or obj:IsA("Smoke") or obj:IsA("Sparkles") then
+					if PerfOriginals.Particles[obj] == nil then
+						PerfOriginals.Particles[obj] = obj.Enabled
+					end
+					obj.Enabled = false
+				end
+			end
+		else
+			RestorePerfParticles()
+		end
+	end
+
+	local function RestoreAllPerf()
+		RestorePerfShadows()
+		RestorePerfPostFX()
+		RestorePerfMaterials()
+		RestorePerfParticles()
+	end
 	local UI_elements = load_module(SUB_DIR .. "UI_elements.lua")(context)
 	local es, et, eb, eh = UI_elements.s, UI_elements.t, UI_elements.b, UI_elements.h
 
@@ -15,6 +126,15 @@ return function(context)
 	x5.t = et
 	x5.b = eb
 	x5.h = eh
+
+	local stable_shapes = {
+		["Cursed Technique Red"] = true,
+		["Galactic Web"] = true,
+		["Celestial Ribbon"] = true,
+		["Big Ring Things"] = true,
+		["Point Impact"] = true,
+		["Domain Expansion Infinite Void"] = true
+	}
 
 	function x5.st()
 		if x5.g and x5.up then
@@ -41,14 +161,22 @@ return function(context)
 
 	function x5.mw(sg)
 		local function toggle_window(win, state)
+			local scale = win:FindFirstChild("UIScale")
+			if not scale then
+				scale = Instance.new("UIScale", win)
+				scale.Scale = 0.8
+			end
+			local prop = win:IsA("CanvasGroup") and "GroupTransparency" or "BackgroundTransparency"
 			if state then
 				win.Visible = true
-				v6:Create(win, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 0}):Play()
+				v6:Create(win, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {[prop] = 0}):Play()
+				v6:Create(scale, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
 			else
-				local tw = v6:Create(win, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {GroupTransparency = 1})
+				local tw = v6:Create(win, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {[prop] = 1})
+				v6:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0.8}):Play()
 				local conn
 				conn = tw.Completed:Connect(function() 
-					if win.GroupTransparency >= 0.99 then win.Visible = false end 
+					if win[prop] >= 0.99 then win.Visible = false end 
 					if conn then conn:Disconnect() end
 				end)
 				tw:Play()
@@ -82,6 +210,8 @@ return function(context)
 				hud_l.TextColor3 = col
 			end)
 		)
+
+		hud.Visible = x1.ShowHUD ~= false
 
 		local m = Instance.new("Frame", sg)
 		m.Name = "Main"
@@ -174,6 +304,14 @@ return function(context)
 		ap.PaddingLeft = UDim.new(0, 15)
 		ap.PaddingRight = UDim.new(0, 15)
 
+		et(ac, "Predictive Tracking", x1.PredictiveTracking ~= false, function(v)
+			x1.PredictiveTracking = v
+			save_settings()
+		end)
+		es(ac, "Prediction Factor", 0, 500, x1.PredictionFactor or 150, function(v)
+			x1.PredictionFactor = v
+			save_settings()
+		end)
 		es(ac, "Damping", 0, 5, x1.Damping, function(v)
 			x1.Damping = v
 			save_settings()
@@ -201,6 +339,55 @@ return function(context)
 				save_settings()
 			end, true)
 		end
+		
+		et(ac, "Disable Shadows", x1.Perf_DisableShadows, function(v)
+			x1.Perf_DisableShadows = v
+			ApplyPerfShadows(v)
+			save_settings()
+		end)
+		et(ac, "Disable Post-FX", x1.Perf_DisablePostFX, function(v)
+			x1.Perf_DisablePostFX = v
+			ApplyPerfPostFX(v)
+			save_settings()
+		end)
+		et(ac, "Potato Materials", x1.Perf_PotatoMaterials, function(v)
+			x1.Perf_PotatoMaterials = v
+			ApplyPerfMaterials(v)
+			save_settings()
+		end)
+		et(ac, "Hide Particles", x1.Perf_HideParticles, function(v)
+			x1.Perf_HideParticles = v
+			ApplyPerfParticles(v)
+			save_settings()
+		end)
+		
+		ApplyPerfShadows(x1.Perf_DisableShadows)
+		ApplyPerfPostFX(x1.Perf_DisablePostFX)
+		ApplyPerfMaterials(x1.Perf_PotatoMaterials)
+		ApplyPerfParticles(x1.Perf_HideParticles)
+		
+		local function update_color()
+			if x6.b then
+				x6.b.Color = x1.k3
+				if x6.b:FindFirstChild("Visual") and x6.b.Visual:FindFirstChildOfClass("ImageLabel") then
+					x6.b.Visual:FindFirstChildOfClass("ImageLabel").ImageColor3 = x1.k3
+				end
+			end
+			save_settings()
+		end
+
+		es(ac, "Center Color R", 0, 255, math.floor(x1.k3.R * 255), function(v)
+			x1.k3 = Color3.fromRGB(v, x1.k3.G * 255, x1.k3.B * 255)
+			update_color()
+		end, true)
+		es(ac, "Center Color G", 0, 255, math.floor(x1.k3.G * 255), function(v)
+			x1.k3 = Color3.fromRGB(x1.k3.R * 255, v, x1.k3.B * 255)
+			update_color()
+		end, true)
+		es(ac, "Center Color B", 0, 255, math.floor(x1.k3.B * 255), function(v)
+			x1.k3 = Color3.fromRGB(x1.k3.R * 255, x1.k3.G * 255, v)
+			update_color()
+		end, true)
 
 		local ab = eb(c, "Advanced Settings", function()
 			am.Visible = not am.Visible
@@ -277,17 +464,31 @@ return function(context)
 			scl.HorizontalAlignment = Enum.HorizontalAlignment.Center
 			local s = x1.S[x1.k6] or {}
 
-			eh(gsc, "Control")
 
+			et(gsc, "Show HUD", x1.ShowHUD ~= false, function(v)
+				x1.ShowHUD = v
+				if hud then hud.Visible = v end
+				save_settings()
+			end)
 
 			et(gsc, "Anchor to Self", x1.AnchorSelf, function(v)
 				x1.AnchorSelf = v
+				if v then
+					x1.PI_All = false
+					table.clear(x1.Targets)
+					x1.TgtActive = false
+					if x5.up then x5.up() end
+				end
 				save_settings()
 			end)
 
 			if not x1.SimpleMode then
 				et(gsc, "Anti-Fling", x1.AntiFling, function(v)
 					x1.AntiFling = v
+					save_settings()
+				end)
+				et(gsc, "SM(ps.lag)", x1["SM(ps.lag)"], function(v)
+					x1["SM(ps.lag)"] = v
 					save_settings()
 				end)
 			end
@@ -311,6 +512,12 @@ return function(context)
 			if not x1.SimpleMode then
 				et(gsc, "Target Everyone", x1.PI_All, function(v)
 					x1.PI_All = v
+					if v then
+						x1.AnchorSelf = false
+						table.clear(x1.Targets)
+						x1.TgtActive = false
+						if x5.up then x5.up() end
+					end
 					save_settings()
 				end)
 			end
@@ -345,7 +552,14 @@ return function(context)
 				end)
 			)
 
-			local tn = x1.Tgt and "Target: " .. (x1.Tgt.DisplayName or x1.Tgt.Name) or "Select Target"
+			local tn = "Select Target"
+			if x1.Targets and #x1.Targets > 0 then
+				if #x1.Targets == 1 then
+					tn = "Target: " .. (x1.Targets[1].DisplayName or x1.Targets[1].Name)
+				else
+					tn = "Multi-Target (" .. tostring(#x1.Targets) .. ")"
+				end
+			end
 
 			local tdb = Instance.new("TextButton", gsc)
 			tdb.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
@@ -359,7 +573,7 @@ return function(context)
 			local dst2 = Instance.new("UIStroke", tdb)
 			dst2.Color = Color3.fromRGB(40, 40, 45)
 
-			if x1.Tgt then
+			if x1.Targets and #x1.Targets > 0 then
 				local ctb = Instance.new("TextButton", tdb)
 				ctb.BackgroundTransparency = 1
 				ctb.Position = UDim2.new(1, -25, 0, 0)
@@ -368,7 +582,7 @@ return function(context)
 				ctb.TextColor3 = Color3.fromRGB(200, 80, 80)
 				ctb.TextSize = 16
 				ctb.MouseButton1Click:Connect(function()
-					x1.Tgt = nil
+					table.clear(x1.Targets)
 					x1.TgtActive = false
 					f1()
 				end)
@@ -388,19 +602,27 @@ return function(context)
 			end)
 
 			if not x1.SimpleMode then
-				eh(sc, "Shape")
 				local shape_mod = get_shape(x1.k6)
 				if shape_mod and shape_mod.Controls then
 					for _, ctrl in ipairs(shape_mod.Controls) do
 						local current_val = s[ctrl.Key]
 						local p_frame = ctrl.Parent == "gsc" and gsc or sc
 						if ctrl.Type == "Slider" then
-							if current_val == nil then current_val = ctrl.Min end
+							if current_val == nil then
+								if ctrl.Default ~= nil then
+									current_val = ctrl.Default
+								else
+									current_val = ctrl.Min
+								end
+							end
 							if ctrl.Div then current_val = current_val * ctrl.Div end
 							es(p_frame, ctrl.Name, ctrl.Min, ctrl.Max, current_val, function(v)
 								if ctrl.Div then s[ctrl.Key] = v / ctrl.Div else s[ctrl.Key] = v end
 							end, ctrl.IntOnly)
 						elseif ctrl.Type == "Toggle" then
+							if current_val == nil then
+								current_val = ctrl.Default ~= nil and ctrl.Default or false
+							end
 							et(p_frame, ctrl.Name, current_val, function(v)
 								s[ctrl.Key] = v
 							end)
@@ -408,6 +630,135 @@ return function(context)
 					end
 				end
 			end
+
+			local reset_btn = Instance.new("TextButton", sc)
+		reset_btn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+		reset_btn.Size = UDim2.new(1, 0, 0, 24)
+		reset_btn.Text = "⚠ RESET ALL SETTINGS"
+		reset_btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+		reset_btn.Font = Enum.Font.GothamBold
+		reset_btn.TextSize = 9
+		reset_btn.AutoButtonColor = false
+		Instance.new("UICorner", reset_btn).CornerRadius = UDim.new(0, 6)
+		local reset_stroke = Instance.new("UIStroke", reset_btn)
+		reset_stroke.Color = Color3.fromRGB(255, 80, 80)
+		reset_stroke.Thickness = 1
+
+		reset_btn.MouseEnter:Connect(function()
+			v6:Create(reset_btn, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(220, 50, 50) }):Play()
+		end)
+		reset_btn.MouseLeave:Connect(function()
+			v6:Create(reset_btn, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(180, 40, 40) }):Play()
+		end)
+
+			reset_btn.MouseButton1Click:Connect(function()
+				if x6.reset_confirm then
+					x6.reset_confirm:Destroy()
+					x6.reset_confirm = nil
+				end
+
+				local confirm = Instance.new("CanvasGroup", sg)
+				confirm.Name = "ResetConfirm"
+				confirm.BackgroundColor3 = Color3.fromRGB(12, 12, 15)
+				confirm.Position = UDim2.new(0.5, -100, 0.5, -60)
+				confirm.Size = UDim2.new(0, 200, 0, 120)
+				confirm.GroupTransparency = 1
+				confirm.ZIndex = 100
+				Instance.new("UICorner", confirm).CornerRadius = UDim.new(0, 12)
+				local confirm_stroke = Instance.new("UIStroke", confirm)
+				confirm_stroke.Color = Color3.fromRGB(120, 40, 40)
+				confirm_stroke.Thickness = 1
+				local warning_icon = Instance.new("TextLabel", confirm)
+				warning_icon.Position = UDim2.new(0.5, -10, 0, 10)
+				warning_icon.Size = UDim2.new(0, 20, 0, 20)
+				warning_icon.Text = "⚠"
+				warning_icon.TextColor3 = Color3.fromRGB(255, 100, 100)
+				warning_icon.TextSize = 16
+				warning_icon.ZIndex = 101
+
+				local confirm_title = Instance.new("TextLabel", confirm)
+				confirm_title.BackgroundTransparency = 1
+				confirm_title.Position = UDim2.new(0, 10, 0, 35)
+				confirm_title.Size = UDim2.new(1, -20, 0, 20)
+				confirm_title.Text = "RESET ALL SETTINGS?"
+				confirm_title.TextColor3 = Color3.fromRGB(255, 255, 255)
+				confirm_title.Font = Enum.Font.GothamBold
+				confirm_title.TextSize = 10
+				confirm_title.ZIndex = 101
+
+				local confirm_desc = Instance.new("TextLabel", confirm)
+				confirm_desc.BackgroundTransparency = 1
+				confirm_desc.Position = UDim2.new(0, 10, 0, 55)
+				confirm_desc.Size = UDim2.new(1, -20, 0, 30)
+				confirm_desc.Text = "This will reset all settings to default. This cannot be undone."
+				confirm_desc.TextColor3 = Color3.fromRGB(150, 150, 160)
+				confirm_desc.Font = Enum.Font.Gotham
+				confirm_desc.TextSize = 8
+				confirm_desc.TextWrapped = true
+				confirm_desc.ZIndex = 101
+
+				local cancel_btn = Instance.new("TextButton", confirm)
+				cancel_btn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+				cancel_btn.Position = UDim2.new(0, 10, 1, -30)
+				cancel_btn.Size = UDim2.new(0.5, -15, 0, 20)
+				cancel_btn.Text = "CANCEL"
+				cancel_btn.TextColor3 = Color3.fromRGB(200, 200, 210)
+				cancel_btn.Font = Enum.Font.GothamBold
+				cancel_btn.TextSize = 8
+				cancel_btn.AutoButtonColor = false
+				cancel_btn.ZIndex = 101
+				Instance.new("UICorner", cancel_btn).CornerRadius = UDim.new(0, 4)
+
+				local confirm_reset_btn = Instance.new("TextButton", confirm)
+				confirm_reset_btn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+				confirm_reset_btn.Position = UDim2.new(0.5, 5, 1, -30)
+				confirm_reset_btn.Size = UDim2.new(0.5, -15, 0, 20)
+				confirm_reset_btn.Text = "RESET"
+				confirm_reset_btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+				confirm_reset_btn.Font = Enum.Font.GothamBold
+				confirm_reset_btn.TextSize = 8
+				confirm_reset_btn.AutoButtonColor = false
+				confirm_reset_btn.ZIndex = 101
+				Instance.new("UICorner", confirm_reset_btn).CornerRadius = UDim.new(0, 4)
+				local confirm_reset_stroke = Instance.new("UIStroke", confirm_reset_btn)
+				confirm_reset_stroke.Color = Color3.fromRGB(120, 30, 30)
+
+				cancel_btn.MouseButton1Click:Connect(function()
+					v6:Create(confirm, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.In), { GroupTransparency = 1 }):Play()
+					task.delay(0.2, function()
+						confirm:Destroy()
+						x6.reset_confirm = nil
+					end)
+				end)
+
+				confirm_reset_btn.MouseButton1Click:Connect(function()
+					if reset_config then
+						reset_config()
+						save_settings()
+						if x5.up then
+							x5.up()
+						end
+						if x6.b then
+							x6.b.Color = x1.k3
+							if x6.b:FindFirstChild("Visual") and x6.b.Visual:FindFirstChildOfClass("ImageLabel") then
+								x6.b.Visual:FindFirstChildOfClass("ImageLabel").ImageColor3 = x1.k3
+							end
+						end
+					end
+					v6:Create(confirm, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.In), { GroupTransparency = 1 }):Play()
+					task.delay(0.2, function()
+						confirm:Destroy()
+						x6.reset_confirm = nil
+					end)
+				end)
+
+				x6.reset_confirm = confirm
+
+				local scale = Instance.new("UIScale", confirm)
+				scale.Scale = 0.9
+				v6:Create(confirm, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { GroupTransparency = 0 }):Play()
+				v6:Create(scale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+			end)
 		end
 		x5.up = f1
 
@@ -481,6 +832,10 @@ return function(context)
 				if fa ~= fb then
 					return fa > fb
 				end
+				local sa, sb = stable_shapes[a] and 1 or 0, stable_shapes[b] and 1 or 0
+				if sa ~= sb then
+					return sa > sb
+				end
 				return a < b
 			end)
 
@@ -489,11 +844,19 @@ return function(context)
 					continue
 				end
 
+				local is_stable = stable_shapes[mn]
 				local f = Instance.new("Frame", dlst)
 				f.Size = UDim2.new(1, -16, 0, 24)
 				f.BackgroundColor3 = mn == x1.k6 and Color3.fromRGB(40, 40, 180) or Color3.fromRGB(25, 25, 30)
 				f.ZIndex = 12
-				Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
+				Instance.new("UICorner", f).CornerRadius = is_stable and UDim.new(1, 0) or UDim.new(0, 4)
+				
+				if not is_stable then
+					local fs = Instance.new("UIStroke", f)
+					fs.Color = Color3.fromRGB(200, 80, 80)
+					fs.Thickness = 1
+					fs.Transparency = 0.5
+				end
 
 				local ib = Instance.new("TextButton", f)
 				ib.Size = UDim2.new(1, -40, 1, 0)
@@ -527,6 +890,7 @@ return function(context)
 					if shape then
 						x1.k6 = mn
 						x6.transition_time = time()
+						x6.transition_dur = 1.5
 						for _, d in pairs(x6.a) do
 							d.trans_vl = d.vl or Vector3.zero
 							d.v1, d.v2, d.v3, d.v4, d.v5, d.v6, d.v7, d.v8, d.v9 = nil, nil, nil, nil, nil, nil, nil, nil, nil
@@ -626,15 +990,50 @@ return function(context)
 				end
 
 				local ib = Instance.new("TextButton", t_scroll)
-				ib.Size = UDim2.new(1, -16, 0, 26)
+				ib.Size = UDim2.new(1, -16, 0, 36)
 				ib.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-				ib.Text = "  " .. pl.DisplayName
-				ib.TextColor3 = Color3.fromRGB(255, 255, 255)
-				ib.Font = Enum.Font.GothamBold
-				ib.TextSize = 9
-				ib.TextXAlignment = 0
+				ib.Text = ""
+				ib.AutoButtonColor = false
 				ib.ZIndex = 12
 				Instance.new("UICorner", ib).CornerRadius = UDim.new(0, 6)
+				
+				local is_selected = table.find(x1.Targets, pl) ~= nil
+				local sel_indicator = Instance.new("Frame", ib)
+				sel_indicator.Position = UDim2.new(1, -20, 0.5, -5)
+				sel_indicator.Size = UDim2.new(0, 10, 0, 10)
+				sel_indicator.BackgroundColor3 = is_selected and Color3.fromRGB(60, 200, 100) or Color3.fromRGB(60, 60, 65)
+				sel_indicator.ZIndex = 12
+				Instance.new("UICorner", sel_indicator).CornerRadius = UDim.new(1, 0)
+
+				local pfp = Instance.new("ImageLabel", ib)
+				pfp.Size = UDim2.new(0, 26, 0, 26)
+				pfp.Position = UDim2.new(0, 6, 0.5, -13)
+				pfp.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+				pfp.Image = "rbxthumb://type=AvatarHeadShot&id=" .. pl.UserId .. "&w=48&h=48"
+				pfp.ZIndex = 12
+				Instance.new("UICorner", pfp).CornerRadius = UDim.new(1, 0)
+
+				local dname = Instance.new("TextLabel", ib)
+				dname.BackgroundTransparency = 1
+				dname.Position = UDim2.new(0, 38, 0, 4)
+				dname.Size = UDim2.new(1, -44, 0, 14)
+				dname.Text = pl.DisplayName
+				dname.TextColor3 = Color3.fromRGB(255, 255, 255)
+				dname.Font = Enum.Font.GothamBold
+				dname.TextSize = 10
+				dname.TextXAlignment = 0
+				dname.ZIndex = 12
+
+				local uname = Instance.new("TextLabel", ib)
+				uname.BackgroundTransparency = 1
+				uname.Position = UDim2.new(0, 38, 0, 18)
+				uname.Size = UDim2.new(1, -44, 0, 12)
+				uname.Text = "@" .. pl.Name
+				uname.TextColor3 = Color3.fromRGB(150, 150, 150)
+				uname.Font = Enum.Font.GothamMedium
+				uname.TextSize = 8
+				uname.TextXAlignment = 0
+				uname.ZIndex = 12
 
 				ib.MouseEnter:Connect(function()
 					ib.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
@@ -651,9 +1050,17 @@ return function(context)
 				end)
 
 				ib.MouseButton1Click:Connect(function()
-					x1.Tgt = pl
-					x1.TgtActive = true
-					toggle_window(tdlst, false)
+					local idx = table.find(x1.Targets, pl)
+					if idx then
+						table.remove(x1.Targets, idx)
+						sel_indicator.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
+					else
+						table.insert(x1.Targets, pl)
+						sel_indicator.BackgroundColor3 = Color3.fromRGB(60, 200, 100)
+						x1.AnchorSelf = false
+						x1.PI_All = false
+					end
+					x1.TgtActive = (#x1.Targets > 0)
 					if x5.up then x5.up() end
 				end)
 			end
@@ -670,6 +1077,69 @@ return function(context)
 		minb.Size = UDim2.new(0, 14, 0, 14)
 		minb.Text = ""
 		Instance.new("UICorner", minb).CornerRadius = UDim.new(1, 0)
+		
+		local tutb = Instance.new("TextButton", h)
+		tutb.BackgroundColor3 = Color3.fromRGB(50, 150, 200)
+		tutb.Position = UDim2.new(1, -66, 0.5, -7)
+		tutb.Size = UDim2.new(0, 14, 0, 14)
+		tutb.Text = "?"
+		tutb.TextColor3 = Color3.fromRGB(255, 255, 255)
+		tutb.Font = Enum.Font.GothamBold
+		tutb.TextSize = 10
+		Instance.new("UICorner", tutb).CornerRadius = UDim.new(1, 0)
+
+		local tut_container = Instance.new("CanvasGroup", sg)
+		tut_container.Name = "Tutorial"
+		tut_container.Visible = false
+		tut_container.GroupTransparency = 1
+		tut_container.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+		tut_container.Position = UDim2.new(0.5, -100, 0.5, -120)
+		tut_container.Size = UDim2.new(0, 200, 0, 240)
+		tut_container.Active = true
+		tut_container.Draggable = true
+		Instance.new("UICorner", tut_container).CornerRadius = UDim.new(0, 10)
+		local tuls = Instance.new("UIStroke", tut_container)
+		tuls.Color = Color3.fromRGB(40, 40, 45)
+
+		local tut_header = Instance.new("Frame", tut_container)
+		tut_header.BackgroundTransparency = 1
+		tut_header.Size = UDim2.new(1, 0, 0, 30)
+		
+		local tut_title = Instance.new("TextLabel", tut_header)
+		tut_title.BackgroundTransparency = 1
+		tut_title.Position = UDim2.new(0, 15, 0, 0)
+		tut_title.Size = UDim2.new(0.8, 0, 1, 0)
+		tut_title.Text = "HOW TO USE"
+		tut_title.TextColor3 = Color3.fromRGB(255, 255, 255)
+		tut_title.Font = Enum.Font.GothamBlack
+		tut_title.TextSize = 10
+		tut_title.TextXAlignment = 0
+
+		local tut_close = Instance.new("TextButton", tut_header)
+		tut_close.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+		tut_close.Position = UDim2.new(1, -22, 0.5, -7)
+		tut_close.Size = UDim2.new(0, 14, 0, 14)
+		tut_close.Text = ""
+		Instance.new("UICorner", tut_close).CornerRadius = UDim.new(1, 0)
+		tut_close.MouseButton1Click:Connect(function()
+			toggle_window(tut_container, false)
+		end)
+
+		local tut_text = Instance.new("TextLabel", tut_container)
+		tut_text.BackgroundTransparency = 1
+		tut_text.Position = UDim2.new(0, 15, 0, 35)
+		tut_text.Size = UDim2.new(1, -30, 1, -45)
+		tut_text.Text = "• Core Controls: Tap 'PLC' to reposition the gravitational center. Tap 'CLN' to wipe active parts.\n\n• Targeting: Use 'Select Target' to focus gravity onto a specific player.\n\n• Elevation: Use 'UP' and 'DWN' buttons to manually adjust the vertical height of the formation.\n\n• System: Tap 'PAU' to instantly pause physics. Tap 'DIS' to disable the system.\n\n• Modes: Select modes to seamlessly morph between geometry.\n\n• Config: Scroll down the main menu to tune the shape config. Open 'Advanced Settings' for global physics."
+		tut_text.TextColor3 = Color3.fromRGB(200, 200, 205)
+		tut_text.Font = Enum.Font.GothamMedium
+		tut_text.TextSize = 9
+		tut_text.TextXAlignment = 0
+		tut_text.TextYAlignment = 0
+		tut_text.TextWrapped = true
+
+		tutb.MouseButton1Click:Connect(function()
+			toggle_window(tut_container, not tut_container.Visible)
+		end)
 
 		local closeb = Instance.new("TextButton", h)
 		closeb.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
@@ -695,11 +1165,18 @@ return function(context)
 		end)
 
 		closeb.MouseButton1Click:Connect(function()
+			RestoreAllPerf()
 			if context.x4 and context.x4.f5 then
 				context.x4.f5()
 			else
 				sg:Destroy()
 			end
+		end)
+		
+		pcall(function()
+			sg.Destroying:Connect(function()
+				RestoreAllPerf()
+			end)
 		end)
 
 		local ctrl_container = Instance.new("Frame", sg)
