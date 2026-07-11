@@ -4,6 +4,8 @@ return function(context)
 	local x5 = context.x5
 	local get_shape = context.get_shape
 	local load_module = context.load_module
+	local QoL = load_module((context.SUB_DIR or "") .. "QoL.lua")
+	if QoL then QoL = QoL(context) end
 
 	local x4, x8 = {}, {}
 	local x7 = {}
@@ -42,6 +44,9 @@ return function(context)
 	}
 
 	function x7.e(p)
+		if QoL and QoL.IsPartFiltered(p) then
+			return true
+		end
 		if not p:IsA("BasePart") then
 			return true
 		end
