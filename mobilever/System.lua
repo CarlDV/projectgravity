@@ -328,8 +328,8 @@ return function(context)
 						end
 					end
 					
-					local limit = (max_speed and not cur_no_damp) and max_speed or 3000
-					if pure_target_pos then limit = math.max(limit, 15000) end
+					local limit = (max_speed and not cur_no_damp) and max_speed or 3300
+					if pure_target_pos then limit = math.max(limit, 15300) end
 					if d.vl.Magnitude > limit then
 						d.vl = d.vl.Unit * limit
 					end
