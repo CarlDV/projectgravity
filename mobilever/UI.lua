@@ -6,8 +6,6 @@ return function(context)
 	local load_module = context.load_module
 	local reset_config = context.reset_config
 	local SUB_DIR = context.SUB_DIR or "mobilever/"
-	local QoL = load_module((context.SUB_DIR or "") .. "QoL.lua")
-	if QoL then QoL = QoL(context) end
 
 	local Lighting = game:GetService("Lighting")
 	
@@ -391,15 +389,6 @@ return function(context)
 			update_color()
 		end, true)
 
-		es(ac, "Filter Max Size", 0, 1000, x1.FilterMaxSize or 0, function(v)
-			x1.FilterMaxSize = v
-			save_settings()
-		end, true)
-		es(ac, "Filter Max Mass", 0, 10000, x1.FilterMaxMass or 0, function(v)
-			x1.FilterMaxMass = v
-			save_settings()
-		end, true)
-
 		local ab = eb(c, "Advanced Settings", function()
 			am.Visible = not am.Visible
 		end)
@@ -755,9 +744,6 @@ return function(context)
 								x6.b.Visual:FindFirstChildOfClass("ImageLabel").ImageColor3 = x1.k3
 							end
 						end
-						if QoL and QoL.Toast then
-							QoL.Toast("System Reset", "All settings reverted to default", 3, Color3.fromRGB(255, 107, 129))
-						end
 					end
 					v6:Create(confirm, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.In), { GroupTransparency = 1 }):Play()
 					task.delay(0.2, function()
@@ -915,9 +901,6 @@ return function(context)
 						end
 						toggle_window(dlst_container, false)
 						save_settings()
-						if QoL and QoL.Toast then
-							QoL.Toast("Mode Changed", "Switched to " .. mn, 2, Color3.fromRGB(52, 152, 219))
-						end
 						if x5.up then
 							x5.up()
 						end
@@ -1076,9 +1059,6 @@ return function(context)
 						sel_indicator.BackgroundColor3 = Color3.fromRGB(60, 200, 100)
 						x1.AnchorSelf = false
 						x1.PI_All = false
-						if QoL and QoL.Toast then
-							QoL.Toast("Target Locked", "Now focusing on " .. pl.DisplayName, 2, Color3.fromRGB(255, 107, 129))
-						end
 					end
 					x1.TgtActive = (#x1.Targets > 0)
 					if x5.up then x5.up() end

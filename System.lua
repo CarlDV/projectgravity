@@ -4,8 +4,6 @@ return function(context)
 	local x5 = context.x5
 	local get_shape = context.get_shape
 	local load_module = context.load_module
-	local QoL = load_module((context.SUB_DIR or "") .. "QoL.lua")
-	if QoL then QoL = QoL(context) end
 
 	local x4, x8 = {}, {}
 	local x7 = {}
@@ -44,9 +42,6 @@ return function(context)
 	}
 
 	function x7.e(p)
-		if QoL and QoL.IsPartFiltered(p) then
-			return true
-		end
 		if not p:IsA("BasePart") then
 			return true
 		end
@@ -78,10 +73,10 @@ return function(context)
 		return x1.S[x1.k6] or {}
 	end
 
-	local function px(md, t, c)
+	local function px(md, t, c, x1)
 		local shape = get_shape(md)
 		if shape and shape.px then
-			shape.px(t, c, x6, x9)
+			shape.px(t, c, x6, x9, x1)
 		end
 	end
 
@@ -114,6 +109,29 @@ return function(context)
 		pcall(function()
 			local c = x6.b.Position
 			x6.f = x6.f + 1
+			if x6.last_shape ~= x1.k6 then
+				x6.last_shape = x1.k6
+				for _, d in pairs(x6.a) do
+					d.v1 = nil
+					d.v2 = nil
+					d.v3 = nil
+					d.v4 = nil
+					d.v5 = nil
+					d.v6 = nil
+					d.v7 = nil
+					d.v8 = nil
+					d.v9 = nil
+					d.nx = nil
+					d.ny = nil
+					d.nz = nil
+					d.phase = nil
+					d.phase2 = nil
+					d.last_t = nil
+					d.last_target_pos = nil
+					d.hit_wall = nil
+					d.integral = Vector3.zero
+				end
+			end
 			local dt = x6.n > 5000 and 10 or (x6.n > 2500 and 6 or (x6.n > 1000 and 3 or 1))
 			local et, ft = x1.k7 or dt, time()
 			if x1["SM(ps.lag)"] then
@@ -171,7 +189,7 @@ return function(context)
 					end
 				end
 			end
-			px(x1.k6, ft, x3())
+			px(x1.k6, ft, x3(), x1)
 			local cur_no_damp = no_damp[x1.k6]
 			
 			local target_positions = {}
@@ -261,8 +279,9 @@ return function(context)
 				end
 				if tc_mag > c7 then
 					local target_pos_delta = Vector3.new(0, 0.01, 0)
+					local pure_target_pos = nil
 					if cur_shape_mod then
-						target_pos_delta = cur_shape_mod.f2(p, active_c, d, ft, cur_shape_cfg, x1, x6, x9)
+						target_pos_delta, pure_target_pos = cur_shape_mod.f2(p, active_c, d, ft, cur_shape_cfg, x1, x6, x9)
 					end
 					if vert_mult then
 						target_pos_delta = target_pos_delta * vert_mult
@@ -275,6 +294,17 @@ return function(context)
 						target_pos_delta = target_pos_delta + (d.integral * ki)
 					end
 					local tv = target_pos_delta
+					
+					if pure_target_pos then
+						if d.last_target_pos then
+							local target_velocity = (pure_target_pos - d.last_target_pos) / real_dt
+							tv = tv + target_velocity
+						end
+						d.last_target_pos = pure_target_pos
+					else
+						d.last_target_pos = nil
+					end
+					
 					if damping > 0 and not cur_no_damp then
 						tv = tv - (p_vel * damping)
 					end
@@ -290,14 +320,10 @@ return function(context)
 						end
 					end
 					
-					if max_speed and not cur_no_damp then
-						if d.vl.Magnitude > max_speed then
-							d.vl = d.vl.Unit * max_speed
-						end
-					else
-						if d.vl.Magnitude > 3000 then
-							d.vl = d.vl.Unit * 3000
-						end
+					local limit = (max_speed and not cur_no_damp) and max_speed or 3000
+					if pure_target_pos then limit = math.max(limit, 15000) end
+					if d.vl.Magnitude > limit then
+						d.vl = d.vl.Unit * limit
 					end
 					d.lv.VectorVelocity = d.vl
 					

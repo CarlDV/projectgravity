@@ -35,8 +35,6 @@ return {
 		MaxSpeed = 500,
 		AngularDamping = 0.5,
 		VerticalStiffness = 1.0,
-		FilterMaxSize = 0,
-		FilterMaxMass = 0,
 	},
 	x2 = {
 		["Pulsar Vortex"] = { k11 = 200, k12 = 8, k13 = 10, k14 = 0, k15 = 0, k16 = 0, k17 = 0, k23 = false },
