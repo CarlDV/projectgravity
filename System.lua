@@ -144,14 +144,14 @@ return function(context)
 				x6.pi_targets = {}
 				if x1.PI_All then
 					for _, pl in ipairs(v2:GetPlayers()) do
-						if pl ~= v8 and pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") then
+						if pl ~= v8 and pl.Character and (pl.Character:FindFirstChild("HumanoidRootPart") or pl.Character:FindFirstChildWhichIsA("BasePart")) then
 							table.insert(x6.pi_targets, pl)
 						end
 					end
 				else
 					if x1.Targets and #x1.Targets > 0 then
 						for _, tgt in ipairs(x1.Targets) do
-							if tgt and tgt.Parent and tgt.Character and tgt.Character:FindFirstChild("HumanoidRootPart") then
+							if tgt and tgt.Parent and tgt.Character and (tgt.Character:FindFirstChild("HumanoidRootPart") or tgt.Character:FindFirstChildWhichIsA("BasePart")) then
 								table.insert(x6.pi_targets, tgt)
 							end
 						end
@@ -196,8 +196,8 @@ return function(context)
 			local valid_targets = 0
 			if #x6.pi_targets > 0 then
 				for _, tgt in ipairs(x6.pi_targets) do
-					if tgt and tgt.Character and tgt.Character:FindFirstChild("HumanoidRootPart") then
-						local root = tgt.Character.HumanoidRootPart
+					local root = tgt and tgt.Character and (tgt.Character:FindFirstChild("HumanoidRootPart") or tgt.Character:FindFirstChildWhichIsA("BasePart"))
+					if root then
 						local pos = root.Position
 						if x1.PredictiveTracking then
 							pos = get_predicted_pos(root, x1.PredictionFactor or 150)
@@ -373,8 +373,8 @@ return function(context)
 		end
 		if x1.TgtActive and x1.Targets and #x1.Targets > 0 then
 			local tgt = x1.Targets[1]
-			if tgt and tgt.Character and tgt.Character:FindFirstChild("HumanoidRootPart") then
-				local root = tgt.Character.HumanoidRootPart
+			local root = tgt and tgt.Character and (tgt.Character:FindFirstChild("HumanoidRootPart") or tgt.Character:FindFirstChildWhichIsA("BasePart"))
+			if root then
 				local pos = root.Position
 				if x1.PredictiveTracking then
 					pos = get_predicted_pos(root, x1.PredictionFactor or 150)
@@ -383,8 +383,8 @@ return function(context)
 				x6.b.AssemblyLinearVelocity = Vector3.zero
 				return
 			end
-		elseif x1.AnchorSelf and v8.Character and v8.Character:FindFirstChild("HumanoidRootPart") then
-			local root = v8.Character.HumanoidRootPart
+		elseif x1.AnchorSelf and v8.Character and (v8.Character:FindFirstChild("HumanoidRootPart") or v8.Character:FindFirstChildWhichIsA("BasePart")) then
+			local root = v8.Character:FindFirstChild("HumanoidRootPart") or v8.Character:FindFirstChildWhichIsA("BasePart")
 			local pos = root.Position
 			if x1.PredictiveTracking then
 				pos = get_predicted_pos(root, x1.PredictionFactor or 150)
@@ -510,6 +510,7 @@ return function(context)
 					pcall(function()
 						if sethiddenproperty then
 							sethiddenproperty(v8, "SimulationRadius", 9e9)
+							sethiddenproperty(v8, "MaximumSimulationRadius", 9e9)
 						elseif setsimulationradius then
 							setsimulationradius(9e9)
 						end
@@ -525,15 +526,38 @@ return function(context)
 				end
 			end)
 		)
+		local anti_fling_cache = setmetatable({}, {__mode = "k"})
 		table.insert(
 			x6.c,
 			v3.Stepped:Connect(function()
 				if x1.AntiFling then
 					for _, p in ipairs(v2:GetPlayers()) do
 						if p ~= v8 and p.Character then
-							for _, part in ipairs(p.Character:GetChildren()) do
-								if part:IsA("BasePart") and part.CanCollide then
-									part.CanCollide = false
+							local parts = anti_fling_cache[p.Character]
+							if not parts then
+								parts = {}
+								for _, part in ipairs(p.Character:GetDescendants()) do
+									if part:IsA("BasePart") then
+										table.insert(parts, part)
+									end
+								end
+								anti_fling_cache[p.Character] = parts
+								pcall(function()
+									p.Character.DescendantAdded:Connect(function(desc)
+										if desc:IsA("BasePart") then
+											table.insert(parts, desc)
+										end
+									end)
+								end)
+							end
+							for i = #parts, 1, -1 do
+								local part = parts[i]
+								if part and part.Parent then
+									if part.CanCollide then
+										part.CanCollide = false
+									end
+								else
+									table.remove(parts, i)
 								end
 							end
 						end
@@ -717,8 +741,9 @@ return function(context)
 		task.spawn(function()
 			local spawnPos = Vector3.new(0, 50, 0)
 			pcall(function()
-				if v8.Character and v8.Character:FindFirstChild("HumanoidRootPart") then
-					spawnPos = v8.Character.HumanoidRootPart.Position + (v8.Character.HumanoidRootPart.CFrame.LookVector * 15) + Vector3.new(0, 10, 0)
+				local root = v8.Character and (v8.Character:FindFirstChild("HumanoidRootPart") or v8.Character:FindFirstChildWhichIsA("BasePart"))
+				if root then
+					spawnPos = root.Position + (root.CFrame.LookVector * 15) + Vector3.new(0, 10, 0)
 				end
 			end)
 			x4.f4(spawnPos)
