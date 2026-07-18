@@ -150,6 +150,8 @@ return function(context)
 			if ft > x6.pi_timer then
 				x6.pi_timer = ft + 1
 				x6.pi_targets = {}
+				if x1.PI_All then
+					for _, pl in ipairs(v2:GetPlayers()) do
 						if pl ~= v8 and pl.Character and (pl.Character:FindFirstChild("HumanoidRootPart") or pl.Character:FindFirstChildWhichIsA("BasePart")) then
 							table.insert(x6.pi_targets, pl)
 						end
