@@ -4,9 +4,12 @@ return function(context)
 	local x5 = context.x5
 	local get_shape = context.get_shape
 	local load_module = context.load_module
+	local is_mobile = context.is_mobile
 
 	local x4, x8 = {}, {}
 	local x7 = {}
+	local ANTI_SLEEP_V = Vector3.new(0, 0.01, 0)
+	local LIFTOFF_KICK = Vector3.new(0, 60, 0)
 
 	function x7.n(t, x, d)
 		pcall(function()
@@ -88,8 +91,9 @@ return function(context)
 	local function get_predicted_pos(root, factor)
 		local pos = root.Position
 		local vel = root.AssemblyLinearVelocity
-		if vel.Magnitude > 250 then
-			vel = vel.Unit * 250
+		local vmag = vel.Magnitude
+		if vmag > 250 then
+			vel = vel * (250 / vmag)
 		end
 		local y_vel = math.clamp(vel.Y, -50, 15)
 		vel = Vector3.new(vel.X, y_vel, vel.Z)
@@ -106,7 +110,7 @@ return function(context)
 		if x1.Paused then
 			for _, d in pairs(x6.a) do
 				if d.lv then
-					d.lv.VectorVelocity = Vector3.new(0, 0.01, 0)
+					d.lv.VectorVelocity = ANTI_SLEEP_V
 				end
 			end
 			return
@@ -140,6 +144,10 @@ return function(context)
 			end
 			local dt = x6.n > 5000 and 10 or (x6.n > 2500 and 6 or (x6.n > 1000 and 3 or 1))
 			local et, ft = x1.k7 or dt, time()
+			if is_mobile and x6.n > 800 then
+				local mobile_et = x6.n > 4000 and 12 or (x6.n > 2000 and 8 or (x6.n > 800 and 5 or et))
+				et = math.max(et, mobile_et)
+			end
 			if x1["Force Smooth (Lags)"] then
 				dt = 1
 				et = 1
@@ -197,21 +205,23 @@ return function(context)
 			end
 			px(x1.k6, ft, x3(), x1)
 			local cur_no_damp = no_damp[x1.k6]
-			
-			local target_positions = {}
+			local target_positions = x6.target_pos_buffer
 			local valid_targets = 0
 			local fallen_height = workspace.FallenPartsDestroyHeight + 50
 			if #x6.pi_targets > 0 then
+				local predictive = x1.PredictiveTracking
+				local pred_factor = x1.PredictionFactor or 150
+				local void_off = x1.VoidProtection == false
 				for _, tgt in ipairs(x6.pi_targets) do
 					local root = tgt and tgt.Character and (tgt.Character:FindFirstChild("HumanoidRootPart") or tgt.Character:FindFirstChildWhichIsA("BasePart"))
 					if root then
 						local pos = root.Position
-						if (x1.VoidProtection == false) or (pos.Y > fallen_height) then
-							if x1.PredictiveTracking then
-								pos = get_predicted_pos(root, x1.PredictionFactor or 150)
+						if void_off or (pos.Y > fallen_height) then
+							if predictive then
+								pos = get_predicted_pos(root, pred_factor)
 							end
-							table.insert(target_positions, pos)
 							valid_targets = valid_targets + 1
+							target_positions[valid_targets] = pos
 						end
 					end
 				end
@@ -267,6 +277,9 @@ return function(context)
 			local water_level = x6.water_level ~= false and x6.water_level or nil
 			local ghp = gethiddenproperty
 			local workspace_gravity = workspace.Gravity or 196.2
+			-- Only used by the Realistic Liftoff branch; build once per frame instead
+			-- of once per part. Nil when the feature is off so we never allocate it.
+			local gravity_down = x1["Realistic Liftoff"] and Vector3.new(0, -workspace_gravity, 0) or nil
 			local shape_f2 = cur_shape_mod and cur_shape_mod.f2
 
 			for k = #x6.active_array, 1, -1 do
@@ -313,7 +326,7 @@ return function(context)
 					continue
 				end
 				if tc_mag > c7 then
-					local target_pos_delta = Vector3.new(0, 0.01, 0)
+					local target_pos_delta = ANTI_SLEEP_V
 					local pure_target_pos = nil
 					if shape_f2 then
 						local ok, r1, r2 = pcall(shape_f2, p, active_c, d, ft, cur_shape_cfg, x1, x6, x9)
@@ -332,8 +345,11 @@ return function(context)
 					end
 					if ki > 0 and d.integral then
 						d.integral = d.integral + (target_pos_delta * dt_mult)
-						if d.integral.Magnitude > 100 then
-							d.integral = d.integral.Unit * 100
+						-- v.Unit * 100 == v * (100/mag); avoids the second sqrt that
+						-- reading .Unit after .Magnitude would incur.
+						local imag = d.integral.Magnitude
+						if imag > 100 then
+							d.integral = d.integral * (100 / imag)
 						end
 						target_pos_delta = target_pos_delta + (d.integral * ki)
 					end
@@ -344,8 +360,8 @@ return function(context)
 						local age = ft - d.claim_t
 						if age < 4 then
 							local p_factor = math.clamp(age / 4, 0, 1)
-							local g_bias = Vector3.new(0, -workspace_gravity, 0) * (1 - p_factor)
-							local kick = Vector3.new(0, 60, 0) * math.clamp(1 - (age / 0.8), 0, 1)
+							local g_bias = gravity_down * (1 - p_factor)
+							local kick = LIFTOFF_KICK * math.clamp(1 - (age / 0.8), 0, 1)
 							tv = tv + g_bias + kick
 							liftoff_limit = 8 + ((max_speed or 3300) - 8) * (p_factor ^ 4)
 						end
@@ -384,8 +400,11 @@ return function(context)
 					local limit = (max_speed and not cur_no_damp) and max_speed or 3300
 					if pure_target_pos then limit = math.max(limit, 15300) end
 					if liftoff_limit then limit = math.min(limit, liftoff_limit) end
-					if d.vl.Magnitude > limit then
-						d.vl = d.vl.Unit * limit
+					local vl_mag = d.vl.Magnitude
+					if vl_mag > limit then
+						-- v.Unit * limit does a second sqrt internally; scaling by
+						-- the ratio reuses the magnitude we already computed.
+						d.vl = d.vl * (limit / vl_mag)
 					end
 					
 					if water_level and p.Position.Y < water_level then
@@ -743,10 +762,30 @@ return function(context)
 		x6.o = false
 		v7:UnbindAction("C")
 		v7:UnbindAction("R")
+		v7:UnbindAction("Clr")
 		if x5.g then
 			x5.g:Destroy()
 		end
 		x7.n("Sys", "Stopped", 2)
+	end
+
+	function x4.clean_physics()
+		for _, p in ipairs(x6.active_array) do
+			local d = x6.a[p]
+			if d then
+				pcall(function()
+					p.CanCollide = true
+					p.CustomPhysicalProperties = nil
+				end)
+				if d.at and d.at.Parent then d.at:Destroy() end
+				if d.lv and d.lv.Parent then d.lv:Destroy() end
+				if d.av and d.av.Parent then d.av:Destroy() end
+				x6.a[p] = nil
+			end
+		end
+		table.clear(x6.active_array)
+		x6.n = 0
+		x7.n("Sys", "Cleared", 2)
 	end
 
 	function x8.h(n, s, o)
@@ -759,6 +798,9 @@ return function(context)
 		elseif n == "R" then
 			x4.f5()
 			return Enum.ContextActionResult.Sink
+		elseif n == "Clr" then
+			x4.clean_physics()
+			return Enum.ContextActionResult.Sink
 		end
 		return Enum.ContextActionResult.Pass
 	end
@@ -766,6 +808,7 @@ return function(context)
 	function x8.i()
 		v7:BindAction("C", x8.h, false, Enum.KeyCode.E)
 		v7:BindAction("R", x8.h, false, Enum.KeyCode.Q)
+		v7:BindAction("Clr", x8.h, false, Enum.KeyCode.C)
 		v7:BindAction("P", function(_, s)
 			if s == Enum.UserInputState.Begin then
 				x1.Paused = not x1.Paused
