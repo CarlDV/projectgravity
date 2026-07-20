@@ -307,59 +307,70 @@ return function(context)
 		et(ac, "Predictive Tracking", x1.PredictiveTracking ~= false, function(v)
 			x1.PredictiveTracking = v
 			save_settings()
-		end)
+		end, "Predicts player movement to smooth out parts when targeting them.")
 		es(ac, "Prediction Factor", 0, 500, x1.PredictionFactor or 150, function(v)
 			x1.PredictionFactor = v
 			save_settings()
-		end)
+		end, false, "How far ahead the script predicts the target's movement.")
 		es(ac, "Damping", 0, 5, x1.Damping, function(v)
 			x1.Damping = v
 			save_settings()
-		end)
+		end, false, "Slows down parts to reduce jittering. Higher values = smoother but slower.")
 		es(ac, "Integral Gain", 0, 10, x1.Ki, function(v)
 			x1.Ki = v
 			save_settings()
-		end)
+		end, false, "Helps parts reach their exact target position faster (fixes sagging).")
 		es(ac, "Max Speed", 50, 2000, x1.MaxSpeed or 500, function(v)
 			x1.MaxSpeed = v
 			save_settings()
-		end)
+		end, false, "Caps the maximum velocity of all parts to prevent them from flinging.")
 		es(ac, "Angular Damp", 0, 1, x1.AngularDamping or 0.5, function(v)
 			x1.AngularDamping = v
 			save_settings()
-		end)
+		end, false, "Stops parts from spinning uncontrollably on their own axis.")
 		es(ac, "Vert Stiffness", 0.1, 5, x1.VerticalStiffness or 1.0, function(v)
 			x1.VerticalStiffness = v
 			save_settings()
-		end)
+		end, false, "Multiplies vertical pull to fight Roblox's gravity. Use 1.0 for normal.")
+		
+		et(ac, "Aggressive Claiming", x1.AggressiveClaim, function(v)
+			x1.AggressiveClaim = v
+			save_settings()
+		end, "WARNING: Spams CFrames into your character to forcefully steal Network Ownership from other scripts.")
+		
+		et(ac, "Void Protection", x1.VoidProtection, function(v)
+			x1.VoidProtection = v
+			save_settings()
+		end, "Automatically ignores targets that fall into the void to prevent your parts from being destroyed.")
+		
 		if setfpscap then
 			es(ac, "FPS Cap (0=Unc)", 0, 144, x1.FPSCap or 60, function(v)
 				x1.FPSCap = v
 				setfpscap(v)
 				save_settings()
-			end, true)
+			end, true, "Caps your max FPS. 0 means uncapped.")
 		end
 		
 		et(ac, "Disable Shadows", x1.Perf_DisableShadows, function(v)
 			x1.Perf_DisableShadows = v
 			ApplyPerfShadows(v)
 			save_settings()
-		end)
+		end, "Turns off all game shadows to boost your FPS significantly.")
 		et(ac, "Disable Post-FX", x1.Perf_DisablePostFX, function(v)
 			x1.Perf_DisablePostFX = v
 			ApplyPerfPostFX(v)
 			save_settings()
-		end)
+		end, "Disables Bloom, Blur, SunRays, and ColorCorrection to save performance.")
 		et(ac, "Potato Materials", x1.Perf_PotatoMaterials, function(v)
 			x1.Perf_PotatoMaterials = v
 			ApplyPerfMaterials(v)
 			save_settings()
-		end)
+		end, "Forces all parts in the game to use SmoothPlastic to lower rendering load.")
 		et(ac, "Hide Particles", x1.Perf_HideParticles, function(v)
 			x1.Perf_HideParticles = v
 			ApplyPerfParticles(v)
 			save_settings()
-		end)
+		end, "Hides fire, smoke, beams, trails, and particle emitters.")
 		
 		ApplyPerfShadows(x1.Perf_DisableShadows)
 		ApplyPerfPostFX(x1.Perf_DisablePostFX)
@@ -393,6 +404,20 @@ return function(context)
 			am.Visible = not am.Visible
 		end)
 		ab.Size = UDim2.new(1, 0, 0, 20)
+
+		local dcb = eb(c, "Join Discord Server", function()
+			pcall(function()
+				if setclipboard then
+					setclipboard("https://discord.gg/9xYyyYuKap")
+				elseif toclipboard then
+					toclipboard("https://discord.gg/9xYyyYuKap")
+				end
+			end)
+			pcall(function()
+				v5:SetCore("SendNotification", { Title = "Discord", Text = "Invite link copied to clipboard!", Duration = 3 })
+			end)
+		end)
+		dcb.Size = UDim2.new(1, 0, 0, 20)
 
 		local mode_f = Instance.new("Frame", c)
 		mode_f.BackgroundTransparency = 1
@@ -489,6 +514,10 @@ return function(context)
 				end)
 				et(gsc, "Force Smooth (Lags)", x1["Force Smooth (Lags)"], function(v)
 					x1["Force Smooth (Lags)"] = v
+					save_settings()
+				end)
+				et(gsc, "Realistic Liftoff", x1["Realistic Liftoff"], function(v)
+					x1["Realistic Liftoff"] = v
 					save_settings()
 				end)
 			end
@@ -1081,7 +1110,7 @@ return function(context)
 		minb.Size = UDim2.new(0, 14, 0, 14)
 		minb.Text = ""
 		Instance.new("UICorner", minb).CornerRadius = UDim.new(1, 0)
-		
+
 		local tutb = Instance.new("TextButton", h)
 		tutb.BackgroundColor3 = Color3.fromRGB(50, 150, 200)
 		tutb.Position = UDim2.new(1, -66, 0.5, -7)

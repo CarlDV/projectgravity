@@ -1,3 +1,38 @@
+-- ============================================================================
+-- Project Gravity — namespace legend
+-- ----------------------------------------------------------------------------
+-- The codebase uses short symbol names. This is the authoritative map. Keep it
+-- in sync when adding config keys or context fields.
+--
+-- Tables passed around via `context`:
+--   x1  global settings (this file's `x1`); x1.S aliases x2 at runtime
+--   x2  per-shape settings, keyed by shape name (this file's `x2`)
+--   x5  UI module return (built by UI.lua)
+--   x6  runtime state (anchor part, active parts, connections) — see System.lua
+--   x7  helper fns (notify x7.n, exclusion test x7.e) — built in System.lua
+--   x9  physics scaling constants c1..c8 — defined in main.lua
+--
+-- Roblox services (context v1..v9):
+--   v1 UserInputService   v2 Players            v3 RunService
+--   v4 Workspace          v5 StarterGui         v6 TweenService
+--   v7 ContextActionService  v8 LocalPlayer     v9 Mouse
+--
+-- System.lua function handles:
+--   f1 claim part   f2 release part   f3 physics loop   f4 spawn/move anchor
+--   f5 stop/teardown
+--
+-- x1 global keys (k1..k10 are engine-wide; k11+ are per-shape, see x2):
+--   k1  attract range (parts farther than this are ignored)
+--   k2  anchor part size (Vector3)      k3  anchor/center color (Color3)
+--   k4  LinearVelocity MaxForce         k5  exclusion tag names
+--   k6  current shape name              k7  frame-skip interval (perf)
+--   k8  velocity smoothing factor       k9  global ring radius
+--   k10 global pull strength (used by nearly every shape's f2)
+--
+-- x2 per-shape keys (k11..k23): meaning is defined by each shape's `Controls`
+--   table in shapes/<name>.lua — the same key means different things per shape.
+-- ============================================================================
+
 return {
 	x1 = {
 		k1 = 2000,
@@ -28,13 +63,16 @@ return {
 		PredictiveTracking = true,
 		PredictionFactor = 150,
 		ShowHUD = true,
+		AggressiveClaim = false,
 		["Force Smooth (Lags)"] = false,
+		["Realistic Liftoff"] = false,
 		Paused = false,
 		Damping = 0.5,
 		Ki = 0.1,
 		MaxSpeed = 500,
 		AngularDamping = 0.5,
 		VerticalStiffness = 1.0,
+		VoidProtection = true,
 	},
 	x2 = {
 		["Pulsar Vortex"] = { k11 = 200, k12 = 8, k13 = 10, k14 = 0, k15 = 0, k16 = 0, k17 = 0, k23 = false },
@@ -56,6 +94,8 @@ return {
 		["Möbius Strip"] = { k11 = 50, k12 = 20, k13 = 15, k14 = 0, k15 = 0, k16 = 0, k17 = 0, k23 = false },
 		["DNA Helix"] = { k11 = 20, k12 = 80, k13 = 10, k14 = 50, k15 = 0, k16 = 0, k17 = 0, k23 = false },
 		["Black Hole"] = { k11 = 40, k12 = 100, k13 = 15, k14 = 50, k15 = 5, k16 = 0, k17 = 0, k23 = false },
+		-- ["Drop"] = { k11 = 500, k12 = 5 },
+		["Dense Spin"] = { k11 = 50, k12 = 2 },
 		["Tesseract"] = { k11 = 40, k12 = 80, k13 = 10, k14 = 50, k15 = 0, k16 = 0, k17 = 0, k23 = false },
 		["Klein Bottle"] = { k11 = 60, k12 = 20, k13 = 20, k14 = 0, k15 = 0, k16 = 0, k17 = 0, k23 = false },
 		["Space Station"] = { k11 = 80, k12 = 30, k13 = 10, k14 = 150, k15 = 0, k16 = 0, k17 = 0, k23 = false },

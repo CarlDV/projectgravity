@@ -107,7 +107,7 @@ loading_text.TextSize = 12
 
 local x9 = { c1 = 0.15, c2 = 0.05, c3 = 0.01, c4 = 0.2, c5 = 0.6, c6 = 0.8, c7 = 0.1, c8 = 0.25 }
 local ANTI_SLEEP = Vector3.new(0, 0.01, 0)
-local BASE_URL = "https://raw.githubusercontent.com/CarlDV/projectgravity/main/"
+local BASE_URL = "https://raw.githubusercontent.com/CarlDV/Project-Gravity-02/main/"
 
 local function safe_http_get(url)
 	local cache_buster = "?cb=" .. tostring(math.random(1000000, 9999999))
@@ -144,10 +144,73 @@ local function load_module(path)
 	return nil
 end
 
+local function fatal(msg)
+	warn("Project Gravity: " .. msg)
+	pcall(function()
+		loading_text.Text = "FAILED"
+		loading_text.TextColor3 = Color3.fromRGB(255, 90, 90)
+	end)
+	pcall(function()
+		if spin_conn then spin_conn:Disconnect() end
+	end)
+	pcall(function()
+		v5:SetCore("SendNotification", { Title = "Project Gravity", Text = msg, Duration = 8 })
+	end)
+	task.delay(6, function()
+		pcall(function() loading_sg:Destroy() end)
+	end)
+	error("Project Gravity: " .. msg, 0)
+end
+
 local config = load_module("config.lua")
+if type(config) ~= "table" or type(config.x1) ~= "table" or type(config.x2) ~= "table" then
+	fatal("Failed to load config.lua (check network / raw.githubusercontent reachability)")
+end
 local x1 = config.x1
 local x2 = config.x2
 x1.S = x2
+
+local local_shapes = {}
+if isfolder and makefolder and listfiles and readfile then
+	pcall(function()
+		if not isfolder("GravityShapes") then
+			makefolder("GravityShapes")
+		end
+		local files = listfiles("GravityShapes")
+		for _, file in ipairs(files) do
+			if string.match(string.lower(file), "%.lua$") or string.match(string.lower(file), "%.txt$") then
+				local name = string.match(file, "([^/\\]+)%.[^%.]+$")
+				if name then
+					local_shapes[name] = file
+					if not x2[name] then
+						x2[name] = {}
+						local read_success, code = pcall(readfile, file)
+						if read_success and code then
+							local func = loadstring(code)
+							if func then
+								local load_success, shape_mod = pcall(func)
+								if load_success and type(shape_mod) == "table" and shape_mod.Controls then
+									for _, ctrl in ipairs(shape_mod.Controls) do
+										if type(ctrl) == "table" and ctrl.Key then
+											local default_val = ctrl.Default
+											if default_val == nil then
+												default_val = ctrl.Min or 0
+											end
+											if ctrl.Div then
+												default_val = default_val / ctrl.Div
+											end
+											x2[name][ctrl.Key] = default_val
+										end
+									end
+								end	
+							end
+						end
+					end
+				end
+			end
+		end
+	end)
+end
 
 local default_x1 = {}
 for k, v in pairs(x1) do
@@ -269,22 +332,43 @@ end
 local loaded_shapes = {}
 local function get_shape(name)
 	if not loaded_shapes[name] then
-		local url = BASE_URL .. "shapes/" .. HttpService:UrlEncode(name) .. ".lua"
-		local code = safe_http_get(url)
 		local success, result = false, nil
-		if code then
-			local func = loadstring(code)
-			if func then
-				success, result = pcall(func)
+
+		if local_shapes and local_shapes[name] then
+			local read_success, code = pcall(readfile, local_shapes[name])
+			if read_success and code then
+				local func, err = loadstring(code)
+				if func then
+					success, result = pcall(func)
+				else
+					result = "Syntax error in local shape: " .. tostring(err)
+				end
 			else
-				result = "Syntax error in shape source"
+				result = "Failed to read local shape file"
 			end
-		else
-			result = "HTTP Request Failed"
 		end
-		if success and result then
+
+		if not success then
+			local url = BASE_URL .. "shapes/" .. HttpService:UrlEncode(name) .. ".lua"
+			local code = safe_http_get(url)
+			if code then
+				local func, err = loadstring(code)
+				if func then
+					success, result = pcall(func)
+				else
+					result = "Syntax error in shape source: " .. tostring(err)
+				end
+			else
+				result = "HTTP Request Failed"
+			end
+		end
+
+		if success and type(result) == "table" and type(result.f2) == "function" then
 			loaded_shapes[name] = result
 		else
+			if success and type(result) == "table" then
+				result = "shape module is missing a function 'f2'"
+			end
 			warn("Failed to load shape: " .. tostring(name) .. " Error: " .. tostring(result))
 		end
 	end

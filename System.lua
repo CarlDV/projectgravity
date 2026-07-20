@@ -56,12 +56,17 @@ return function(context)
 				return true
 			end
 		end
-		local target = p.Parent
-		while target and target ~= v4 and target ~= game do
-			if target:IsA("Accessory") or target:IsA("Tool") then
+		for _, pl in ipairs(v2:GetPlayers()) do
+			if pl.Character and p:IsDescendantOf(pl.Character) then
 				return true
 			end
+		end
+		local target = p
+		while target and target ~= v4 and target ~= game do
 			if target:IsA("Model") and (target:FindFirstChildOfClass("Humanoid") or target:FindFirstChildOfClass("AnimationController")) then
+				return true
+			end
+			if target:IsA("Accessory") or target:IsA("Tool") then
 				return true
 			end
 			target = target.Parent
@@ -195,16 +200,19 @@ return function(context)
 			
 			local target_positions = {}
 			local valid_targets = 0
+			local fallen_height = workspace.FallenPartsDestroyHeight + 50
 			if #x6.pi_targets > 0 then
 				for _, tgt in ipairs(x6.pi_targets) do
 					local root = tgt and tgt.Character and (tgt.Character:FindFirstChild("HumanoidRootPart") or tgt.Character:FindFirstChildWhichIsA("BasePart"))
 					if root then
 						local pos = root.Position
-						if x1.PredictiveTracking then
-							pos = get_predicted_pos(root, x1.PredictionFactor or 150)
+						if (x1.VoidProtection == false) or (pos.Y > fallen_height) then
+							if x1.PredictiveTracking then
+								pos = get_predicted_pos(root, x1.PredictionFactor or 150)
+							end
+							table.insert(target_positions, pos)
+							valid_targets = valid_targets + 1
 						end
-						table.insert(target_positions, pos)
-						valid_targets = valid_targets + 1
 					end
 				end
 			end
@@ -225,6 +233,9 @@ return function(context)
 				smoothing = 1
 			end
 			local sm_alpha = smoothing >= 1 and 1 or (1 - math.exp(-dt_mult * -math.log(math.max(0.001, 1 - smoothing))))
+			if x1["Force Smooth (Lags)"] then
+				sm_alpha = 1
+			end
 
 			local ang_damp_mult = 1
 			if x1.AngularDamping and x1.AngularDamping > 0 then
@@ -244,6 +255,19 @@ return function(context)
 					in_transition = false
 				end
 			end
+			
+			if x6.f % 60 == 0 or x6.water_level == nil then
+				local water_part = workspace:FindFirstChild("WaterLevel")
+				if water_part and water_part:IsA("BasePart") then
+					x6.water_level = water_part.Position.Y + (water_part.Size.Y / 2) + 5
+				else
+					x6.water_level = false
+				end
+			end
+			local water_level = x6.water_level ~= false and x6.water_level or nil
+			local ghp = gethiddenproperty
+			local workspace_gravity = workspace.Gravity or 196.2
+			local shape_f2 = cur_shape_mod and cur_shape_mod.f2
 
 			for k = #x6.active_array, 1, -1 do
 				local p = x6.active_array[k]
@@ -268,10 +292,20 @@ return function(context)
 				if i % et ~= (x6.f % et) then
 					continue
 				end
+				if not x1.AggressiveClaim and ghp then
+					if d.no3_val == nil or ft - (d.no3_tick or 0) > 0.15 then
+						d.no3_tick = ft
+						local success, no3_val = pcall(ghp, p, 'NetworkOwnerV3')
+						d.no3_val = success and no3_val or 0
+					end
+					if d.no3_val == -1 or d.no3_val == 1 or d.no3_val == 2 or d.no3_val == 3 then
+						continue
+					end
+				end
 				local p_vel = p.AssemblyLinearVelocity
 				local active_c = c
 				if valid_targets > 0 then
-					active_c = target_positions[((i - 1) % valid_targets) + 1]
+					active_c = target_positions[(d.id % valid_targets) + 1]
 				end
 				local tc = active_c - p.Position
 				local tc_mag = tc.Magnitude
@@ -281,8 +315,17 @@ return function(context)
 				if tc_mag > c7 then
 					local target_pos_delta = Vector3.new(0, 0.01, 0)
 					local pure_target_pos = nil
-					if cur_shape_mod then
-						target_pos_delta, pure_target_pos = cur_shape_mod.f2(p, active_c, d, ft, cur_shape_cfg, x1, x6, x9)
+					if shape_f2 then
+						local ok, r1, r2 = pcall(shape_f2, p, active_c, d, ft, cur_shape_cfg, x1, x6, x9)
+						if ok and typeof(r1) == "Vector3" then
+							target_pos_delta = r1
+							pure_target_pos = (typeof(r2) == "Vector3") and r2 or nil
+						end
+					end
+					
+					if d.unclaim then
+						x4.f2(p)
+						continue
 					end
 					if vert_mult then
 						target_pos_delta = target_pos_delta * vert_mult
@@ -295,11 +338,23 @@ return function(context)
 						target_pos_delta = target_pos_delta + (d.integral * ki)
 					end
 					local tv = target_pos_delta
+					local liftoff_limit = nil
+					
+					if x1["Realistic Liftoff"] and d.claim_t then
+						local age = ft - d.claim_t
+						if age < 4 then
+							local p_factor = math.clamp(age / 4, 0, 1)
+							local g_bias = Vector3.new(0, -workspace_gravity, 0) * (1 - p_factor)
+							local kick = Vector3.new(0, 60, 0) * math.clamp(1 - (age / 0.8), 0, 1)
+							tv = tv + g_bias + kick
+							liftoff_limit = 8 + ((max_speed or 3300) - 8) * (p_factor ^ 4)
+						end
+					end
 					
 					if pure_target_pos then
 						if d.last_target_pos and d.sys_last_t then
 							local actual_dt = ft - d.sys_last_t
-							if actual_dt > 0 then
+							if actual_dt > 0.001 then
 								local target_velocity = (pure_target_pos - d.last_target_pos) / actual_dt
 								tv = tv + target_velocity
 							end
@@ -311,7 +366,7 @@ return function(context)
 						d.sys_last_t = nil
 					end
 					
-					if damping > 0 and not cur_no_damp then
+					if damping > 0 and not cur_no_damp and not x1["Force Smooth (Lags)"] then
 						tv = tv - (p_vel * damping)
 					end
 
@@ -328,13 +383,30 @@ return function(context)
 					
 					local limit = (max_speed and not cur_no_damp) and max_speed or 3300
 					if pure_target_pos then limit = math.max(limit, 15300) end
+					if liftoff_limit then limit = math.min(limit, liftoff_limit) end
 					if d.vl.Magnitude > limit then
 						d.vl = d.vl.Unit * limit
 					end
+					
+					if water_level and p.Position.Y < water_level then
+						local depth = water_level - p.Position.Y
+						d.vl = Vector3.new(d.vl.X, math.max(d.vl.Y, 0) + (depth * 5), d.vl.Z)
+					end
+					
 					d.lv.VectorVelocity = d.vl
 					
 					if ang_damp_mult ~= 1 then
 						p.AssemblyAngularVelocity = p.AssemblyAngularVelocity * ang_damp_mult
+					end
+
+					if x1.AggressiveClaim and p.ReceiveAge > 0 then
+						local root = v8.Character and (v8.Character:FindFirstChild("HumanoidRootPart") or v8.Character:FindFirstChildWhichIsA("BasePart"))
+						local base_pos = root and root.Position or active_c
+						if not d.claim_offset then
+							d.claim_offset = Vector3.new(math.sin(d.id) * 20, 15 + (d.id % 15), math.cos(d.id) * 20)
+						end
+						p.CFrame = CFrame.new(base_pos + d.claim_offset)
+						d.lv.VectorVelocity = Vector3.zero
 					end
 				end
 			end
@@ -380,7 +452,7 @@ return function(context)
 		if x1.TgtActive and x1.Targets and #x1.Targets > 0 then
 			local tgt = x1.Targets[1]
 			local root = tgt and tgt.Character and (tgt.Character:FindFirstChild("HumanoidRootPart") or tgt.Character:FindFirstChildWhichIsA("BasePart"))
-			if root then
+			if root and ((x1.VoidProtection == false) or (root.Position.Y > workspace.FallenPartsDestroyHeight + 50)) then
 				local pos = root.Position
 				if x1.PredictiveTracking then
 					pos = get_predicted_pos(root, x1.PredictionFactor or 150)
@@ -418,9 +490,12 @@ return function(context)
 			return
 		end
 		for _, c in ipairs(p:GetChildren()) do
-			if c:IsA("BodyMover") or c:IsA("Constraint") or c:IsA("Attachment") then
+			if c:IsA("BodyMover") or c:IsA("Constraint") or c:IsA("Attachment") or c:IsA("RocketPropulsion") then
 				c:Destroy()
 			end
+		end
+		if p:FindFirstChild("BHAtt") then
+			p.BHAtt:Destroy()
 		end
 		p.CanCollide = false
 		p.Anchored = false
@@ -442,17 +517,22 @@ return function(context)
 		av.RelativeTo = Enum.ActuatorRelativeTo.World
 		av.AngularVelocity = Vector3.zero
 		av.Attachment0 = a
-		
+
 		a.Parent = p
 		lv.Parent = p
 		av.Parent = p
 		
-		x6.a[p] = { at = a, lv = lv, av = av, integral = Vector3.zero }
+		x6.part_id_counter = (x6.part_id_counter or 0) + 1
+		x6.a[p] = { at = a, lv = lv, av = av, integral = Vector3.zero, claim_t = time(), id = x6.part_id_counter }
 		table.insert(x6.active_array, p)
 		x6.n = x6.n + 1
 	end
 
 	function x4.f2(p)
+		pcall(function()
+			p.CanCollide = true
+			p.CustomPhysicalProperties = nil
+		end)
 		local d = x6.a[p]
 		if d then
 			if d.at and d.at.Parent then
@@ -739,21 +819,25 @@ return function(context)
 			end)
 		)
 
-		local sculptor_binder = load_module("System_sculptor.lua")(context, x7)
+		local sculptor_binder = load_module((context.SUB_DIR or "") .. "System_sculptor.lua")(context, x7)
 		sculptor_binder()
 
-		x7.n("Rdy", "System Initialized", 5)
-		
-		task.spawn(function()
-			local spawnPos = Vector3.new(0, 50, 0)
-			pcall(function()
-				local root = v8.Character and (v8.Character:FindFirstChild("HumanoidRootPart") or v8.Character:FindFirstChildWhichIsA("BasePart"))
-				if root then
-					spawnPos = root.Position + (root.CFrame.LookVector * 15) + Vector3.new(0, 10, 0)
-				end
+		if context.is_mobile then
+			x7.n("Rdy", "Tap the anchor button to start", 5)
+		else
+			x7.n("Rdy", "System Initialized", 5)
+
+			task.spawn(function()
+				local spawnPos = Vector3.new(0, 50, 0)
+				pcall(function()
+					local root = v8.Character and (v8.Character:FindFirstChild("HumanoidRootPart") or v8.Character:FindFirstChildWhichIsA("BasePart"))
+					if root then
+						spawnPos = root.Position + (root.CFrame.LookVector * 15) + Vector3.new(0, 10, 0)
+					end
+				end)
+				x4.f4(spawnPos)
 			end)
-			x4.f4(spawnPos)
-		end)
+		end
 	end
 
 	return { x4 = x4, x8 = x8 }
