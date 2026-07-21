@@ -11,13 +11,24 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 			if not d.v2 then
 				d.v2 = math.random()
 			end
+			if not d.v3 then
+				-- Seed per-axis phase offsets once so the core shimmer is time-coherent
+				-- instead of white noise. Per-frame math.random() here fed the velocity
+				-- feed-forward in System.lua and spiked part speeds.
+				d.v3 = Vector3.new(math.random() * math.pi * 2, math.random() * math.pi * 2, math.random() * math.pi * 2)
+			end
 			local dt = t - (d.last_t or t)
 			d.last_t = t
 			d.phase = (d.phase or 0) + (dt * s)
 			local cycle = d.phase % math.pi
 			local burst = math.sin(cycle)
 
-			local core_jitter = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * 2
+			local jit = t * 8
+			local core_jitter = Vector3.new(
+				math.sin(jit + d.v3.X),
+				math.sin(jit * 1.3 + d.v3.Y),
+				math.sin(jit * 0.7 + d.v3.Z)
+			)
 			local shockwave = d.v1 * (burst * MaxSize * d.v2)
 			local current_pos = (burst > 0.1) and shockwave or (d.v1 * ExpandingRad + core_jitter)
 

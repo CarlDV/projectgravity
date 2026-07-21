@@ -13,13 +13,18 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 		d.v2 = math.random()
 	end
 	if not d.v3 then
-		d.v3 = math.random() * math.pi
+		-- Uniform-area polar angle (acos of a uniform cosine); plain random()*pi
+		-- clumps particles at the poles of the spherical fill.
+		d.v3 = math.acos(2 * math.random() - 1)
 	end
 	if not d.v4 then
 		d.v4 = math.random() * math.pi * 2
 	end
 
-	local phase = t * Speed + d.v4
+	local dt = t - (d.last_t or t)
+	d.last_t = t
+	d.phase = (d.phase or 0) + (dt * Speed)
+	local phase = d.phase + d.v4
 	local r = Spread * d.v2 * (0.6 + 0.4 * math.sin(phase * 0.5))
 
 	local px = r * math.sin(d.v3) * math.cos(d.v1)

@@ -29,8 +29,14 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 				d.rot_axis = Vector3.new(rx / len, ry / len, rz / len)
 			end
 
-			local phase = t * SpinSpeed + d.v4
-			local drift_phase = (t * DriftTime) + d.v4
+			-- Integrate phase from dt so moving the Spin/Drift sliders eases in
+			-- instead of snapping the whole cloud to a new absolute-t phase.
+			local dt = t - (d.last_t or t)
+			d.last_t = t
+			d.spin_phase = (d.spin_phase or 0) + dt * SpinSpeed
+			d.drift_ph = (d.drift_ph or 0) + dt * DriftTime
+			local phase = d.spin_phase + d.v4
+			local drift_phase = d.drift_ph + d.v4
 
 			local px = d.v1 * Spread
 			local py = d.v2 * Spread

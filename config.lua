@@ -29,7 +29,7 @@
 --   k8  velocity smoothing factor       k9  global ring radius
 --   k10 global pull strength (used by nearly every shape's f2)
 --
--- x2 per-shape keys (k11..k23): meaning is defined by each shape's `Controls`
+-- x2 per-shape keys (k11..k24): meaning is defined by each shape's `Controls`
 --   table in shapes/<name>.lua — the same key means different things per shape.
 -- ============================================================================
 

@@ -18,7 +18,12 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 
 			local drop_dist = HeightSpawn * 2
 			local fall_time = drop_dist / FallSpeed
-			local current_fall = ((t + d.v3 * fall_time) % fall_time) / fall_time
+			-- Integrate normalized progress so changing Fall Speed re-paces the
+			-- descent smoothly instead of snapping every meteor to a new (t % fall_time).
+			local dt = t - (d.last_t or t)
+			d.last_t = t
+			d.phase = (d.phase or d.v3) + (dt / fall_time)
+			local current_fall = d.phase % 1
 
 			local y_pos = HeightSpawn - (current_fall * drop_dist)
 

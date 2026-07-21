@@ -12,10 +12,13 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 			if not d.v6 then
 				d.v6 = math.random() * math.pi * 2
 			end
+			if not d.v3 then
+				d.v3 = (math.random() - 0.5)
+			end
 			local rad = event_horizon + (d.v2 * (disk_radius - event_horizon))
 			local local_spin = spin * (disk_radius / rad)
 			local disk_phase = (t * local_spin) + d.v6
-			local thickness = (math.random() - 0.5) * disk_height * math.sin(disk_phase * 2) * (event_horizon / rad)
+			local thickness = d.v3 * disk_height * math.sin(disk_phase * 2) * (event_horizon / rad)
 			local tx = rad * math.cos(disk_phase)
 			local tz = rad * math.sin(disk_phase)
 			local target_pos = cen + Vector3.new(tx, thickness, tz)
