@@ -117,6 +117,7 @@ return function(context)
 		RestorePerfParticles()
 	end
 	local UI_elements = load_module("UI_elements.lua")(context)
+	local ai_chat_module = load_module("ai_chat.lua")(context)
 	local es, et, eb, eh = UI_elements.s, UI_elements.t, UI_elements.b, UI_elements.h
 
 	local x5 = {}
@@ -126,17 +127,8 @@ return function(context)
 	x5.b = eb
 	x5.h = eh
 
-	local stable_shapes = {
-		["Cursed Technique Red"] = true,
-		["Galactic Web"] = true,
-		["Celestial Ribbon"] = true,
-		["Big Ring Things"] = true,
-		["Point Impact"] = true,
-		["Domain Expansion Infinite Void"] = true
-	}
-
 	function x5.st()
-		if x5.g and x5.up then
+		if x5.g and x5.g.Parent and x5.up then
 			x5.up()
 			return
 		end
@@ -195,6 +187,10 @@ return function(context)
 		hud_l.TextSize = 14
 		hud_l.TextColor3 = Color3.fromRGB(255, 255, 255)
 
+		local hud_target, hud_state
+		local HUD_ACTIVE = Color3.fromRGB(80, 255, 150)
+		local HUD_PAUSED = Color3.fromRGB(255, 180, 80)
+		local HUD_DISABLED = Color3.fromRGB(255, 80, 80)
 		table.insert(
 			x6.c,
 			v3.RenderStepped:Connect(function()
@@ -203,10 +199,11 @@ return function(context)
 				end
 				local tgt = x1.Tgt and (x1.Tgt.DisplayName or x1.Tgt.Name) or "None"
 				local state = x1.Disabled and "DISABLED" or (x1.Paused and "PAUSED" or "ACTIVE")
-				local col = x1.Disabled and Color3.fromRGB(255, 80, 80)
-					or (x1.Paused and Color3.fromRGB(255, 180, 80) or Color3.fromRGB(80, 255, 150))
-				hud_l.Text = string.format("TARGET: %s  |  STATUS: %s", tgt:upper(), state)
-				hud_l.TextColor3 = col
+				if tgt ~= hud_target or state ~= hud_state then
+					hud_target, hud_state = tgt, state
+					hud_l.Text = string.format("TARGET: %s  |  STATUS: %s", tgt:upper(), state)
+					hud_l.TextColor3 = x1.Disabled and HUD_DISABLED or (x1.Paused and HUD_PAUSED or HUD_ACTIVE)
+				end
 			end)
 		)
 		
@@ -338,7 +335,7 @@ return function(context)
 			x1.VoidProtection = v
 			save_settings()
 		end, "Automatically ignores targets that fall into the void to prevent your parts from being destroyed.")
-		
+
 		et(ac, "Disable Shadows", x1.Perf_DisableShadows, function(v)
 			x1.Perf_DisableShadows = v
 			ApplyPerfShadows(v)
@@ -395,6 +392,13 @@ return function(context)
 			toggle_window(am, not am.Visible)
 		end)
 		ab.Size = UDim2.new(1, 0, 0, 36)
+
+		local ai_btn = eb(c, "PROJECT GRAVITY AI", function()
+			if ai_chat_module and ai_chat_module.toggle then
+				ai_chat_module.toggle(sg)
+			end
+		end)
+		ai_btn.Size = UDim2.new(1, 0, 0, 36)
 
 		local mode_f = Instance.new("Frame", c)
 		mode_f.BackgroundTransparency = 1
@@ -477,6 +481,16 @@ return function(context)
 				save_settings()
 			end)
 
+			et(gsc, "Preserve Collisions", x1.PreserveCollisions, function(v)
+				x1.PreserveCollisions = v
+				for part, data in pairs(x6.a) do
+					if part and part.Parent then
+						part.CanCollide = v and data.original_can_collide or false
+					end
+				end
+				save_settings()
+			end)
+
 			et(gsc, "Anchor to Self", x1.AnchorSelf, function(v)
 				x1.AnchorSelf = v
 				if v then
@@ -540,7 +554,7 @@ return function(context)
 			l_btn.Font = Enum.Font.GothamBold
 			l_btn.TextSize = 13
 			Instance.new("UICorner", l_btn).CornerRadius = UDim.new(0, 6)
-			l_btn.Visible = x1.ImpactManual or (x1.k6 == "Slingshot" and x1.SlingshotManual)
+			l_btn.Visible = x1.k6 == "Slingshot" and x1.SlingshotManual
 
 			l_btn.MouseButton1Click:Connect(function()
 				x1.IsLaunching = not x1.IsLaunching
@@ -551,7 +565,7 @@ return function(context)
 			table.insert(
 				x6.f1_connections,
 				v3.Heartbeat:Connect(function()
-					if x1.ImpactManual or (x1.k6 == "Slingshot" and x1.SlingshotManual) then
+					if x1.k6 == "Slingshot" and x1.SlingshotManual then
 						l_btn.Visible = true
 						l_btn.Text = x1.IsLaunching and "RESET SYSTEM" or "FORCE LAUNCH"
 						l_btn.BackgroundColor3 = x1.IsLaunching and Color3.fromRGB(50, 150, 200)
@@ -754,6 +768,10 @@ return function(context)
 						local current_val = s[ctrl.Key]
 						local p_frame = ctrl.Parent == "gsc" and gsc or sc
 						if ctrl.Type == "Slider" then
+							if ctrl.LegacyToggle and type(current_val) == "boolean" then
+								current_val = current_val and 2 or 1
+								s[ctrl.Key] = current_val
+							end
 							if current_val == nil then
 								if ctrl.Default ~= nil then
 									current_val = ctrl.Default
@@ -761,11 +779,13 @@ return function(context)
 									current_val = ctrl.Min
 								end
 							end
-							if ctrl.Div then current_val = current_val * ctrl.Div end
 							local max_val = ctrl.Max
-							if string.find(ctrl.Name:lower(), "speed") then
+							if string.find(ctrl.Name:lower(), "speed") and not ctrl.ExactMax then
 								max_val = max_val + 300
 							end
+							if ctrl.Div then current_val = current_val * ctrl.Div end
+							current_val = math.clamp(current_val, ctrl.Min, max_val)
+							s[ctrl.Key] = ctrl.Div and (current_val / ctrl.Div) or current_val
 							es(p_frame, ctrl.Name, ctrl.Min, max_val, current_val, function(v)
 								if ctrl.Div then s[ctrl.Key] = v / ctrl.Div else s[ctrl.Key] = v end
 							end, ctrl.IntOnly)
@@ -964,10 +984,6 @@ return function(context)
 				if fa ~= fb then
 					return fa > fb
 				end
-				local sa, sb = stable_shapes[a] and 1 or 0, stable_shapes[b] and 1 or 0
-				if sa ~= sb then
-					return sa > sb
-				end
 				return a < b
 			end)
 
@@ -976,18 +992,10 @@ return function(context)
 					continue
 				end
 
-				local is_stable = stable_shapes[mn]
 				local f = Instance.new("Frame", dlst)
 				f.Size = UDim2.new(1, -16, 0, 40)
 				f.BackgroundColor3 = mn == x1.k6 and Color3.fromRGB(40, 40, 180) or Color3.fromRGB(25, 25, 30)
-				Instance.new("UICorner", f).CornerRadius = is_stable and UDim.new(1, 0) or UDim.new(0, 6)
-
-				if not is_stable then
-					local fs = Instance.new("UIStroke", f)
-					fs.Color = Color3.fromRGB(200, 80, 80)
-					fs.Thickness = 1
-					fs.Transparency = 0.5
-				end
+				Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
 
 				local ib = Instance.new("TextButton", f)
 				ib.Size = UDim2.new(1, -40, 1, 0)
@@ -1125,7 +1133,7 @@ return function(context)
 		tut_text.BackgroundTransparency = 1
 		tut_text.Position = UDim2.new(0, 20, 0, 50)
 		tut_text.Size = UDim2.new(1, -40, 1, -70)
-		tut_text.Text = "• Core Controls: Press 'E' to reposition the gravitational center. Press 'Q' to wipe all parts and reset.\n\n• Targeting: Click 'Select Target' to focus the gravitational pull onto a specific player.\n\n• Hotkeys: Press 'P' to instantly Pause physics (freezing parts). Press 'L' to toggle Disable mode.\n\n• Modes: The Mode Selector allows you to morph between different geometrical formations. Stable shapes feature clean capsules, while unstable ones feature red strokes.\n\n• Configuration: Scroll down the main menu to tune the shape config (radius, spin, etc.). Open 'Advanced Settings' to tweak global physics limits."
+		tut_text.Text = "• Core Controls: Press 'E' to reposition the gravitational center. Press 'Q' to wipe all parts and reset.\n\n• Targeting: Click 'Select Target' to focus the gravitational pull onto a specific player.\n\n• Hotkeys: Press 'P' to instantly Pause physics (freezing parts). Press 'L' to toggle Disable mode.\n\n• Modes: The Mode Selector allows you to morph between different geometrical formations.\n\n• Configuration: Scroll down the main menu to tune the shape config (radius, spin, etc.). Open 'Advanced Settings' to tweak global physics limits."
 		tut_text.TextColor3 = Color3.fromRGB(200, 200, 205)
 		tut_text.Font = Enum.Font.GothamMedium
 		tut_text.TextSize = 13
@@ -1164,12 +1172,17 @@ return function(context)
 
 		closeb.MouseButton1Click:Connect(function()
 			RestoreAllPerf()
-			sg:Destroy()
+			if context.x4 and context.x4.f5 then
+				context.x4.f5()
+			end
+			if sg.Parent then sg:Destroy() end
 		end)
 		
 		pcall(function()
 			sg.Destroying:Connect(function()
 				RestoreAllPerf()
+				if x5.g == sg then x5.g = nil end
+				if x6.sg == sg then x6.sg = nil end
 			end)
 		end)
 	end

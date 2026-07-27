@@ -18,8 +18,6 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 				d.v4 = math.floor(math.random() * 6)
 			end
 
-			-- Integrate both phases so the Rotation/Breath sliders re-pace smoothly
-			-- rather than snapping the whole web when moved.
 			local dt = t - (d.last_t or t)
 			d.last_t = t
 			d.phase = (d.phase or 0) + (dt * RSpeed)

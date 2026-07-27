@@ -1,38 +1,3 @@
--- ============================================================================
--- Project Gravity — namespace legend
--- ----------------------------------------------------------------------------
--- The codebase uses short symbol names. This is the authoritative map. Keep it
--- in sync when adding config keys or context fields.
---
--- Tables passed around via `context`:
---   x1  global settings (this file's `x1`); x1.S aliases x2 at runtime
---   x2  per-shape settings, keyed by shape name (this file's `x2`)
---   x5  UI module return (built by UI.lua)
---   x6  runtime state (anchor part, active parts, connections) — see System.lua
---   x7  helper fns (notify x7.n, exclusion test x7.e) — built in System.lua
---   x9  physics scaling constants c1..c8 — defined in main.lua
---
--- Roblox services (context v1..v9):
---   v1 UserInputService   v2 Players            v3 RunService
---   v4 Workspace          v5 StarterGui         v6 TweenService
---   v7 ContextActionService  v8 LocalPlayer     v9 Mouse
---
--- System.lua function handles:
---   f1 claim part   f2 release part   f3 physics loop   f4 spawn/move anchor
---   f5 stop/teardown
---
--- x1 global keys (k1..k10 are engine-wide; k11+ are per-shape, see x2):
---   k1  attract range (parts farther than this are ignored)
---   k2  anchor part size (Vector3)      k3  anchor/center color (Color3)
---   k4  LinearVelocity MaxForce         k5  exclusion tag names
---   k6  current shape name              k7  frame-skip interval (perf)
---   k8  velocity smoothing factor       k9  global ring radius
---   k10 global pull strength (used by nearly every shape's f2)
---
--- x2 per-shape keys (k11..k24): meaning is defined by each shape's `Controls`
---   table in shapes/<name>.lua — the same key means different things per shape.
--- ============================================================================
-
 return {
 	x1 = {
 		k1 = 2000,
@@ -53,13 +18,13 @@ return {
 		k16 = 0.6,
 		k17 = 150,
 		Targets = {},
-		ImpactManual = false,
 		IsLaunching = false,
 		Disabled = false,
 		TgtActive = false,
 		PI_All = false,
 		AnchorSelf = false,
 		AntiFling = false,
+		PreserveCollisions = false,
 		PredictiveTracking = true,
 		PredictionFactor = 150,
 		ShowHUD = true,
@@ -77,13 +42,13 @@ return {
 	x2 = {
 		["Pulsar Vortex"] = { k11 = 200, k12 = 8, k13 = 10, k14 = 0, k15 = 0, k16 = 0, k17 = 0, k23 = false },
 		["Big Ring Things"] = { k12 = 100, k13 = 10, k14 = 5, k16 = 0.6, k15 = 10, k11 = 2, k17 = 150, k23 = false },
-		["Celestial Ribbon"] = { k12 = 0, k13 = 15, k14 = 30, k16 = 0.4, k11 = 1, k17 = 150, k18 = false, k19 = false, k23 = false },
+		["Celestial Ribbon"] = { k12 = 0, k13 = 15, k14 = 30, k16 = 0.4, k11 = 1, k17 = 150, k18 = false, k19 = 2, k23 = false },
 		["Hollow Worm"] = { k12 = 0, k13 = 15, k14 = 35, k16 = 0.4, k15 = 10, k11 = 15, k17 = 150, k23 = false },
 		["Cosmic Comet"] = { k12 = 50, k13 = 20, k14 = 20, k16 = 0.5, k15 = 5, k11 = 5, k17 = 150, k23 = false },
-		["Point Impact"] = { k12 = 0, k13 = 500, k14 = 0, k16 = 0, k15 = 0, k11 = 0, k17 = 50, k23 = false },
+		["Point Impact"] = {},
 		["Domain Expansion Infinite Void"] = { k11 = 90, k12 = 0, k13 = 15, k14 = 0, k15 = 0, k16 = 0, k23 = false, k18 = true, k19 = true },
-		["Vortex Funnel"] = { k11 = 50, k12 = 300, k13 = 30, k14 = 400, k15 = 5, k16 = 0, k17 = 400, k23 = false },
-		["Quantum Atoms"] = { k11 = 60, k12 = 0, k13 = 15, k14 = 0, k15 = 3, k16 = 0, k17 = 150, k23 = false },
+		["Vortex Funnel"] = { k11 = 50, k12 = 300, k13 = 30, k14 = 400, k15 = 5, k16 = 0, k23 = false },
+		["Quantum Atoms"] = { k11 = 60, k12 = 0, k13 = 15, k14 = 0, k15 = 3, k16 = 0, k23 = false },
 		["Halo Ring"] = { k11 = 40, k12 = 0, k13 = 5, k14 = 80, k15 = 0, k16 = 0, k17 = 50, k23 = false },
 		["Slingshot"] = { k11 = 50, k12 = 3, k13 = 100, k14 = 0, k15 = 5, k16 = 0, k17 = 100, k23 = false },
 		["Gods Call"] = { k11 = 10, k12 = 0, k13 = 0, k14 = 0, k15 = 0, k16 = 0, k17 = 50, k23 = false },
@@ -94,7 +59,6 @@ return {
 		["Möbius Strip"] = { k11 = 50, k12 = 20, k13 = 15, k14 = 0, k15 = 0, k16 = 0, k17 = 0, k23 = false },
 		["DNA Helix"] = { k11 = 20, k12 = 80, k13 = 10, k14 = 50, k15 = 0, k16 = 0, k17 = 0, k23 = false },
 		["Black Hole"] = { k11 = 40, k12 = 100, k13 = 15, k14 = 50, k15 = 5, k16 = 0, k17 = 0, k23 = false },
-		-- ["Drop"] = { k11 = 500, k12 = 5 },
 		["Dense Spin"] = { k11 = 50, k12 = 2 },
 		["Tesseract"] = { k11 = 40, k12 = 80, k13 = 10, k14 = 50, k15 = 0, k16 = 0, k17 = 0, k23 = false },
 		["Klein Bottle"] = { k11 = 60, k12 = 20, k13 = 20, k14 = 0, k15 = 0, k16 = 0, k17 = 0, k23 = false },
@@ -103,10 +67,12 @@ return {
 		["Dyson Sphere"] = { k11 = 150, k12 = 8, k13 = 10, k14 = 0, k15 = 0, k16 = 0, k17 = 0, k23 = false },
 		["Seraphim"] = { k11 = 80, k12 = 4, k13 = 15, k14 = 40, k15 = 0, k16 = 0, k17 = 0, k23 = false },
 		["Alien Mothership"] = { k11 = 120, k12 = 40, k13 = 15, k14 = 200, k15 = 0, k16 = 0, k17 = 0, k23 = false },
-		["Cursed Technique Red"] = { k11 = 2000, k12 = 100 },
+		["Cursed Technique Red"] = { k12 = 100 },
+		["ROOM Ope Ope no Mi"] = { k11 = 150, k12 = 2, k13 = 1.5, k14 = 20, k18 = true },
+		["Light Light no Mi"] = { k11 = 150, k12 = 400, k13 = 0.2, k18 = true },
 		["Quantum Core"] = { k11 = 100, k12 = 30, k13 = 40, k14 = 50, k15 = 0, k16 = 0, k17 = 0, k23 = false },
 		["Galactic Web"] = { k11 = 400, k12 = 10, k13 = 5, k14 = 0, k15 = 0, k16 = 0, k17 = 0, k23 = false, k24 = 200 },
-		["Meteor Shower"] = { k11 = 500, k12 = 300, k13 = 150, k14 = 50, k15 = 0, k16 = 0, k17 = 0, k23 = false },
+		["Meteor Shower"] = { k11 = 500, k12 = 300, k13 = 150, k15 = 0, k16 = 0, k17 = 0, k23 = false },
 		["World Serpent"] = { k11 = 400, k12 = 100, k13 = 20, k14 = 20, k15 = 0, k16 = 0, k17 = 0, k23 = false },
 		["Aurora Borealis"] = { k11 = 600, k12 = 300, k13 = 15, k14 = 100, k15 = 0, k16 = 0, k17 = 0, k23 = false },
 		["Arcane Orrery"] = { k11 = 120, k12 = 4, k13 = 8, k14 = 200, k15 = 0, k16 = 0, k17 = 0, k23 = false },
@@ -115,5 +81,37 @@ return {
 		["Graviton Engine"] = { k11 = 4, k12 = 60, k13 = 12, k14 = 200, k15 = 0, k16 = 0, k17 = 0, k23 = false },
 		["Fractal Web"] = { k11 = 40, k12 = 3, k13 = 3, k14 = 5, k15 = 0, k16 = 0, k17 = 0, k23 = false },
 		["Leviathan Coil"] = { k11 = 50, k12 = 15, k13 = 8, k14 = 250, k15 = 0, k16 = 0, k17 = 0, k23 = false },
+		["Spinning Cube"] = { k11 = 40, k12 = 200, k13 = false, k14 = false, k15 = true },
+		["Twin Core Beam"] = { k11 = 80, k12 = 15, k13 = 150, k14 = 900, k15 = 4, k16 = 1.5, k17 = 0.4, k18 = false, k19 = true },
+		["Abyss Arrow"] = { k11 = 800, k12 = 250 },
+		["Arc Bolt"] = { k11 = 120, k12 = 4 },
+		["Astral Lance"] = { k11 = 18, k12 = 180, k13 = 700 },
+		["Black Sun Burst"] = { k11 = 100, k12 = 3 },
+		["Chain Lightning"] = { k11 = 750, k12 = 6, k13 = 210 },
+		["Comet Barrage"] = { k11 = 45, k12 = 140, k13 = 900 },
+		["Corona Flare"] = { k11 = 130, k12 = 4, k13 = 9 },
+		["Crimson Drill"] = { k11 = 280, k12 = 220, k13 = 5 },
+		["Doom Rail"] = { k11 = 1000, k12 = 320, k13 = 22 },
+		["Eclipse Fangs"] = { k11 = 190, k12 = 3, k13 = 7 },
+		["EMP Nova"] = { k11 = 150, k12 = 2, k13 = 8 },
+		["Flux Needles"] = { k11 = 850, k12 = 230, k13 = 45 },
+		["Gravity Spear"] = { k11 = 900, k12 = 260 },
+		["Hellfire Fan"] = { k11 = 180, k12 = 1.5, k13 = 6 },
+		["Infernal Halos"] = { k11 = 160, k12 = 5, k13 = 45 },
+		["Kinetic Hammer"] = { k11 = 160, k12 = 300, k13 = 900 },
+		["Leviathan Maw"] = { k11 = 800, k12 = 180, k13 = 120 },
+		["Lunar Guillotine"] = { k11 = 220, k12 = 3 },
+		["Orbital Siege"] = { k11 = 210, k12 = 2, k13 = 5 },
+		["Plasma Rift"] = { k11 = 90, k12 = 1.8, k13 = 180 },
+		["Quasar Shards"] = { k11 = 950, k12 = 270, k13 = 8, k14 = 38 },
+		["Radiant Javelin"] = { k11 = 25, k12 = 8, k13 = 240 },
+		["Razor Orbit"] = { k11 = 140, k12 = 4 },
+		["Shrapnel Storm"] = { k11 = 170, k12 = 2.5 },
+		["Singularity Shot"] = { k11 = 1000, k12 = 300, k13 = 6 },
+		["Solar Blades"] = { k11 = 200, k12 = 7 },
+		["Thunder Cleaver"] = { k11 = 240, k12 = 4, k13 = 260 },
+		["Void Torpedo"] = { k11 = 700, k12 = 200, k13 = 35 },
+		["Warhead Crusher"] = { k11 = 300, k12 = 3, k13 = 70 },
+		["Zero Point Crossfire"] = { k11 = 180, k12 = 5 },
 	},
 }

@@ -13,9 +13,7 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 		d.v2 = math.random()
 	end
 	if not d.v3 then
-		-- Uniform-area polar angle (acos of a uniform cosine); plain random()*pi
-		-- clumps particles at the poles of the spherical fill.
-		d.v3 = math.acos(2 * math.random() - 1)
+		d.v3 = math.random() * math.pi
 	end
 	if not d.v4 then
 		d.v4 = math.random() * math.pi * 2

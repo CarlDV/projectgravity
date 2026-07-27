@@ -1,25 +1,21 @@
 local M = {}
 
 function M.f2(p, cen, d, t, c, x1, x6, x9)
-	local wp = p.Position
-	local tc = cen - wp
-	
-	local speed = c.k11 or 500
-	local drop_dist = c.k12 or 5
-	
-	local target_pos = cen
-	
-	if tc.Magnitude <= drop_dist then
+	if p.Anchored then
 		d.unclaim = true
-		return Vector3.zero, cen
+		return Vector3.zero, p.Position
 	end
-	
-	return (target_pos - wp) * speed, target_pos
+
+	if not d.unclaim then
+		p.CFrame = p.CFrame + (cen - p.Position)
+		d.unclaim = true
+	end
+
+	return Vector3.zero, cen
 end
 
-M.Controls = {
-	{ Type = "Slider", Name = "Pull Speed", Min = 50, Max = 2000, Key = "k11" },
-	{ Type = "Slider", Name = "Drop Radius", Min = 1, Max = 20, Key = "k12" }
-}
+M.Drop = true
+
+M.Controls = {}
 
 return M

@@ -14,8 +14,8 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 			if not d.v3 then
 				d.v3 = math.random()
 			end
-			if not d.v5 then
-				d.v5 = (math.random() - 0.5) * 2
+			if not d.v4 then
+				d.v4 = math.random() * 2 - 1
 			end
 			local is_rung = d.v3 > 0.8
 			local dt = t - (d.last_t or t)
@@ -27,7 +27,7 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 			if is_rung then
 				local rung_pos = math.floor(d.v1 * 10) / 10
 				local rung_phase = d.phase + (rung_pos * freq)
-				local rung_t = d.v5
+				local rung_t = d.v4
 				tx = rung_t * R * math.cos(rung_phase)
 				tz = rung_t * R * math.sin(rung_phase)
 				ty = (rung_pos - 0.5) * H

@@ -144,28 +144,7 @@ local function load_module(path)
 	return nil
 end
 
-local function fatal(msg)
-	warn("Project Gravity: " .. msg)
-	pcall(function()
-		loading_text.Text = "FAILED"
-		loading_text.TextColor3 = Color3.fromRGB(255, 90, 90)
-	end)
-	pcall(function()
-		if spin_conn then spin_conn:Disconnect() end
-	end)
-	pcall(function()
-		v5:SetCore("SendNotification", { Title = "Project Gravity", Text = msg, Duration = 8 })
-	end)
-	task.delay(6, function()
-		pcall(function() loading_sg:Destroy() end)
-	end)
-	error("Project Gravity: " .. msg, 0)
-end
-
 local config = load_module("config.lua")
-if type(config) ~= "table" or type(config.x1) ~= "table" or type(config.x2) ~= "table" then
-	fatal("Failed to load config.lua (check network / raw.githubusercontent reachability)")
-end
 local x1 = config.x1
 local x2 = config.x2
 x1.S = x2
@@ -246,6 +225,7 @@ local function reset_config()
 	end
 	for mk, mv in pairs(default_x2) do
 		if x2[mk] then
+			table.clear(x2[mk])
 			for sk, sv in pairs(mv) do
 				x2[mk][sk] = sv
 			end
@@ -314,7 +294,9 @@ local function load_settings()
 			for mk, mv in pairs(cx2) do
 				if x2[mk] and type(mv) == "table" then
 					for sk, sv in pairs(mv) do
-						x2[mk][sk] = sv
+						if x2[mk][sk] ~= nil and typeof(x2[mk][sk]) == typeof(sv) then
+							x2[mk][sk] = sv
+						end
 					end
 				end
 			end
@@ -363,12 +345,9 @@ local function get_shape(name)
 			end
 		end
 
-		if success and type(result) == "table" and type(result.f2) == "function" then
+		if success and result then
 			loaded_shapes[name] = result
 		else
-			if success and type(result) == "table" then
-				result = "shape module is missing a function 'f2'"
-			end
 			warn("Failed to load shape: " .. tostring(name) .. " Error: " .. tostring(result))
 		end
 	end
@@ -386,12 +365,12 @@ local x6 = {
 	n = 0,
 	pi_targets = {},
 	pi_timer = 0,
-	target_pos_buffer = {},
 	ex_nodes = {},
 	ex_timer = 0,
 	esp_timer = 0,
 	claim_queue = {},
 	active_array = {},
+	run_connections = {},
 	pre = {},
 	pre_buffer = table.create(200),
 	sculptor_selected = setmetatable({}, {__mode = "k"}),
@@ -439,6 +418,8 @@ local context = {
 	save_favs = save_favs,
 	save_settings = save_settings,
 	get_shape = get_shape,
+	local_shapes = local_shapes,
+	loaded_shapes = loaded_shapes,
 	load_module = load_module,
 	is_mobile = is_mobile,
 	SUB_DIR = SUB_DIR,
@@ -458,9 +439,22 @@ local function destroy()
 		pcall(function() x6.c[i]:Disconnect() end)
 		x6.c[i] = nil
 	end
-	for _, d in pairs(x6.a) do
-		if d and d.lv then
-			pcall(function() d.lv:Destroy() end)
+	for i = #x6.run_connections, 1, -1 do
+		pcall(function() x6.run_connections[i]:Disconnect() end)
+		x6.run_connections[i] = nil
+	end
+	for p, d in pairs(x6.a) do
+		if d then
+			pcall(function()
+				if p and p.Parent then
+					p.CanCollide = d.original_can_collide
+					p.Anchored = d.original_anchored
+					p.CustomPhysicalProperties = d.original_properties
+				end
+				if d.at then d.at:Destroy() end
+				if d.lv then d.lv:Destroy() end
+				if d.av then d.av:Destroy() end
+			end)
 		end
 	end
 	x6.a = setmetatable({}, {__mode = "k"})

@@ -12,9 +12,7 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 				d.v2 = math.random() * math.pi * 2
 			end
 			if not d.v3 then
-				-- Area-uniform polar angle (inverse CDF). Plain random()*pi clumps
-				-- parts at the poles; acos(2u-1) spreads them evenly over the shell.
-				d.v3 = math.acos(2 * math.random() - 1)
+				d.v3 = math.random() * math.pi
 			end
 			if not d.v4 then
 				local roll = math.random()
