@@ -181,24 +181,11 @@ return function(context)
 		return attach(l, parent)
 	end
 
-	-- Soft shadow / bloom behind a surface. Never add one of these to a
-	-- container using AutomaticSize: the shadow is deliberately larger than its
-	-- parent, so the parent would grow to fit it, forever.
-	local function shadow(parent, spread, transparency, color)
-		spread = spread or 22
-		return new("ImageLabel", {
-			BackgroundTransparency = 1,
-			Image = SOFT,
-			ImageColor3 = color or TH.black,
-			ImageTransparency = transparency or 0.55,
-			ScaleType = Enum.ScaleType.Slice,
-			SliceCenter = TH.slice,
-			AnchorPoint = V2(0.5, 0.5),
-			Position = U2(0.5, 0, 0.5, 0),
-			Size = U2(1, spread * 2, 1, spread * 2),
-			ZIndex = -8,
-			Active = false,
-		}, parent)
+	-- Drop shadows are deliberately gone: the panel reads better as a crisp box
+	-- against the game world. This stays as a no-op so any caller that still asks
+	-- for one simply gets nothing instead of an error.
+	local function shadow()
+		return nil
 	end
 
 	----------------------------------------------------------------------

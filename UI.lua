@@ -149,8 +149,8 @@ return function(context)
 	E = E(context)
 
 	local TH, fx = E.TH, E.fx
-	local new, corner, stroke, grad, pad, list, label, shadow =
-		E.new, E.corner, E.stroke, E.grad, E.pad, E.list, E.label, E.shadow
+	local new, corner, stroke, grad, pad, list, label =
+		E.new, E.corner, E.stroke, E.grad, E.pad, E.list, E.label
 	local CS, CSK, NS, NSK = E.CS, E.CSK, E.NS, E.NSK
 	local es, et, eb, eh = E.s, E.t, E.b, E.h
 
@@ -354,10 +354,9 @@ return function(context)
 		-- panel chrome
 		------------------------------------------------------------------
 
-		-- The panel itself is an invisible container. Its visible body is a child
-		-- drawn above the drop shadow, because a child always renders in front of
-		-- its parent: putting the shadow and the body on the same frame would let
-		-- the shadow bleed across the surface.
+		-- The panel itself is an invisible container and its visible body is a
+		-- child. That split is kept from the shadowed design because the close
+		-- animation and the minimise morph both drive `surface` on its own.
 		local panel = new("Frame", {
 			Name = "Panel",
 			BackgroundTransparency = 1,
@@ -368,7 +367,6 @@ return function(context)
 			ZIndex = 4,
 		}, sg)
 		local panel_scale = new("UIScale", { Scale = 0.9 }, panel)
-		shadow(panel, 26, 0.42)
 
 		local surface = new("Frame", {
 			BackgroundColor3 = TH.bg1,
@@ -860,7 +858,6 @@ return function(context)
 			ZIndex = 6,
 		}, sg)
 		local hud_scale = new("UIScale", {}, hud)
-		shadow(hud, 16, 0.65)
 		local hud_surface = new("Frame", {
 			BackgroundColor3 = TH.bg1,
 			BackgroundTransparency = 0.12,
@@ -926,7 +923,6 @@ return function(context)
 			}, sg)
 			dock_scale = new("UIScale", { Scale = 0.85 }, dock)
 			fx.to(dock_scale, "Scale", ui_scale, "bounce")
-			shadow(dock, 18, 0.55)
 
 			local dock_surface = new("Frame", {
 				BackgroundColor3 = TH.bg1,
@@ -939,8 +935,8 @@ return function(context)
 			corner(dock_surface, 16)
 			stroke(dock_surface, TH.line, 1, 0.1)
 
-			-- the buttons live one level in so the drop shadow stays out of the
-			-- list layout
+			-- the buttons live one level in so the padding and list layout stay
+			-- off the draggable dock frame itself
 			local rack = new("Frame", {
 				BackgroundTransparency = 1,
 				Size = U2(1, 0, 1, 0),
@@ -1049,12 +1045,13 @@ return function(context)
 					if dragging and E.is_move(io) then
 						local vp = viewport()
 						local size = dock.AbsoluteSize
-						fx.to(dock, "Position", U2(
+						-- direct, like the panel: a spring here just lags the finger
+						fx.set(dock, "Position", U2(
 							0,
 							mclamp(io.Position.X - grab.X, 4, mmax(4, vp.X - size.X - 4)),
 							0,
 							mclamp(io.Position.Y - grab.Y, 4, mmax(4, vp.Y - size.Y - 4))
-						), "snap")
+						))
 					end
 				end)
 			)
@@ -2186,10 +2183,13 @@ return function(context)
 		end
 
 		------------------------------------------------------------------
-		-- dragging, with a touch of inertial tilt
+		-- dragging
 		------------------------------------------------------------------
+		-- The panel tracks the pointer exactly: no spring, no inertial tilt. A
+		-- lagging or rotating window reads as the interface coming apart, which
+		-- is the opposite of responsive.
 
-		local drag_active, drag_grab, drag_last_x, drag_vel, drag_travel = false, V2(0, 0), 0, 0, 0
+		local drag_active, drag_grab, drag_last_x, drag_travel = false, V2(0, 0), 0, 0
 
 		local function clamp_panel(px, py)
 			local vp = viewport()
@@ -2235,12 +2235,9 @@ return function(context)
 					return
 				end
 				local px, py = clamp_panel(io.Position.X - drag_grab.X, io.Position.Y - drag_grab.Y)
-				fx.to(panel, "Position", U2(0, px, 0, py), "snap")
-				local dx = io.Position.X - drag_last_x
-				drag_travel = drag_travel + mabs(dx)
-				drag_vel = drag_vel * 0.6 + dx * 0.4
+				fx.set(panel, "Position", U2(0, px, 0, py))
+				drag_travel = drag_travel + mabs(io.Position.X - drag_last_x)
 				drag_last_x = io.Position.X
-				fx.to(panel, "Rotation", mclamp(drag_vel * 0.09, -3.5, 3.5), "flow")
 			end)
 		)
 		table.insert(
@@ -2250,8 +2247,6 @@ return function(context)
 					return
 				end
 				drag_active = false
-				drag_vel = 0
-				fx.to(panel, "Rotation", 0, "bounce")
 				if minimized and drag_travel < 8 then
 					set_minimized(false)
 				end
