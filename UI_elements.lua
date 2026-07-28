@@ -798,20 +798,6 @@ return function(context)
 		local knob_px = is_mobile and 16 or 13
 		knob.Size = U2(0, knob_px, 0, knob_px)
 
-		local halo = new("ImageLabel", {
-			BackgroundTransparency = 1,
-			Image = SOFT,
-			ImageColor3 = TH.acc,
-			ImageTransparency = 1,
-			ScaleType = Enum.ScaleType.Slice,
-			SliceCenter = TH.slice,
-			AnchorPoint = V2(0.5, 0.5),
-			Position = U2(0.5, 0, 0.5, 0),
-			Size = U2(1, 26, 1, 26),
-			ZIndex = 2,
-			Active = false,
-		}, knob)
-
 		local value = df
 		local silent = false
 
@@ -865,7 +851,6 @@ return function(context)
 			release = function()
 				dragging = false
 				fx.to(knob_scale, "Scale", 1, "pop")
-				fx.to(halo, "ImageTransparency", 1, "flow")
 				fx.to(vbox, "TextColor3", TH.tx1, "flow")
 				fx.to(knob_stroke, "Thickness", 2, "flow")
 			end,
@@ -880,7 +865,6 @@ return function(context)
 			grab_x, grab_v = io.Position.X, value
 			drag_slider = handle
 			fx.to(knob_scale, "Scale", 1.45, "bounce")
-			fx.to(halo, "ImageTransparency", 0.55, "snap")
 			fx.to(vbox, "TextColor3", TH.acc2, "snap")
 			fx.to(knob_stroke, "Thickness", 3, "snap")
 			if not shift_down then
@@ -892,13 +876,11 @@ return function(context)
 			hit.MouseEnter:Connect(function()
 				if not dragging then
 					fx.to(knob_scale, "Scale", 1.2, "pop")
-					fx.to(halo, "ImageTransparency", 0.82, "flow")
 				end
 			end)
 			hit.MouseLeave:Connect(function()
 				if not dragging then
 					fx.to(knob_scale, "Scale", 1, "flow")
-					fx.to(halo, "ImageTransparency", 1, "flow")
 				end
 			end)
 		end

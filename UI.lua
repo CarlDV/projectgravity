@@ -168,6 +168,7 @@ return function(context)
 		up = "\u{25B2}",
 		down = "\u{25BC}",
 		pause = "\u{25AE}\u{25AE}",
+		power = "\u{25C9}",
 		chevron = "\u{203A}",
 		star_on = "\u{2605}",
 		star_off = "\u{2606}",
@@ -431,20 +432,6 @@ return function(context)
 			Active = false,
 		}, aurora_clip)
 		grad(aurora_b, CS({ CSK(0, TH.acc2), CSK(1, TH.acc) }), -35, NS({ NSK(0, 0.6), NSK(0.7, 1), NSK(1, 1) }))
-
-		local bloom = new("ImageLabel", {
-			BackgroundTransparency = 1,
-			Image = TH.soft,
-			ImageColor3 = TH.acc,
-			ImageTransparency = 0.94,
-			ScaleType = Enum.ScaleType.Slice,
-			SliceCenter = TH.slice,
-			AnchorPoint = V2(0.5, 0.5),
-			Position = U2(0.5, 0, 0.35, 0),
-			Size = U2(0, 260, 0, 260),
-			ZIndex = 1,
-			Active = false,
-		}, aurora_clip)
 
 		------------------------------------------------------------------
 		-- title bar
@@ -907,17 +894,26 @@ return function(context)
 		local dock_hold, dock_pause_api, dock_power_api = 0, nil, nil
 
 		local function build_dock()
+			-- Bare glyphs told nobody anything, least of all on a phone where
+			-- there is no hover tooltip to fall back on. Every control now carries
+			-- its own caption and the hold-to-repeat ones say so.
 			local slots = 6
-			local icon = 30
-			local gap = 7
-			local height = slots * icon + (slots - 1) * gap + 16
+			local DOCK_W = is_mobile and 116 or 106
+			local BTN_H = is_mobile and 38 or 36
+			local PAD = 8
+			local GRIP_H = 14
+			local gap = 5
+			local height = PAD * 2 + GRIP_H + slots * BTN_H + (slots - 1) * gap
 
+			-- Positioned in offsets, not scale, because the drag handler works in
+			-- offsets: mixing the two makes the dock jump on the first touch.
+			local vpd = viewport()
 			dock = new("Frame", {
 				Name = "Dock",
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
-				Position = U2(0, 16, 0.28, 0),
-				Size = U2(0, icon + 16, 0, height),
+				Position = U2(0, 16, 0, mmax(8, mfloor(vpd.Y * 0.5 - height * ui_scale * 0.5))),
+				Size = U2(0, DOCK_W, 0, height),
 				Active = true,
 				ZIndex = 8,
 			}, sg)
@@ -935,14 +931,28 @@ return function(context)
 			corner(dock_surface, 16)
 			stroke(dock_surface, TH.line, 1, 0.1)
 
+			-- the only part of the dock that is not a button, so it doubles as the
+			-- drag handle and looks like one
+			local grip = new("Frame", {
+				BackgroundColor3 = TH.line2,
+				BackgroundTransparency = 0.35,
+				BorderSizePixel = 0,
+				AnchorPoint = V2(0.5, 0),
+				Position = U2(0.5, 0, 0, PAD),
+				Size = U2(0, 28, 0, 4),
+				ZIndex = 9,
+				Active = false,
+			}, dock)
+			corner(grip, UD(1, 0))
+
 			-- the buttons live one level in so the padding and list layout stay
 			-- off the draggable dock frame itself
 			local rack = new("Frame", {
 				BackgroundTransparency = 1,
-				Size = U2(1, 0, 1, 0),
+				Position = U2(0, PAD, 0, PAD + GRIP_H),
+				Size = U2(1, -PAD * 2, 1, -(PAD * 2 + GRIP_H)),
 				ZIndex = 9,
 			}, dock)
-			pad(rack, 8, 8, 8, 8)
 			list(rack, gap)
 
 			local function place()
@@ -960,9 +970,10 @@ return function(context)
 			end
 
 			local defs = {
-				{ glyph = GLYPH.plus, color = TH.acc2, action = place },
+				{ glyph = GLYPH.plus, caption = "PLACE", color = TH.acc2, action = place },
 				{
 					glyph = GLYPH.close,
+					caption = "CLEAR",
 					color = TH.bad,
 					action = function()
 						if not context.x4 then
@@ -975,35 +986,94 @@ return function(context)
 						end
 					end,
 				},
-				{ glyph = GLYPH.up, color = TH.tx2, hold = 1 },
-				{ glyph = GLYPH.down, color = TH.tx2, hold = -1 },
-				{
-					glyph = GLYPH.pause,
-					color = TH.warn,
-					pause = true,
-					action = function()
-						x1.Paused = not x1.Paused
-					end,
-				},
-				{
-					glyph = "PWR",
-					color = TH.ok,
-					power = true,
-					small = true,
-					action = function()
-						x1.Disabled = not x1.Disabled
-						apply_disabled(x1.Disabled)
-						save_settings()
-					end,
-				},
+				{ glyph = GLYPH.up, caption = "RAISE", color = TH.tx1, hold = 1 },
+				{ glyph = GLYPH.down, caption = "LOWER", color = TH.tx1, hold = -1 },
+				{ glyph = GLYPH.pause, caption = "PAUSE", color = TH.warn, pause = true, action = function()
+					x1.Paused = not x1.Paused
+				end },
+				{ glyph = GLYPH.power, caption = "ONLINE", color = TH.ok, power = true, action = function()
+					x1.Disabled = not x1.Disabled
+					apply_disabled(x1.Disabled)
+					save_settings()
+				end },
 			}
 
-			for _, def in ipairs(defs) do
-				local wrap, api = E.icon(rack, def.glyph, def.action, def.color, icon)
-				wrap.ZIndex = 10
-				if def.small then
-					api.label.TextSize = 9
+			local function dock_button(def)
+				local wrap = new("Frame", {
+					BackgroundTransparency = 1,
+					Size = U2(1, 0, 0, BTN_H),
+					ZIndex = 10,
+				}, rack)
+				local b = new("TextButton", {
+					BackgroundColor3 = TH.bg2,
+					BorderSizePixel = 0,
+					AutoButtonColor = false,
+					Size = U2(1, 0, 1, 0),
+					Text = "",
+					ClipsDescendants = true,
+					ZIndex = 10,
+				}, wrap)
+				corner(b, 10)
+				local bs = stroke(b, TH.line, 1, 0.2)
+				local sc = new("UIScale", {}, b)
+
+				local gl = label(b, def.glyph, mfloor(BTN_H * 0.38), TH.font.bold, def.color, {
+					Position = U2(0, 2, 0, 0),
+					Size = U2(0, 24, 1, 0),
+					TextXAlignment = Enum.TextXAlignment.Center,
+					ZIndex = 11,
+				})
+				local cap = label(b, def.caption, is_mobile and 10 or 9, TH.font.black, TH.tx2, {
+					Position = U2(0, 28, 0, 0),
+					Size = U2(1, -32, 1, 0),
+					ZIndex = 11,
+					TextTruncate = Enum.TextTruncate.AtEnd,
+				})
+				if def.hold then
+					cap.Size = U2(1, -66, 1, 0)
+					label(b, "HOLD", 8, TH.font.med, TH.tx3, {
+						AnchorPoint = V2(1, 0.5),
+						Position = U2(1, -8, 0.5, 0),
+						Size = U2(0, 30, 0, 12),
+						TextXAlignment = Enum.TextXAlignment.Right,
+						ZIndex = 11,
+					})
 				end
+
+				local hovered = false
+				E.interactive(b, {
+					scale = sc,
+					lift = 1.05,
+					press = 0.94,
+					ripple_color = def.color,
+					paint = function(hover)
+						hovered = hover
+						fx.to(b, "BackgroundColor3", hover and TH.bg4 or TH.bg2, "snap")
+						fx.to(bs, "Color", hover and def.color or TH.line, "snap")
+						fx.to(cap, "TextColor3", hover and TH.white or TH.tx2, "snap")
+					end,
+				})
+				if def.action then
+					b.MouseButton1Click:Connect(function()
+						def.action()
+					end)
+				end
+				return {
+					frame = wrap,
+					button = b,
+					glyph = gl,
+					caption = cap,
+					stroke = bs,
+					scale = sc,
+					-- the sync pass must not fight the hover tint for the stroke
+					is_hovered = function()
+						return hovered
+					end,
+				}
+			end
+
+			for _, def in ipairs(defs) do
+				local api = dock_button(def)
 				if def.pause then
 					dock_pause_api = api
 				elseif def.power then
@@ -1058,13 +1128,20 @@ return function(context)
 
 			on_sync(function()
 				if dock_pause_api then
-					fx.to(dock_pause_api.label, "TextColor3", x1.Paused and TH.white or TH.warn, "snap")
-					fx.to(dock_pause_api.stroke, "Color", x1.Paused and TH.warn or TH.line, "snap")
+					local paused = x1.Paused and true or false
+					dock_pause_api.caption.Text = paused and "RESUME" or "PAUSE"
+					fx.to(dock_pause_api.glyph, "TextColor3", paused and TH.white or TH.warn, "snap")
+					if not dock_pause_api.is_hovered() then
+						fx.to(dock_pause_api.stroke, "Color", paused and TH.warn or TH.line, "snap")
+					end
 				end
 				if dock_power_api then
 					local off = x1.Disabled and true or false
-					fx.to(dock_power_api.label, "TextColor3", off and TH.bad or TH.ok, "snap")
-					fx.to(dock_power_api.stroke, "Color", off and TH.bad or TH.line, "snap")
+					dock_power_api.caption.Text = off and "OFFLINE" or "ONLINE"
+					fx.to(dock_power_api.glyph, "TextColor3", off and TH.bad or TH.ok, "snap")
+					if not dock_power_api.is_hovered() then
+						fx.to(dock_power_api.stroke, "Color", off and TH.bad or TH.line, "snap")
+					end
 				end
 			end)
 		end
@@ -2305,20 +2382,6 @@ return function(context)
 				core_dot.Size = U2(0, pulse, 0, pulse)
 			end
 		end)
-
-		if not is_mobile then
-			panel.MouseMoved:Connect(function(mx, my)
-				if minimized or fx.level() < 2 then
-					return
-				end
-				local a = panel.AbsolutePosition
-				fx.to(bloom, "Position", U2(0, mx - a.X, 0, my - a.Y), "glide")
-				fx.to(bloom, "ImageTransparency", 0.84, "flow")
-			end)
-			panel.MouseLeave:Connect(function()
-				fx.to(bloom, "ImageTransparency", 0.94, "flow")
-			end)
-		end
 
 		------------------------------------------------------------------
 		-- readouts and state sync
