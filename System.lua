@@ -78,10 +78,21 @@ return function(context)
 		return false
 	end
 
+	-- Both the core tracker and the multi-target sweep want the same thing from a
+	-- character, and both used to inline it twice per call.
+	local function root_of(char)
+		if not char then
+			return nil
+		end
+		return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChildWhichIsA("BasePart")
+	end
+
 	local function get_predicted_pos(root, factor)
 		local pos = root.Position
 		local vel = root.AssemblyLinearVelocity
-		if vel.Magnitude > 250 then
+		-- squared compare first: Magnitude's sqrt is only worth paying when the
+		-- velocity actually needs clamping
+		if vel:Dot(vel) > 62500 then
 			vel = vel.Unit * 250
 		end
 		local y_vel = math.clamp(vel.Y, -50, 15)
@@ -90,6 +101,10 @@ return function(context)
 	end
 
 	local no_damp = { ["Slingshot"] = true, ["Point Impact"] = true, ["Deflect"] = true, ["Light Light no Mi"] = true }
+
+	-- NetworkOwnerV3 values that mean somebody else is simulating the part. One
+	-- hash lookup instead of a four-way comparison chain, per part per frame.
+	local NO3_SKIP = { [-1] = true, [1] = true, [2] = true, [3] = true }
 
 	-- The hot loop lives in its own function so the per-frame pcall does not have
 	-- to allocate a fresh closure sixty times a second.
@@ -143,20 +158,27 @@ return function(context)
 			local update_bucket = x6.f % et
 			if ft > x6.pi_timer then
 				x6.pi_timer = ft + 1
-				x6.pi_targets = {}
-				local target_set = {}
+				local pi = x6.pi_targets
+				table.clear(pi)
+				local target_set = x6.pi_set
+				if not target_set then
+					target_set = {}
+					x6.pi_set = target_set
+				else
+					table.clear(target_set)
+				end
 				if x1.PI_All then
 					for _, pl in ipairs(v2:GetPlayers()) do
-						if pl ~= v8 and pl.Character and (pl.Character:FindFirstChild("HumanoidRootPart") or pl.Character:FindFirstChildWhichIsA("BasePart")) then
-							table.insert(x6.pi_targets, pl)
+						if pl ~= v8 and pl.Character and root_of(pl.Character) then
+							pi[#pi + 1] = pl
 							target_set[pl] = true
 						end
 					end
 				else
 					if x1.Targets and #x1.Targets > 0 then
 						for _, tgt in ipairs(x1.Targets) do
-							if tgt and tgt.Parent and tgt.Character and (tgt.Character:FindFirstChild("HumanoidRootPart") or tgt.Character:FindFirstChildWhichIsA("BasePart")) then
-								table.insert(x6.pi_targets, tgt)
+							if tgt and tgt.Parent and tgt.Character and root_of(tgt.Character) then
+								pi[#pi + 1] = tgt
 								target_set[tgt] = true
 							end
 						end
@@ -217,16 +239,19 @@ return function(context)
 			local valid_targets = 0
 			local fallen_height = workspace.FallenPartsDestroyHeight + 50
 			if #x6.pi_targets > 0 then
+				local predictive = x1.PredictiveTracking
+				local pfactor = x1.PredictionFactor or 150
+				local void_off = x1.VoidProtection == false
 				for _, tgt in ipairs(x6.pi_targets) do
-					local root = tgt and tgt.Character and (tgt.Character:FindFirstChild("HumanoidRootPart") or tgt.Character:FindFirstChildWhichIsA("BasePart"))
+					local root = tgt and root_of(tgt.Character)
 					if root then
 						local pos = root.Position
-						if (x1.VoidProtection == false) or (pos.Y > fallen_height) then
-							if x1.PredictiveTracking then
-								pos = get_predicted_pos(root, x1.PredictionFactor or 150)
+						if void_off or (pos.Y > fallen_height) then
+							if predictive then
+								pos = get_predicted_pos(root, pfactor)
 							end
-							table.insert(target_positions, pos)
 							valid_targets = valid_targets + 1
+							target_positions[valid_targets] = pos
 						end
 					end
 				end
@@ -286,8 +311,22 @@ return function(context)
 			local is_self_bounded_shape = shape_name == "ROOM Ope Ope no Mi" or shape_name == "Light Light no Mi"
 			local aggressive_root = nil
 			if x1.AggressiveClaim and v8.Character then
-				aggressive_root = v8.Character:FindFirstChild("HumanoidRootPart") or v8.Character:FindFirstChildWhichIsA("BasePart")
+				aggressive_root = root_of(v8.Character)
 			end
+
+			-- Everything below is constant for the whole sweep. Reading it once
+			-- here instead of once per part removes a few thousand hash lookups
+			-- and string comparisons per frame at high part counts.
+			local aggressive_claim = x1.AggressiveClaim and true or false
+			local realistic_liftoff = x1["Realistic Liftoff"] and true or false
+			local is_point_impact = shape_name == "Point Impact"
+			local is_light_shape = shape_name == "Light Light no Mi"
+			local is_cursed_red = shape_name == "Cursed Technique Red"
+			local always_process = (is_drop_shape or is_self_bounded_shape) and true or false
+			local base_limit = is_light_shape and 1000 or ((max_speed and not cur_no_damp) and max_speed or 3300)
+			local check_no3 = (not is_drop_shape) and (not aggressive_claim) and ghp ~= nil
+			local do_damping = damping > 0 and not cur_no_damp and not force_smooth
+			local integral_on = ki > 0
 
 			for k = #x6.active_array, 1, -1 do
 				local p = x6.active_array[k]
@@ -312,13 +351,13 @@ return function(context)
 				if i % et ~= update_bucket then
 					continue
 				end
-				if not is_drop_shape and not x1.AggressiveClaim and ghp then
+				if check_no3 then
 					if d.no3_val == nil or ft - (d.no3_tick or 0) > 0.15 then
 						d.no3_tick = ft
 						local success, no3_val = pcall(ghp, p, 'NetworkOwnerV3')
 						d.no3_val = success and no3_val or 0
 					end
-					if d.no3_val == -1 or d.no3_val == 1 or d.no3_val == 2 or d.no3_val == 3 then
+					if NO3_SKIP[d.no3_val] then
 						continue
 					end
 				end
@@ -329,10 +368,10 @@ return function(context)
 				local p_pos = p.Position
 				local tc = active_c - p_pos
 				local distance_sq = tc:Dot(tc)
-				if distance_sq > k1_sq and not is_drop_shape and not is_self_bounded_shape then
+				if distance_sq > k1_sq and not always_process then
 					continue
 				end
-				if distance_sq > c7_sq or is_drop_shape or is_self_bounded_shape or shape_name == "Cursed Technique Red" then
+				if distance_sq > c7_sq or always_process or is_cursed_red then
 					local target_pos_delta = ANTI_SLEEP
 					local pure_target_pos = nil
 					if shape_f2 then
@@ -346,17 +385,19 @@ return function(context)
 					if vert_mult then
 						target_pos_delta = target_pos_delta * vert_mult
 					end
-					if ki > 0 and d.integral then
-						d.integral = d.integral + (target_pos_delta * dt_mult)
-						if d.integral.Magnitude > 100 then
-							d.integral = d.integral.Unit * 100
+					if integral_on and d.integral then
+						local ig = d.integral + (target_pos_delta * dt_mult)
+						local ig_sq = ig:Dot(ig)
+						if ig_sq > 10000 then
+							ig = ig * (100 / math.sqrt(ig_sq))
 						end
-						target_pos_delta = target_pos_delta + (d.integral * ki)
+						d.integral = ig
+						target_pos_delta = target_pos_delta + (ig * ki)
 					end
 					local tv = target_pos_delta
 					local liftoff_limit = nil
-					
-					if x1["Realistic Liftoff"] and d.claim_t then
+
+					if realistic_liftoff and d.claim_t then
 						local age = ft - d.claim_t
 						if age < 4 then
 							local p_factor = math.clamp(age / 4, 0, 1)
@@ -382,49 +423,50 @@ return function(context)
 						d.sys_last_t = nil
 					end
 					
-					if damping > 0 and not cur_no_damp and not force_smooth then
+					if do_damping then
 						tv = tv - (p.AssemblyLinearVelocity * damping)
 					end
 
-
-
-					d.vl = d.vl and d.vl:Lerp(tv, sm_alpha) or tv
+					local vl = d.vl and d.vl:Lerp(tv, sm_alpha) or tv
 					if in_transition and d.trans_vl then
 						if trans_ease < 1 then
-							d.vl = d.trans_vl:Lerp(d.vl, trans_ease)
+							vl = d.trans_vl:Lerp(vl, trans_ease)
 						else
 							d.trans_vl = nil
 						end
 					end
-					
-					if shape_name == "Point Impact" then
-						local impact_delta = active_c - p.Position
-						d.vl = impact_delta.Magnitude > 0 and (impact_delta.Unit * 10000) or ZERO_VECTOR
+
+					if is_point_impact then
+						local impact_delta = active_c - p_pos
+						local id_sq = impact_delta:Dot(impact_delta)
+						-- one sqrt instead of Magnitude's plus Unit's
+						vl = id_sq > 0 and (impact_delta * (10000 / math.sqrt(id_sq))) or ZERO_VECTOR
 					else
-						local limit = shape_name == "Light Light no Mi" and 1000 or ((max_speed and not cur_no_damp) and max_speed or 3300)
+						local limit = base_limit
 						if pure_target_pos then limit = math.max(limit, 15300) end
 						if liftoff_limit then limit = math.min(limit, liftoff_limit) end
-						local velocity_mag = d.vl.Magnitude
-						if velocity_mag > limit then
-							d.vl = d.vl * (limit / velocity_mag)
+						local vl_sq = vl:Dot(vl)
+						if vl_sq > limit * limit then
+							vl = vl * (limit / math.sqrt(vl_sq))
 						end
 
 						if water_level then
-							local current_y = p.Position.Y
+							local current_y = p_pos.Y
 							if current_y < water_level then
 								local depth = water_level - current_y
-								d.vl = Vector3.new(d.vl.X, math.max(d.vl.Y, 0) + (depth * 5), d.vl.Z)
+								vl = Vector3.new(vl.X, math.max(vl.Y, 0) + (depth * 5), vl.Z)
 							end
 						end
 					end
-					
-					d.lv.VectorVelocity = d.vl
-					
+
+					d.vl = vl
+					d.lv.VectorVelocity = vl
+
 					if ang_damp_mult ~= 1 then
 						p.AssemblyAngularVelocity = p.AssemblyAngularVelocity * ang_damp_mult
 					end
 
-					if shape_name ~= "Point Impact" and x1.AggressiveClaim and p.ReceiveAge > 0 then
+					if aggressive_claim and not is_point_impact and p.ReceiveAge > 0 then
 						local base_pos = aggressive_root and aggressive_root.Position or active_c
 						if not d.claim_offset then
 							d.claim_offset = Vector3.new(math.sin(d.id) * 20, 15 + (d.id % 15), math.cos(d.id) * 20)
@@ -488,28 +530,30 @@ return function(context)
 		if not x6.b or x1.Disabled then
 			return
 		end
+		-- One root lookup, one copy of the "move the core onto it" code. The
+		-- fall-through rules are unchanged: a selected-but-unreachable target
+		-- parks the core, an unreachable self-anchor falls back to dragging.
+		local track = nil
 		if x1.TgtActive and x1.Targets and #x1.Targets > 0 then
 			local tgt = x1.Targets[1]
-			local root = tgt and tgt.Character and (tgt.Character:FindFirstChild("HumanoidRootPart") or tgt.Character:FindFirstChildWhichIsA("BasePart"))
-			if root and ((x1.VoidProtection == false) or (root.Position.Y > workspace.FallenPartsDestroyHeight + 50)) then
-				local pos = root.Position
-				if x1.PredictiveTracking then
-					pos = get_predicted_pos(root, x1.PredictionFactor or 150)
-				end
-				x6.b.Position = pos
-				x6.b.AssemblyLinearVelocity = Vector3.zero
+			local root = root_of(tgt and tgt.Character)
+			if not (root and ((x1.VoidProtection == false) or (root.Position.Y > workspace.FallenPartsDestroyHeight + 50))) then
 				return
 			end
-		elseif x1.AnchorSelf and v8.Character and (v8.Character:FindFirstChild("HumanoidRootPart") or v8.Character:FindFirstChildWhichIsA("BasePart")) then
-			local root = v8.Character:FindFirstChild("HumanoidRootPart") or v8.Character:FindFirstChildWhichIsA("BasePart")
-			local pos = root.Position
+			track = root
+		elseif x1.AnchorSelf then
+			track = root_of(v8.Character)
+		end
+		if track then
+			local pos = track.Position
 			if x1.PredictiveTracking then
-				pos = get_predicted_pos(root, x1.PredictionFactor or 150)
+				pos = get_predicted_pos(track, x1.PredictionFactor or 150)
 			end
 			x6.b.Position = pos
-			x6.b.AssemblyLinearVelocity = Vector3.zero
+			x6.b.AssemblyLinearVelocity = ZERO_VECTOR
 			return
-		elseif x6.d then
+		end
+		if x6.d then
 			local c = v4.CurrentCamera
 			if not c then
 				return
@@ -520,7 +564,7 @@ return function(context)
 			local tp = r.Origin + (r.Direction * x6.p)
 			local alpha = x9.c8 >= 1 and 1 or (1 - math.exp(-60 * real_dt * -math.log(math.max(0.001, 1 - x9.c8))))
 			x6.b.Position = x6.b.Position:Lerp(tp, alpha)
-			x6.b.AssemblyLinearVelocity = Vector3.zero
+			x6.b.AssemblyLinearVelocity = ZERO_VECTOR
 		end
 	end
 
@@ -581,19 +625,23 @@ return function(context)
 		return true
 	end
 
+	-- Hoisted out of x4.f2 so releasing a few thousand parts does not allocate a
+	-- few thousand closures on the way out.
+	local function f2_restore(p, d, drop_release)
+		if d then
+			p.CanCollide = d.original_can_collide
+			p.Anchored = d.original_anchored
+			p.CustomPhysicalProperties = d.original_properties
+		end
+		if drop_release then
+			p.AssemblyLinearVelocity = ZERO_VECTOR
+			p.AssemblyAngularVelocity = ZERO_VECTOR
+		end
+	end
+
 	function x4.f2(p, drop_release, active_index)
 		local d = x6.a[p]
-		pcall(function()
-			if d then
-				p.CanCollide = d.original_can_collide
-				p.Anchored = d.original_anchored
-				p.CustomPhysicalProperties = d.original_properties
-			end
-			if drop_release then
-				p.AssemblyLinearVelocity = Vector3.zero
-				p.AssemblyAngularVelocity = Vector3.zero
-			end
-		end)
+		pcall(f2_restore, p, d, drop_release)
 		if d then
 			if d.at and d.at.Parent then
 				d.at:Destroy()
@@ -628,8 +676,9 @@ return function(context)
 		table.insert(
 			x6.c,
 			v3.Heartbeat:Connect(function(dt)
-				if time() - last_upd > 0.5 then
-					last_upd = time()
+				local now = time()
+				if now - last_upd > 0.5 then
+					last_upd = now
 					for _, p in ipairs(v2:GetPlayers()) do
 						if p ~= v8 then
 							pcall(function()
@@ -676,33 +725,43 @@ return function(context)
 			end)
 		)
 		local anti_fling_cache = setmetatable({}, {__mode = "k"})
+		local af_tick = 0
 		table.insert(
 			x6.c,
 			v3.Stepped:Connect(function()
-				if x1.AntiFling and not x1.PreserveCollisions then
-					for _, p in ipairs(v2:GetPlayers()) do
-						if p ~= v8 and p.Character then
-							local parts = anti_fling_cache[p.Character]
-							if not parts then
-								parts = {}
-								for _, part in ipairs(p.Character:GetDescendants()) do
-									if part:IsA("BasePart") then
-										table.insert(parts, part)
-									end
+				if not x1.AntiFling or x1.PreserveCollisions then
+					return
+				end
+				-- 20 Hz is plenty. The server is what re-enables collisions, and it
+				-- does not do it every frame, so sweeping every frame was paying
+				-- roughly twenty thousand property reads a second for nothing.
+				af_tick = af_tick + 1
+				if af_tick % 3 ~= 0 then
+					return
+				end
+				for _, p in ipairs(v2:GetPlayers()) do
+					if p ~= v8 and p.Character then
+						local parts = anti_fling_cache[p.Character]
+						if not parts then
+							parts = {}
+							for _, part in ipairs(p.Character:GetDescendants()) do
+								if part:IsA("BasePart") then
+									table.insert(parts, part)
 								end
-								anti_fling_cache[p.Character] = parts
-								pcall(function()
-									local conn = p.Character.DescendantAdded:Connect(function(desc)
-										if desc:IsA("BasePart") then
-											table.insert(parts, desc)
-										end
-									end)
-									table.insert(x6.c, conn)
-								end)
 							end
-							for i = #parts, 1, -1 do
-								local part = parts[i]
-								if part and part.Parent then
+							anti_fling_cache[p.Character] = parts
+							pcall(function()
+								local conn = p.Character.DescendantAdded:Connect(function(desc)
+									if desc:IsA("BasePart") then
+										table.insert(parts, desc)
+									end
+								end)
+								table.insert(x6.c, conn)
+							end)
+						end
+						for i = #parts, 1, -1 do
+							local part = parts[i]
+							if part and part.Parent then
 									if part.CanCollide then
 										part.CanCollide = false
 									end
@@ -711,7 +770,6 @@ return function(context)
 								end
 							end
 						end
-					end
 				end
 			end)
 		)
