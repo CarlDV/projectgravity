@@ -471,7 +471,7 @@ return function(context)
 		local ring_a = new("Frame", { BackgroundTransparency = 1, Size = U2(1, 0, 1, 0), ZIndex = 3 }, orb)
 		corner(ring_a, UD(1, 0))
 		local ring_a_stroke = stroke(ring_a, TH.acc, 1.6, 0.1)
-		grad(ring_a_stroke, CS({ CSK(0, TH.acc), CSK(0.5, TH.acc2) }), 0, NS({ NSK(0, 0), NSK(0.55, 0.1), NSK(1, 1) }))
+		grad(ring_a_stroke, CS({ CSK(0, TH.acc), CSK(0.5, TH.acc2), CSK(1, TH.acc3) }), 0, NS({ NSK(0, 0), NSK(0.55, 0.1), NSK(1, 1) }))
 		local ring_b = new("Frame", {
 			BackgroundTransparency = 1,
 			AnchorPoint = V2(0.5, 0.5),
