@@ -12,6 +12,12 @@ return function(context)
 	local LIGHT_PHYSICS = PhysicalProperties.new(0.001, 0, 0, 0, 0)
 
 	function x7.n(t, x, d)
+		-- prefer the in-panel toast so notifications match the rest of the UI;
+		-- fall back to the Roblox notification when the panel is not up yet
+		local ui = context.x5
+		if ui and ui.toast and ui.toast(t, x, nil, d) then
+			return
+		end
 		pcall(function()
 			v5:SetCore("SendNotification", { Title = t, Text = x, Duration = d or 3 })
 		end)
@@ -85,20 +91,9 @@ return function(context)
 
 	local no_damp = { ["Slingshot"] = true, ["Point Impact"] = true, ["Deflect"] = true, ["Light Light no Mi"] = true }
 
-	local function f3(real_dt)
-		real_dt = real_dt or (1/60)
-		if not x6.b or x1.Disabled then
-			return
-		end
-		if x1.Paused then
-			for _, d in pairs(x6.a) do
-				if d.lv then
-					d.lv.VectorVelocity = ANTI_SLEEP
-				end
-			end
-			return
-		end
-		pcall(function()
+	-- The hot loop lives in its own function so the per-frame pcall does not have
+	-- to allocate a fresh closure sixty times a second.
+	local function f3_body(real_dt)
 			local c = x6.b.Position
 			x6.f = x6.f + 1
 			if x6.last_shape ~= x1.k6 then
@@ -439,7 +434,25 @@ return function(context)
 					end
 				end
 			end
-		end)
+	end
+
+	local function f3(real_dt)
+		real_dt = real_dt or (1 / 60)
+		if not x6.b or x1.Disabled then
+			return
+		end
+		if x1.Paused then
+			-- walking the dense array beats iterating the weak part table
+			local arr = x6.active_array
+			for i = #arr, 1, -1 do
+				local d = x6.a[arr[i]]
+				if d and d.lv then
+					d.lv.VectorVelocity = ANTI_SLEEP
+				end
+			end
+			return
+		end
+		pcall(f3_body, real_dt)
 	end
 
 	function x4.ProcessQueue()
@@ -766,6 +779,17 @@ return function(context)
 		)
 	end
 
+	-- Release every claimed part but leave the core where it is. The action dock
+	-- has always called this; it just never existed until now.
+	function x4.clean_physics()
+		local released = #x6.active_array
+		while #x6.active_array > 0 do
+			x4.f2(x6.active_array[#x6.active_array], true, #x6.active_array)
+		end
+		table.clear(x6.claim_queue)
+		x7.n("Sys", released .. " parts released", 2)
+	end
+
 	function x4.f5()
 		if x6.b then
 			x6.b.Parent:Destroy()
@@ -810,25 +834,22 @@ return function(context)
 		v7:BindAction("Disable", function(_, s)
 			if s == Enum.UserInputState.Begin then
 				x1.Disabled = not x1.Disabled
-				local state = x1.Disabled and "Disabled" or "Enabled"
-				x7.n("Sys", "Script " .. state, 2)
-				if x6.disable_btn then
-					x6.disable_btn.BackgroundColor3 = x1.Disabled and Color3.fromRGB(100, 255, 100)
-						or Color3.fromRGB(60, 60, 60)
-					local v = x1.Disabled
-					if x6.b then
-						x6.b.Transparency = v and 1 or x9.c7
-						if x6.b:FindFirstChild("Visual") then
-							x6.b.Visual.Enabled = not v
-						end
+				local v = x1.Disabled
+				x7.n("Sys", "Script " .. (v and "Disabled" or "Enabled"), 2)
+				-- this used to be gated on the UI toggle existing, which meant the
+				-- hotkey silently did nothing whenever the panel was closed
+				if x6.b then
+					x6.b.Transparency = v and 1 or x9.c7
+					if x6.b:FindFirstChild("Visual") then
+						x6.b.Visual.Enabled = not v
 					end
-					for _, d in pairs(x6.a) do
-						if d.lv then
-							d.lv.MaxForce = v and 0 or x1.k4
-						end
-						if d.av then
-							d.av.MaxTorque = v and 0 or math.huge
-						end
+				end
+				for _, d in pairs(x6.a) do
+					if d.lv then
+						d.lv.MaxForce = v and 0 or x1.k4
+					end
+					if d.av then
+						d.av.MaxTorque = v and 0 or math.huge
 					end
 				end
 			end

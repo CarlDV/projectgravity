@@ -39,61 +39,50 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 		end)
 	end
 
-	local part_idx = d.id or 1
-	local is_right = (part_idx % 2 == 0)
-	local side_mult = is_right and 1 or -1
+	if state.last_frame ~= x6.f then
+		state.last_frame = x6.f
+		local fire_override = x1.IsLaunching or (c.k18 == true)
+		local should_fire = state.holding or state.tap_locked or fire_override
+
+		if should_fire then
+			local hit_pos = nil
+			local local_plr = plrs.LocalPlayer
+			local mouse = local_plr and local_plr:GetMouse()
+			if mouse and mouse.Hit then
+				hit_pos = mouse.Hit.Position
+			end
+			if not hit_pos or hit_pos.Magnitude > 10000 then
+				local cam = workspace.CurrentCamera
+				if cam then
+					local mouse_loc = uis:GetMouseLocation()
+					local ray = cam:ViewportPointToRay(mouse_loc.X, mouse_loc.Y)
+					local res = workspace:Raycast(ray.Origin, ray.Direction * 1000)
+					hit_pos = res and res.Position or (ray.Origin + ray.Direction * 400)
+				end
+			end
+			if hit_pos then
+				state.target_point = hit_pos
+				state.active_beam = true
+			else
+				state.active_beam = false
+			end
+		else
+			state.active_beam = false
+		end
+	end
+
 	local active_items = x6.active_array
 	local total_parts = #active_items
 	if total_parts == 0 then
 		return Vector3.zero, cen
 	end
 
+	local part_idx = d.id or 1
+	local is_right = (part_idx % 2 == 0)
+	local side_mult = is_right and 1 or -1
 	local group_idx = math.floor((part_idx - 1) / 2) + 1
 	local half_count = math.max(1, math.floor(total_parts / 2))
 	local norm_idx = (group_idx - 1) % half_count
-
-	local interval = c.k16 or 1.5
-	local burst_len = c.k17 or 0.4
-	local has_targets = x6.target_positions and #x6.target_positions > 0
-	local auto_pulse_enabled = (c.k19 ~= false) and has_targets
-	local in_pulse_window = (t % interval) < burst_len
-
-	if state.last_frame ~= x6.f then
-		state.last_frame = x6.f
-
-		local fire_override = x1.IsLaunching or (c.k18 == true) or (auto_pulse_enabled and in_pulse_window)
-		local should_fire = state.holding or state.tap_locked or fire_override
-
-		if should_fire then
-			if not (auto_pulse_enabled and in_pulse_window) then
-				local hit_pos = nil
-				local local_plr = plrs.LocalPlayer
-				local mouse = local_plr and local_plr:GetMouse()
-				if mouse and mouse.Hit then
-					hit_pos = mouse.Hit.Position
-				end
-				if not hit_pos or hit_pos.Magnitude > 10000 then
-					local cam = workspace.CurrentCamera
-					if cam then
-						local mouse_loc = uis:GetMouseLocation()
-						local ray = cam:ViewportPointToRay(mouse_loc.X, mouse_loc.Y)
-						local res = workspace:Raycast(ray.Origin, ray.Direction * 1000)
-						hit_pos = res and res.Position or (ray.Origin + ray.Direction * 400)
-					end
-				end
-				if hit_pos then
-					state.target_point = hit_pos
-					state.active_beam = true
-				else
-					state.active_beam = false
-				end
-			else
-				state.active_beam = true
-			end
-		else
-			state.active_beam = false
-		end
-	end
 
 	local dist = c.k11 or 80
 	local rad = c.k12 or 15
@@ -101,10 +90,9 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 	local fly_speed = c.k14 or 900
 	local beam_spread = c.k15 or 4
 
-	local origin_pos = (x6.b and x6.b.Position) or cen
 	local rot_angle = t * spd
 	local offset_vec = Vector3.new(math.cos(rot_angle) * dist * 0.5, math.sin(rot_angle * 0.5) * 4, math.sin(rot_angle) * dist * 0.5) * side_mult
-	local orb_center = origin_pos + offset_vec
+	local orb_center = cen + offset_vec
 
 	local gold_ratio = (1 + math.sqrt(5)) / 2
 	local phi = math.acos(math.clamp(1 - 2 * (norm_idx + 0.5) / half_count, -1, 1))
@@ -118,16 +106,7 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 
 	local target_pos
 	if state.active_beam then
-		local dest
-		if auto_pulse_enabled and in_pulse_window then
-			local tgt_count = #x6.target_positions
-			local pulse_cycle_id = math.floor(t / interval)
-			local target_idx = ((group_idx + pulse_cycle_id + (is_right and 1 or 0)) % tgt_count) + 1
-			dest = x6.target_positions[target_idx] or origin_pos
-		else
-			dest = state.target_point
-		end
-
+		local dest = state.target_point
 		local ray_vec = dest - orb_center
 		local ray_dist = ray_vec.Magnitude
 		
@@ -164,10 +143,7 @@ M.Controls = {
 	{ Type = "Slider", Name = "Rotation Speed", Min = 0, Max = 500, Key = "k13", Default = 150 },
 	{ Type = "Slider", Name = "Beam Velocity", Min = 100, Max = 3000, Key = "k14", Default = 900 },
 	{ Type = "Slider", Name = "Beam Spread", Min = 1, Max = 30, Key = "k15", Default = 4 },
-	{ Type = "Slider", Name = "Target Pulse Rate", Min = 0.5, Max = 5.0, Key = "k16", Default = 1.5 },
-	{ Type = "Slider", Name = "Pulse Duration", Min = 0.1, Max = 1.0, Key = "k17", Default = 0.4 },
-	{ Type = "Toggle", Name = "Always Fire Beam", Key = "k18", Default = false },
-	{ Type = "Toggle", Name = "Target Auto Pulse", Key = "k19", Default = true }
+	{ Type = "Toggle", Name = "Always Fire Beam", Key = "k18", Default = false }
 }
 
 return M

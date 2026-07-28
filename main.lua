@@ -67,6 +67,7 @@ local loading_sg = Instance.new("ScreenGui")
 loading_sg.Name = "GravityLoading"
 loading_sg.DisplayOrder = 99999
 loading_sg.IgnoreGuiInset = true
+loading_sg.ResetOnSpawn = false
 if gethui then
 	loading_sg.Parent = gethui()
 elseif syn and syn.protect_gui then
@@ -75,35 +76,120 @@ elseif syn and syn.protect_gui then
 else
 	loading_sg.Parent = v8:WaitForChild("PlayerGui")
 end
-local spinner = Instance.new("Frame", loading_sg)
-spinner.Size = UDim2.new(0, 36, 0, 36)
-spinner.Position = UDim2.new(0.5, -18, 0.5, -18)
+
+local ACCENT = Color3.fromRGB(126, 92, 255)
+local ACCENT2 = Color3.fromRGB(56, 214, 255)
+
+local veil = Instance.new("Frame", loading_sg)
+veil.BackgroundColor3 = Color3.fromRGB(6, 7, 11)
+veil.BackgroundTransparency = 0.35
+veil.BorderSizePixel = 0
+veil.Size = UDim2.new(1, 0, 1, 0)
+
+local stage = Instance.new("Frame", loading_sg)
+stage.BackgroundTransparency = 1
+stage.AnchorPoint = Vector2.new(0.5, 0.5)
+stage.Position = UDim2.new(0.5, 0, 0.5, 0)
+stage.Size = UDim2.new(0, 220, 0, 130)
+
+local spinner = Instance.new("Frame", stage)
 spinner.BackgroundTransparency = 1
-local uic = Instance.new("UICorner", spinner)
-uic.CornerRadius = UDim.new(1, 0)
+spinner.AnchorPoint = Vector2.new(0.5, 0)
+spinner.Position = UDim2.new(0.5, 0, 0, 0)
+spinner.Size = UDim2.new(0, 40, 0, 40)
+Instance.new("UICorner", spinner).CornerRadius = UDim.new(1, 0)
 local uis = Instance.new("UIStroke", spinner)
-uis.Thickness = 3
-uis.Color = Color3.fromRGB(255, 255, 255)
+uis.Thickness = 2.5
+uis.Color = ACCENT
 local uig = Instance.new("UIGradient", uis)
+uig.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, ACCENT),
+	ColorSequenceKeypoint.new(1, ACCENT2),
+})
 uig.Transparency = NumberSequence.new({
 	NumberSequenceKeypoint.new(0, 0),
-	NumberSequenceKeypoint.new(0.5, 0),
-	NumberSequenceKeypoint.new(1, 1)
+	NumberSequenceKeypoint.new(0.45, 0.1),
+	NumberSequenceKeypoint.new(1, 1),
 })
+
+local inner = Instance.new("Frame", spinner)
+inner.BackgroundTransparency = 1
+inner.AnchorPoint = Vector2.new(0.5, 0.5)
+inner.Position = UDim2.new(0.5, 0, 0.5, 0)
+inner.Size = UDim2.new(0, 20, 0, 20)
+Instance.new("UICorner", inner).CornerRadius = UDim.new(1, 0)
+local inner_stroke = Instance.new("UIStroke", inner)
+inner_stroke.Thickness = 1.5
+inner_stroke.Color = Color3.fromRGB(255, 94, 188)
+inner_stroke.Transparency = 0.3
+local inner_grad = Instance.new("UIGradient", inner_stroke)
+inner_grad.Transparency = NumberSequence.new({
+	NumberSequenceKeypoint.new(0, 1),
+	NumberSequenceKeypoint.new(0.5, 0.05),
+	NumberSequenceKeypoint.new(1, 1),
+})
+
+local core = Instance.new("Frame", spinner)
+core.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+core.BorderSizePixel = 0
+core.AnchorPoint = Vector2.new(0.5, 0.5)
+core.Position = UDim2.new(0.5, 0, 0.5, 0)
+core.Size = UDim2.new(0, 6, 0, 6)
+Instance.new("UICorner", core).CornerRadius = UDim.new(1, 0)
+
+local wordmark = Instance.new("TextLabel", stage)
+wordmark.BackgroundTransparency = 1
+wordmark.Position = UDim2.new(0, 0, 0, 58)
+wordmark.Size = UDim2.new(1, 0, 0, 20)
+wordmark.Text = "PROJECT GRAVITY"
+wordmark.TextColor3 = Color3.fromRGB(240, 242, 252)
+wordmark.Font = Enum.Font.GothamBlack
+wordmark.TextSize = 15
+
+local loading_text = Instance.new("TextLabel", stage)
+loading_text.BackgroundTransparency = 1
+loading_text.Position = UDim2.new(0, 0, 0, 80)
+loading_text.Size = UDim2.new(1, 0, 0, 14)
+loading_text.Text = "initialising"
+loading_text.TextColor3 = Color3.fromRGB(120, 126, 152)
+loading_text.Font = Enum.Font.GothamMedium
+loading_text.TextSize = 11
+
+local bar_bed = Instance.new("Frame", stage)
+bar_bed.BackgroundColor3 = Color3.fromRGB(25, 27, 39)
+bar_bed.BorderSizePixel = 0
+bar_bed.AnchorPoint = Vector2.new(0.5, 0)
+bar_bed.Position = UDim2.new(0.5, 0, 0, 104)
+bar_bed.Size = UDim2.new(0, 140, 0, 3)
+Instance.new("UICorner", bar_bed).CornerRadius = UDim.new(1, 0)
+
+local bar = Instance.new("Frame", bar_bed)
+bar.BackgroundColor3 = ACCENT
+bar.BorderSizePixel = 0
+bar.Size = UDim2.new(0.08, 0, 1, 0)
+Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
+local bar_grad = Instance.new("UIGradient", bar)
+bar_grad.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, ACCENT),
+	ColorSequenceKeypoint.new(1, ACCENT2),
+})
+
+local boot_progress, boot_shown = 0.08, 0.08
+local function boot_status(text, progress)
+	loading_text.Text = text
+	boot_progress = progress or boot_progress
+end
+
 local spin_t = 0
 local spin_conn = v3.RenderStepped:Connect(function(dt)
 	spin_t = spin_t + dt
-	spinner.Rotation = spin_t * 400
+	spinner.Rotation = spin_t * 260
+	inner.Rotation = spin_t * -420
+	local pulse = 5 + 2 * (0.5 + 0.5 * math.sin(spin_t * 4))
+	core.Size = UDim2.new(0, pulse, 0, pulse)
+	boot_shown = boot_shown + (boot_progress - boot_shown) * math.min(1, dt * 6)
+	bar.Size = UDim2.new(boot_shown, 0, 1, 0)
 end)
-
-local loading_text = Instance.new("TextLabel", loading_sg)
-loading_text.Size = UDim2.new(0, 100, 0, 20)
-loading_text.Position = UDim2.new(0.5, -50, 0.5, 25)
-loading_text.BackgroundTransparency = 1
-loading_text.Text = "LOADING..."
-loading_text.TextColor3 = Color3.fromRGB(200, 200, 200)
-loading_text.Font = Enum.Font.GothamMedium
-loading_text.TextSize = 12
 
 local x9 = { c1 = 0.15, c2 = 0.05, c3 = 0.01, c4 = 0.2, c5 = 0.6, c6 = 0.8, c7 = 0.1, c8 = 0.25 }
 local ANTI_SLEEP = Vector3.new(0, 0.01, 0)
@@ -145,9 +231,14 @@ local function load_module(path)
 end
 
 local config = load_module("config.lua")
+boot_status("configuration", 0.22)
 local x1 = config.x1
 local x2 = config.x2
 x1.S = x2
+if is_mobile then
+	-- the on-screen dock is the only way to place the core without a keyboard
+	x1.ShowDock = true
+end
 
 local local_shapes = {}
 if isfolder and makefolder and listfiles and readfile then
@@ -304,54 +395,67 @@ local function load_settings()
 	end
 end
 load_settings()
+boot_status("settings", 0.34)
 
 if setfpscap then
 	pcall(function()
-		setfpscap(x1.FPSCap or 60)
+		local cap = tonumber(x1.FPSCap) or 240
+		-- the UI treats 360 and above as "uncapped", and so does the executor hook
+		setfpscap(cap >= 360 and 0 or cap)
 	end)
 end
 
 local loaded_shapes = {}
+local failed_shapes = {}
 local function get_shape(name)
-	if not loaded_shapes[name] then
-		local success, result = false, nil
+	local cached = loaded_shapes[name]
+	if cached then
+		return cached
+	end
+	-- Without this the physics loop would retry a broken download every single
+	-- frame, which is far worse than the shape simply not working.
+	if failed_shapes[name] then
+		return nil
+	end
+	local success, result = false, nil
 
-		if local_shapes and local_shapes[name] then
-			local read_success, code = pcall(readfile, local_shapes[name])
-			if read_success and code then
-				local func, err = loadstring(code)
-				if func then
-					success, result = pcall(func)
-				else
-					result = "Syntax error in local shape: " .. tostring(err)
-				end
+	if local_shapes and local_shapes[name] then
+		local read_success, code = pcall(readfile, local_shapes[name])
+		if read_success and code then
+			local func, err = loadstring(code)
+			if func then
+				success, result = pcall(func)
 			else
-				result = "Failed to read local shape file"
+				result = "Syntax error in local shape: " .. tostring(err)
 			end
-		end
-
-		if not success then
-			local url = BASE_URL .. "shapes/" .. HttpService:UrlEncode(name) .. ".lua"
-			local code = safe_http_get(url)
-			if code then
-				local func, err = loadstring(code)
-				if func then
-					success, result = pcall(func)
-				else
-					result = "Syntax error in shape source: " .. tostring(err)
-				end
-			else
-				result = "HTTP Request Failed"
-			end
-		end
-
-		if success and result then
-			loaded_shapes[name] = result
 		else
-			warn("Failed to load shape: " .. tostring(name) .. " Error: " .. tostring(result))
+			result = "Failed to read local shape file"
 		end
 	end
-	return loaded_shapes[name]
+
+	if not success then
+		local url = BASE_URL .. "shapes/" .. HttpService:UrlEncode(name) .. ".lua"
+		local code = safe_http_get(url)
+		if code then
+			local func, err = loadstring(code)
+			if func then
+				success, result = pcall(func)
+			else
+				result = "Syntax error in shape source: " .. tostring(err)
+			end
+		else
+			result = "HTTP Request Failed"
+		end
+	end
+
+	if success and type(result) == "table" then
+		loaded_shapes[name] = result
+		return result
+	end
+
+	failed_shapes[name] = true
+	warn("Failed to load shape: " .. tostring(name) .. " Error: " .. tostring(result))
+	return nil
 end
 
 local x6 = {
@@ -386,16 +490,32 @@ local x6 = {
 }
 
 get_shape(x1.k6)
+boot_status("formations", 0.5)
 
+-- Warm the cache in the background: favourites first, then everything else at a
+-- gentle pace. The old build fired one request per shape every 0.05s, which meant
+-- roughly sixty downloads racing each other while the UI was still starting up.
 coroutine.wrap(function()
-	for mn, _ in pairs(x2) do
+	local queue = {}
+	for mn in pairs(x2) do
 		if mn ~= x1.k6 then
-			pcall(function()
-				get_shape(mn)
-			end)
-			if task and task.wait then
-				task.wait(0.05)
-			end
+			queue[#queue + 1] = mn
+		end
+	end
+	table.sort(queue, function(a, b)
+		local fa, fb = favorites[a] and 1 or 0, favorites[b] and 1 or 0
+		if fa ~= fb then
+			return fa > fb
+		end
+		return a < b
+	end)
+	for i, mn in ipairs(queue) do
+		pcall(get_shape, mn)
+		if task and task.wait then
+			task.wait(favorites[mn] and 0.05 or 0.4)
+		end
+		if i % 8 == 0 and task and task.wait then
+			task.wait(1)
 		end
 	end
 end)()
@@ -473,11 +593,15 @@ end
 getgenv()._GRAVITY_DESTROY = destroy
 
 local success, err = pcall(function()
-	local UI_builder = load_module(SUB_DIR .. "UI.lua")
+	-- The interface is responsive and handles touch itself, so both builds share
+	-- it; only the physics system still has a device-specific variant.
+	boot_status("interface", 0.62)
+	local UI_builder = load_module("UI.lua")
 	if not UI_builder then error("Failed to load UI") end
 	local x5 = UI_builder(context)
 	context.x5 = x5
 
+	boot_status("physics", 0.85)
 	local system_builder = load_module(SUB_DIR .. "System.lua")
 	if not system_builder then error("Failed to load System") end
 	local sys = system_builder(context)
@@ -488,12 +612,40 @@ local success, err = pcall(function()
 	x4.f3()
 	x8.i()
 	x5.st()
+	boot_status("ready", 1)
 end)
 
-spin_conn:Disconnect()
-loading_sg:Destroy()
-spin_conn = nil
-loading_sg = nil
+local function dismiss_boot(fade)
+	if not fade then
+		if spin_conn then
+			spin_conn:Disconnect()
+			spin_conn = nil
+		end
+		if loading_sg then
+			loading_sg:Destroy()
+			loading_sg = nil
+		end
+		return
+	end
+	local info = TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+	pcall(function()
+		v6:Create(veil, info, { BackgroundTransparency = 1 }):Play()
+		for _, obj in ipairs(stage:GetDescendants()) do
+			if obj:IsA("TextLabel") then
+				v6:Create(obj, info, { TextTransparency = 1 }):Play()
+			elseif obj:IsA("UIStroke") then
+				v6:Create(obj, info, { Transparency = 1 }):Play()
+			elseif obj:IsA("Frame") then
+				v6:Create(obj, info, { BackgroundTransparency = 1 }):Play()
+			end
+		end
+	end)
+	task.delay(0.36, function()
+		dismiss_boot(false)
+	end)
+end
+
+dismiss_boot(success)
 
 if not success then
 	destroy()
