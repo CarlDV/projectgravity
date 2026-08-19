@@ -1,40 +1,47 @@
---!optimize 2
--- Project Gravity :: interface.
---
--- Everything the old build spread across five draggable windows (main, advanced,
--- mode list, target list, tutorial) now lives in one panel with five tabs. That
--- removes several hundred instances, all of the popup positioning maths, and the
--- per-toggle UI rebuilds: the panel is built once and state is pushed into the
--- widgets instead of the widgets being thrown away and made again.
---
--- Pages are built the first time you open them, lists reuse their rows, and all
--- animation runs on the single RenderStepped loop that lives in UI_elements.
-
 return function(context)
-	local v1, v2, v3, v4, v5, v6, v7, v8, v9 =
-		context.v1, context.v2, context.v3, context.v4, context.v5, context.v6, context.v7, context.v8, context.v9
+	local v1, v2, v3, v4, v5, v6, v7, v8, v9 = context.v1, context.v2, context.v3, context.v4, context.v5, context.v6, context.v7, context.v8, context.v9
 	local x1, x2, x6, x9 = context.x1, context.x2, context.x6, context.x9
 	local favorites, save_favs, save_settings = context.favorites, context.save_favs, context.save_settings
 	local get_shape = context.get_shape
 	local load_module = context.load_module
 	local reset_config = context.reset_config
-	local is_mobile = context.is_mobile and true or false
+	-- Shared motion vocabulary from main.lua; see the ANIM table there for why
+	-- each curve is what it is. Fallback keeps this module loadable standalone.
+	local A = context.ANIM or {
+		HOVER = TweenInfo.new(0.11, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		TINT = TweenInfo.new(0.13, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		OPEN = TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+		OPEN_POP = TweenInfo.new(0.42, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+		CLOSE = TweenInfo.new(0.19, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+		CLOSE_POP = TweenInfo.new(0.19, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+		ROLL = TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+		FOLD = TweenInfo.new(0.36, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+		UNFOLD = TweenInfo.new(0.42, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+		RESCALE = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+	}
 
 	local Lighting = game:GetService("Lighting")
-
-	----------------------------------------------------------------------
-	-- performance switches
-	----------------------------------------------------------------------
-
-	local PerfOriginals = { Shadows = nil, FX = {}, Materials = {}, Particles = {} }
-
+	
+	-- Weak keys, the same reason scaled_windows below uses them. These tables are
+	-- keyed by every BasePart, PostEffect and emitter in the map, so with strong keys
+	-- every one destroyed after the snapshot was pinned until the toggle went off --
+	-- in a map with any part churn that is an unbounded leak. The restore functions
+	-- already expect entries to go dead (they test part.Parent), so dropping them
+	-- early changes nothing they do.
+	local PerfOriginals = {
+		Shadows = nil,
+		FX = setmetatable({}, { __mode = "k" }),
+		Materials = setmetatable({}, { __mode = "k" }),
+		Particles = setmetatable({}, { __mode = "k" })
+	}
+	
 	local function RestorePerfShadows()
 		if PerfOriginals.Shadows ~= nil then
 			Lighting.GlobalShadows = PerfOriginals.Shadows
 			PerfOriginals.Shadows = nil
 		end
 	end
-
+	
 	local function ApplyPerfShadows(disable)
 		if disable then
 			if PerfOriginals.Shadows == nil then
@@ -45,23 +52,17 @@ return function(context)
 			RestorePerfShadows()
 		end
 	end
-
+	
 	local function RestorePerfPostFX()
-		for effect, was_enabled in pairs(PerfOriginals.FX) do
-			if effect.Parent then
-				effect.Enabled = was_enabled
-			end
+		for fx, was_enabled in pairs(PerfOriginals.FX) do
+			if fx.Parent then fx.Enabled = was_enabled end
 		end
 		table.clear(PerfOriginals.FX)
 	end
-
+	
 	local function ApplyPerfPostFX(disable)
-		if not disable then
-			RestorePerfPostFX()
-			return
-		end
-		local function sweep(root)
-			for _, effect in ipairs(root:GetDescendants()) do
+		if disable then
+			for _, effect in pairs(Lighting:GetDescendants()) do
 				if effect:IsA("PostEffect") then
 					if PerfOriginals.FX[effect] == nil then
 						PerfOriginals.FX[effect] = effect.Enabled
@@ -69,57 +70,55 @@ return function(context)
 					effect.Enabled = false
 				end
 			end
-		end
-		sweep(Lighting)
-		local camera = workspace.CurrentCamera
-		if camera then
-			sweep(camera)
+			local camera = workspace.CurrentCamera
+			if camera then
+				for _, effect in pairs(camera:GetDescendants()) do
+					if effect:IsA("PostEffect") then
+						if PerfOriginals.FX[effect] == nil then
+							PerfOriginals.FX[effect] = effect.Enabled
+						end
+						effect.Enabled = false
+					end
+				end
+			end
+		else
+			RestorePerfPostFX()
 		end
 	end
-
+	
 	local function RestorePerfMaterials()
 		for part, mat in pairs(PerfOriginals.Materials) do
-			if part.Parent then
-				part.Material = mat
-			end
+			if part.Parent then part.Material = mat end
 		end
 		table.clear(PerfOriginals.Materials)
 	end
-
+	
 	local function ApplyPerfMaterials(disable)
 		if disable then
-			local plastic = Enum.Material.SmoothPlastic
-			for _, part in ipairs(workspace:GetDescendants()) do
-				if part:IsA("BasePart") and PerfOriginals.Materials[part] == nil then
-					PerfOriginals.Materials[part] = part.Material
-					part.Material = plastic
+			for _, part in pairs(workspace:GetDescendants()) do
+				if part:IsA("BasePart") then
+					if not PerfOriginals.Materials[part] then
+						PerfOriginals.Materials[part] = part.Material
+					end
+					part.Material = Enum.Material.SmoothPlastic
 				end
 			end
 		else
 			RestorePerfMaterials()
 		end
 	end
-
+	
 	local function RestorePerfParticles()
 		for p, enabled in pairs(PerfOriginals.Particles) do
-			if p.Parent then
-				p.Enabled = enabled
-			end
+			if p.Parent then p.Enabled = enabled end
 		end
 		table.clear(PerfOriginals.Particles)
 	end
-
+	
 	local function ApplyPerfParticles(disable)
 		if disable then
-			for _, obj in ipairs(workspace:GetDescendants()) do
-				if
-					obj:IsA("ParticleEmitter")
-					or obj:IsA("Trail")
-					or obj:IsA("Beam")
-					or obj:IsA("Fire")
-					or obj:IsA("Smoke")
-					or obj:IsA("Sparkles")
-				then
+			for _, obj in pairs(workspace:GetDescendants()) do
+				if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Fire") or obj:IsA("Smoke") or obj:IsA("Sparkles") then
 					if PerfOriginals.Particles[obj] == nil then
 						PerfOriginals.Particles[obj] = obj.Enabled
 					end
@@ -137,92 +136,41 @@ return function(context)
 		RestorePerfMaterials()
 		RestorePerfParticles()
 	end
-
-	----------------------------------------------------------------------
-	-- design system
-	----------------------------------------------------------------------
-
-	local E = load_module("UI_elements.lua")
-	if type(E) ~= "function" then
-		error("Failed to load UI_elements")
+	-- UI_elements is a hard dependency, so fail with a message that says which
+	-- module rather than "attempt to call a nil value" out of load_module's
+	-- failure path, the way main.lua:553 does for UI and System.
+	local UI_elements_builder = load_module("UI_elements.lua")
+	if not UI_elements_builder then
+		error("Failed to load UI_elements", 0)
 	end
-	E = E(context)
-
-	local TH, fx = E.TH, E.fx
-	local new, corner, stroke, grad, pad, list, label =
-		E.new, E.corner, E.stroke, E.grad, E.pad, E.list, E.label
-	local CS, CSK, NS, NSK = E.CS, E.CSK, E.NS, E.NSK
-	local es, et, eb, eh = E.s, E.t, E.b, E.h
-
-	local U2 = UDim2.new
-	local UD = UDim.new
-	local V2 = Vector2.new
-	local mfloor, mclamp, mmax, mmin, mabs = math.floor, math.clamp, math.max, math.min, math.abs
-
-	-- Glyphs are restricted to the blocks this project already proved render in
-	-- Gotham (Latin-1 punctuation, Geometric Shapes, Dingbats).
-	local GLYPH = {
-		close = "\u{00D7}",
-		minus = "\u{2013}",
-		plus = "+",
-		up = "\u{25B2}",
-		down = "\u{25BC}",
-		pause = "\u{25AE}\u{25AE}",
-		power = "\u{25C9}",
-		chevron = "\u{203A}",
-		star_on = "\u{2605}",
-		star_off = "\u{2606}",
-		dot = "\u{00B7}",
-	}
-
-	local ai_chat_module
-	do
-		local ok, mod = pcall(function()
-			local f = load_module("ai_chat.lua")
-			return f and f(context) or nil
-		end)
-		ai_chat_module = ok and mod or nil
-	end
-
-	----------------------------------------------------------------------
-	-- module surface
-	----------------------------------------------------------------------
+	local UI_elements = UI_elements_builder(context)
+	-- The AI chat is optional: both call sites below already nil-guard it. Calling
+	-- load_module's result directly meant a nil threw here first, so one flaky
+	-- fetch for the chat took the whole panel down and those guards could never
+	-- fire.
+	local ai_chat_builder = load_module("ai_chat.lua")
+	local ai_chat_module = ai_chat_builder and ai_chat_builder(context)
+	local es, et, eb, eh = UI_elements.s, UI_elements.t, UI_elements.b, UI_elements.h
+	local etb = UI_elements.tb
+	local ekb = UI_elements.kb
 
 	local x5 = {}
 	x5.g = nil
-	x5.s, x5.t, x5.b, x5.h = es, et, eb, eh
-	x5.fx, x5.theme, x5.elements = fx, TH, E
-
-	local toast_push
-	function x5.toast(head, text, kind, dur)
-		if toast_push then
-			toast_push(head, text, kind, dur)
-			return true
-		end
-		return false
-	end
+	x5.s = es
+	x5.t = et
+	x5.b = eb
+	x5.h = eh
 
 	function x5.st()
-		if x5.g and x5.g.Parent then
-			if x5.up then
-				x5.up()
-			end
+		if x5.g and x5.g.Parent and x5.up then
+			x5.up()
 			return
 		end
 		if x5.g then
-			pcall(function()
-				x5.g:Destroy()
-			end)
+			x5.g:Destroy()
 		end
 		local sg = Instance.new("ScreenGui")
-		sg.Name = "G_" .. math.random(100, 999)
-		sg.DisplayOrder = 9999
-		sg.IgnoreGuiInset = true
-		sg.ResetOnSpawn = false
-		sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-		pcall(function()
-			sg.ClipToDeviceSafeArea = false
-		end)
+		sg.Name = "G_" .. math.random(999)
 		if gethui then
 			sg.Parent = gethui()
 		elseif syn and syn.protect_gui then
@@ -236,2332 +184,1802 @@ return function(context)
 		x5.mw(sg)
 	end
 
-	----------------------------------------------------------------------
-
 	function x5.mw(sg)
-		local handles = {}
-		local function ambient(f, essential)
-			local h = fx.every(f, essential)
-			handles[#handles + 1] = h
-			return h
-		end
+		-- Panel geometry. The minimize animation tweens between these, so they
+		-- cannot stay as literals duplicated between the constructor and the
+		-- handler -- that split is what let the two drift apart before.
+		-- CONTENT_GAP is the gap under the header: the content frame's old
+		-- 60/-70 pair was really HEADER_H + gap, written out by hand.
+		local PANEL_W = 320
+		local PANEL_H = 500
+		local HEADER_H = 50
+		local PILL_SIZE = 44
+		local CONTENT_GAP = 10
 
-		------------------------------------------------------------------
-		-- metrics
-		------------------------------------------------------------------
+		-- Roblox honours one UIScale per GuiObject, so the open/close pop and the
+		-- user's UI Scale setting have to share it. Every scalable window is
+		-- registered here and its scale is always (pop factor * app scale):
+		-- toggle_window used to tween the single UIScale straight to 1, which is
+		-- what silently threw away the Advanced window's saved scale the first
+		-- time it was opened.
+		-- Weak keys, because registration outlives the window. The reset-confirm
+		-- dialog is registered on open and Destroy()ed on dismiss, and
+		-- TargetListContainer is torn down and rebuilt on every refresh -- each
+		-- one used to leave a strong reference to a dead Instance behind here.
+		-- Nothing swept them: the only prune is the win.Parent check inside
+		-- apply_ui_scale, which runs only when the scale setting changes, so the
+		-- table grew for the whole session and pinned every corpse it held. A
+		-- window that is still parented is kept alive by its parent, so weak keys
+		-- drop exactly the dead ones and nothing else.
+		local scaled_windows = setmetatable({}, { __mode = "k" })
 
-		local BASE_W = is_mobile and 328 or 404
-		local BASE_H = is_mobile and 452 or 566
-		local TITLE_H = is_mobile and 46 or 50
-		local TABS_H = is_mobile and 32 or 34
-		local FOOT_H = is_mobile and 24 or 26
-		local MIN_PX = is_mobile and 52 or 58
-		local ICON_PX = mfloor(26 * TH.touch_mult)
-
-		local ui_scale, panel_h = 1, BASE_H
-
-		local function viewport()
-			local s = sg.AbsoluteSize
-			if s.X < 8 or s.Y < 8 then
-				local cam = v4.CurrentCamera
-				return cam and cam.ViewportSize or V2(1280, 720)
+		local function app_scale()
+			local v = tonumber(x1.UIScale) or 1
+			if v ~= v or v <= 0 then
+				return 1
 			end
-			return s
+			return v
 		end
 
-		local function compute_scale()
-			local vp = viewport()
-			local s
-			if is_mobile then
-				s = mclamp(mmin(vp.X / 700, vp.Y / 420), 0.62, 1.05)
+		-- pop is where the window sits in its own open/close animation: 1 when
+		-- open, 0.8 while hidden. Kept per window so a rescale mid-animation
+		-- cannot snap a closed window to full size. Nested windows (the mode
+		-- selector and target list live under Main) must not carry the app scale
+		-- on their own UIScale as well: their parent's UIScale already applies
+		-- it, and applying it twice compounds to scale-squared.
+		local function register_window(win, pop, nested)
+			local scale = win:FindFirstChild("UIScale")
+			if not scale then
+				scale = Instance.new("UIScale", win)
+			end
+			pop = pop or 1
+			scale.Scale = pop * ((nested and 1) or app_scale())
+			scaled_windows[win] = { scale = scale, pop = pop, nested = nested or false }
+			return scale
+		end
+
+		local function set_pop(win, pop, tween_info, nested)
+			local entry = scaled_windows[win]
+			if not entry then
+				register_window(win, pop, nested)
+				entry = scaled_windows[win]
+			end
+			entry.pop = pop
+			local target = pop * ((entry.nested and 1) or app_scale())
+			if tween_info then
+				v6:Create(entry.scale, tween_info, { Scale = target }):Play()
 			else
-				s = mclamp(mmin(vp.X / 1560, vp.Y / 880), 0.8, 1.3)
-			end
-			return s * mclamp(tonumber(x1.UIScale) or 1, 0.6, 1.6)
-		end
-
-		------------------------------------------------------------------
-		-- shared state helpers (declared before anything closes over them)
-		------------------------------------------------------------------
-
-		local sync = {}
-		local function on_sync(f)
-			sync[#sync + 1] = f
-		end
-
-		local function target_summary()
-			local n = x1.Targets and #x1.Targets or 0
-			if x1.PI_All then
-				return "EVERYONE"
-			elseif x1.AnchorSelf then
-				return "SELF"
-			elseif n == 1 then
-				local t = x1.Targets[1]
-				return string.upper(t and (t.DisplayName or t.Name) or "NO TARGET")
-			elseif n > 1 then
-				return n .. " TARGETS"
-			end
-			return "NO TARGET"
-		end
-
-		local function apply_disabled(off)
-			if x6.b then
-				x6.b.Transparency = off and 1 or x9.c7
-				local visual = x6.b:FindFirstChild("Visual")
-				if visual then
-					visual.Enabled = not off
-				end
-			end
-			for _, d in pairs(x6.a) do
-				if d.lv then
-					d.lv.MaxForce = off and 0 or x1.k4
-				end
-				if d.av then
-					d.av.MaxTorque = off and 0 or math.huge
-				end
+				entry.scale.Scale = target
 			end
 		end
 
-		local function update_core_color()
-			if x6.b then
-				x6.b.Color = x1.k3
-				local visual = x6.b:FindFirstChild("Visual")
-				if visual then
-					local img = visual:FindFirstChildOfClass("ImageLabel")
-					if img then
-						img.ImageColor3 = x1.k3
-					end
-				end
-			end
-			save_settings()
-		end
-
-		local function update_core_size(v)
-			x1.k2 = Vector3.new(v, v, v)
-			if x6.b then
-				x6.b.Size = x1.k2
-				-- restart the idle pulse so the new size takes effect immediately;
-				-- TweenService drops the previous tween on the same property
-				v6:Create(
-					x6.b,
-					TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-					{ Size = x1.k2 * 1.2 }
-				):Play()
-			end
-			save_settings()
-		end
-
-		------------------------------------------------------------------
-		-- panel chrome
-		------------------------------------------------------------------
-
-		-- The panel itself is an invisible container and its visible body is a
-		-- child. That split is kept from the shadowed design because the close
-		-- animation and the minimise morph both drive `surface` on its own.
-		local panel = new("Frame", {
-			Name = "Panel",
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			Size = U2(0, BASE_W, 0, BASE_H),
-			Active = true,
-			ClipsDescendants = false,
-			ZIndex = 4,
-		}, sg)
-		local panel_scale = new("UIScale", { Scale = 0.9 }, panel)
-
-		local surface = new("Frame", {
-			BackgroundColor3 = TH.bg1,
-			BorderSizePixel = 0,
-			Size = U2(1, 0, 1, 0),
-			ZIndex = -1,
-			Active = false,
-		}, panel)
-		local panel_corner = corner(surface, TH.radius_panel)
-
-		-- System.lua gates its L-key handler on x6.disable_btn existing and writes
-		-- a BackgroundColor3 into it. Hand it an invisible surface so that write is
-		-- harmless; the real button is kept in step by the sync pass below.
-		x6.disable_btn = new("Frame", {
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			Visible = false,
-			Size = U2(0, 0, 0, 0),
-		}, panel)
-
-		local panel_stroke = stroke(surface, TH.line, 1.4, 0.05)
-		local edge_grad = grad(
-			panel_stroke,
-			CS({
-				CSK(0, TH.line),
-				CSK(0.30, TH.line),
-				CSK(0.46, TH.acc),
-				CSK(0.54, TH.acc2),
-				CSK(0.70, TH.line),
-				CSK(1, TH.line),
-			}),
-			0
-		)
-
-		local aurora_clip = new("Frame", {
-			BackgroundTransparency = 1,
-			Size = U2(1, 0, 1, 0),
-			ClipsDescendants = true,
-			ZIndex = 0,
-			Active = false,
-		}, panel)
-		local aurora_corner = corner(aurora_clip, TH.radius_panel)
-
-		local aurora_a = new("Frame", {
-			BackgroundColor3 = TH.acc,
-			BackgroundTransparency = 0.82,
-			BorderSizePixel = 0,
-			AnchorPoint = V2(0.5, 0.5),
-			Position = U2(0.25, 0, 0.1, 0),
-			Size = U2(1.6, 0, 1.1, 0),
-			Active = false,
-		}, aurora_clip)
-		grad(aurora_a, CS({ CSK(0, TH.acc), CSK(1, TH.acc3) }), 25, NS({ NSK(0, 0.55), NSK(0.6, 1), NSK(1, 1) }))
-
-		local aurora_b = new("Frame", {
-			BackgroundColor3 = TH.acc2,
-			BackgroundTransparency = 0.86,
-			BorderSizePixel = 0,
-			AnchorPoint = V2(0.5, 0.5),
-			Position = U2(0.8, 0, 0.92, 0),
-			Size = U2(1.4, 0, 1, 0),
-			Active = false,
-		}, aurora_clip)
-		grad(aurora_b, CS({ CSK(0, TH.acc2), CSK(1, TH.acc) }), -35, NS({ NSK(0, 0.6), NSK(0.7, 1), NSK(1, 1) }))
-
-		------------------------------------------------------------------
-		-- title bar
-		------------------------------------------------------------------
-
-		local titlebar = new("Frame", {
-			BackgroundTransparency = 1,
-			Size = U2(1, 0, 0, TITLE_H),
-			Active = true,
-			ZIndex = 3,
-		}, panel)
-		pad(titlebar, 0, 0, 14, 12)
-
-		local orb = new("Frame", {
-			BackgroundTransparency = 1,
-			AnchorPoint = V2(0, 0.5),
-			Position = U2(0, 0, 0.5, 0),
-			Size = U2(0, 24, 0, 24),
-			ZIndex = 3,
-		}, titlebar)
-		local orb_scale = new("UIScale", {}, orb)
-		local ring_a = new("Frame", { BackgroundTransparency = 1, Size = U2(1, 0, 1, 0), ZIndex = 3 }, orb)
-		corner(ring_a, UD(1, 0))
-		local ring_a_stroke = stroke(ring_a, TH.acc, 1.6, 0.1)
-		grad(ring_a_stroke, CS({ CSK(0, TH.acc), CSK(0.5, TH.acc2), CSK(1, TH.acc3) }), 0, NS({ NSK(0, 0), NSK(0.55, 0.1), NSK(1, 1) }))
-		local ring_b = new("Frame", {
-			BackgroundTransparency = 1,
-			AnchorPoint = V2(0.5, 0.5),
-			Position = U2(0.5, 0, 0.5, 0),
-			Size = U2(0.62, 0, 0.62, 0),
-			ZIndex = 3,
-		}, orb)
-		corner(ring_b, UD(1, 0))
-		local ring_b_stroke = stroke(ring_b, TH.acc3, 1.4, 0.25)
-		grad(ring_b_stroke, CS({ CSK(0, TH.acc3), CSK(1, TH.acc2) }), 0, NS({ NSK(0, 1), NSK(0.45, 0.05), NSK(1, 1) }))
-		local core_dot = new("Frame", {
-			BackgroundColor3 = TH.white,
-			BorderSizePixel = 0,
-			AnchorPoint = V2(0.5, 0.5),
-			Position = U2(0.5, 0, 0.5, 0),
-			Size = U2(0, 6, 0, 6),
-			ZIndex = 4,
-		}, orb)
-		corner(core_dot, UD(1, 0))
-
-		local title = label(titlebar, "PROJECT GRAVITY", is_mobile and 13 or 15, TH.font.black, TH.white, {
-			Position = U2(0, 34, 0, is_mobile and 5 or 7),
-			Size = U2(1, -170, 0, 18),
-			ZIndex = 3,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-		})
-		local title_grad = grad(
-			title,
-			CS({ CSK(0, TH.white), CSK(0.45, TH.white), CSK(0.5, TH.acc2), CSK(0.55, TH.white), CSK(1, TH.white) }),
-			0
-		)
-
-		local subtitle = label(titlebar, "", 10, TH.font.med, TH.tx3, {
-			Position = U2(0, 34, 0, is_mobile and 23 or 26),
-			Size = U2(1, -170, 0, 14),
-			ZIndex = 3,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-		})
-
-		local btn_row = new("Frame", {
-			BackgroundTransparency = 1,
-			AnchorPoint = V2(1, 0.5),
-			Position = U2(1, 0, 0.5, 0),
-			Size = U2(0, ICON_PX * 4 + 20, 0, ICON_PX + 4),
-			ZIndex = 4,
-		}, titlebar)
-		local btn_layout = list(btn_row, 5, Enum.FillDirection.Horizontal)
-		btn_layout.HorizontalAlignment = Enum.HorizontalAlignment.Right
-		btn_layout.VerticalAlignment = Enum.VerticalAlignment.Center
-
-		------------------------------------------------------------------
-		-- tab strip
-		------------------------------------------------------------------
-
-		local TABS = { "CORE", "SHAPES", "TARGET", "TUNING", "SYSTEM" }
-		local TAB_N = #TABS
-
-		local tabstrip = new("Frame", {
-			BackgroundTransparency = 1,
-			Position = U2(0, 12, 0, TITLE_H - 4),
-			Size = U2(1, -24, 0, TABS_H - 6),
-			ZIndex = 3,
-		}, panel)
-
-		local tab_bed = new("Frame", {
-			BackgroundColor3 = TH.bg0,
-			BackgroundTransparency = 0.3,
-			BorderSizePixel = 0,
-			Size = U2(1, 0, 1, 0),
-			ZIndex = 3,
-		}, tabstrip)
-		corner(tab_bed, UD(1, 0))
-		stroke(tab_bed, TH.line, 1, 0.55)
-
-		local tab_pill = new("Frame", {
-			BackgroundColor3 = TH.acc,
-			BorderSizePixel = 0,
-			Position = U2(0, 3, 0, 3),
-			Size = U2(1 / TAB_N, -6, 1, -6),
-			ZIndex = 3,
-		}, tab_bed)
-		corner(tab_pill, UD(1, 0))
-		grad(tab_pill, TH.accent_seq(), 8)
-		local pill_stroke = stroke(tab_pill, TH.acc2, 1, 0.35)
-
-		local tab_labels = {}
-
-		------------------------------------------------------------------
-		-- body + footer
-		------------------------------------------------------------------
-
-		local body = new("Frame", {
-			BackgroundTransparency = 1,
-			Position = U2(0, 0, 0, TITLE_H + TABS_H),
-			Size = U2(1, 0, 1, -(TITLE_H + TABS_H + FOOT_H)),
-			ClipsDescendants = true,
-			ZIndex = 3,
-		}, panel)
-
-		local footer = new("Frame", {
-			BackgroundTransparency = 1,
-			AnchorPoint = V2(0, 1),
-			Position = U2(0, 0, 1, 0),
-			Size = U2(1, 0, 0, FOOT_H),
-			ZIndex = 3,
-		}, panel)
-		pad(footer, 0, 4, 14, 14)
-
-		local foot_rule = new("Frame", {
-			BackgroundColor3 = TH.line,
-			BackgroundTransparency = 0.4,
-			BorderSizePixel = 0,
-			Size = U2(1, 0, 0, 1),
-			ZIndex = 3,
-		}, footer)
-		grad(
-			foot_rule,
-			CS({ CSK(0, TH.line), CSK(0.5, TH.acc), CSK(1, TH.line) }),
-			0,
-			NS({ NSK(0, 1), NSK(0.5, 0.4), NSK(1, 1) })
-		)
-
-		local foot_left = label(footer, "", 9, TH.font.med, TH.tx3, {
-			Position = U2(0, 0, 0, 3),
-			Size = U2(0.62, 0, 1, -3),
-			ZIndex = 3,
-		})
-		local foot_right = label(footer, "", 9, TH.font.bold, TH.tx3, {
-			Position = U2(0.62, 0, 0, 3),
-			Size = U2(0.38, 0, 1, -3),
-			TextXAlignment = Enum.TextXAlignment.Right,
-			ZIndex = 3,
-		})
-
-		------------------------------------------------------------------
-		-- pages
-		------------------------------------------------------------------
-
-		local pages, page_built = {}, {}
-		local active_tab = 0
-
-		local function make_page(i)
-			local sf = new("ScrollingFrame", {
-				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-				Size = U2(1, 0, 1, 0),
-				CanvasSize = U2(0, 0, 0, 0),
-				AutomaticCanvasSize = Enum.AutomaticSize.Y,
-				ScrollBarThickness = 3,
-				ScrollBarImageColor3 = TH.acc,
-				ScrollBarImageTransparency = 0.45,
-				ScrollingDirection = Enum.ScrollingDirection.Y,
-				ElasticBehavior = Enum.ElasticBehavior.WhenScrollable,
-				Visible = false,
-				ZIndex = 3,
-			}, body)
-			pad(sf, 10, 18, 14, 14)
-			list(sf, 5)
-			pages[i] = sf
-			return sf
-		end
-
-		local FADE_PROPS = {
-			TextLabel = "TextTransparency",
-			TextButton = "TextTransparency",
-			TextBox = "TextTransparency",
-			ImageLabel = "ImageTransparency",
-			UIStroke = "Transparency",
-		}
-
-		-- one-off reveal: rows fade up in sequence the first time a tab opens.
-		-- Budgeted, because a long list would otherwise start a spring per label.
-		local function materialize(container, base)
-			if fx.level() < 2 then
-				return
-			end
-			local slot, budget = 0, 140
-			for _, kid in ipairs(container:GetChildren()) do
-				if kid:IsA("GuiObject") then
-					local delay = base + slot * 0.028
-					slot = slot + 1
-					if slot > 14 or budget <= 0 then
-						break
-					end
-					local targets = kid:GetDescendants()
-					targets[#targets + 1] = kid
-					for _, obj in ipairs(targets) do
-						local prop = FADE_PROPS[obj.ClassName]
-						if prop == nil and obj:IsA("Frame") then
-							prop = "BackgroundTransparency"
-						end
-						if prop then
-							local original = obj[prop]
-							if original < 1 then
-								obj[prop] = 1
-								fx.spring(obj, prop, original, { k = 260, d = 30, delay = delay })
-								budget = budget - 1
-								if budget <= 0 then
-									break
-								end
-							end
-						end
-					end
-				end
-			end
-		end
-
-		local build_page
-
-		local function select_tab(i, instant)
-			if i == active_tab then
-				return
-			end
-			local previous = active_tab
-			active_tab = i
-
-			fx.to(tab_pill, "Position", U2((i - 1) / TAB_N, 3, 0, 3), "pop")
-			fx.punch(pill_stroke, "Thickness", 2.4, 1, "bounce")
-			for j = 1, TAB_N do
-				fx.to(tab_labels[j], "TextColor3", j == i and TH.white or TH.tx3, "snap")
-			end
-
-			if previous > 0 and pages[previous] then
-				local old = pages[previous]
-				fx.to(old, "Position", U2(0, previous < i and -24 or 24, 0, 0), "flow")
-				task.delay(0.13, function()
-					if active_tab ~= previous and old.Parent then
-						old.Visible = false
-					end
-				end)
-			end
-
-			local page = pages[i] or make_page(i)
-			local fresh = not page_built[i]
-			if fresh then
-				page_built[i] = true
-				build_page(i, page)
-			end
-			page.Visible = true
-			if instant or previous == 0 then
-				fx.set(page, "Position", U2(0, 0, 0, 0))
-			else
-				fx.set(page, "Position", U2(0, previous < i and 28 or -28, 0, 0))
-				fx.to(page, "Position", U2(0, 0, 0, 0), "pop")
-			end
-			if fresh then
-				materialize(page, instant and 0.2 or 0.04)
-			end
-		end
-
-		for i = 1, TAB_N do
-			local b = new("TextButton", {
-				BackgroundTransparency = 1,
-				Text = "",
-				AutoButtonColor = false,
-				Position = U2((i - 1) / TAB_N, 0, 0, 0),
-				Size = U2(1 / TAB_N, 0, 1, 0),
-				ZIndex = 4,
-			}, tab_bed)
-			tab_labels[i] = label(b, TABS[i], is_mobile and 10 or 11, TH.font.bold, TH.tx3, {
-				TextXAlignment = Enum.TextXAlignment.Center,
-				ZIndex = 4,
-			})
-			b.MouseButton1Click:Connect(function()
-				select_tab(i)
-			end)
-			if not is_mobile then
-				b.MouseEnter:Connect(function()
-					if active_tab ~= i then
-						fx.to(tab_labels[i], "TextColor3", TH.tx1, "snap")
-					end
-				end)
-				b.MouseLeave:Connect(function()
-					if active_tab ~= i then
-						fx.to(tab_labels[i], "TextColor3", TH.tx3, "flow")
-					end
-				end)
-			end
-		end
-
-		------------------------------------------------------------------
-		-- toasts
-		------------------------------------------------------------------
-
-		local toast_host = new("Frame", {
-			Name = "Toasts",
-			BackgroundTransparency = 1,
-			AnchorPoint = V2(1, 1),
-			Position = U2(1, -16, 1, -16),
-			Size = U2(0, is_mobile and 214 or 262, 0, 320),
-			ZIndex = 20,
-		}, sg)
-		local toast_layout = list(toast_host, 8)
-		toast_layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
-		toast_layout.HorizontalAlignment = Enum.HorizontalAlignment.Right
-
-		local TOAST_TINT = { info = TH.acc2, ok = TH.ok, warn = TH.warn, bad = TH.bad }
-		local toast_live = 0
-
-		toast_push = function(head, text, kind, dur)
-			if toast_live > 4 then
-				return
-			end
-			toast_live = toast_live + 1
-			local tint = TOAST_TINT[kind or "info"] or TH.acc2
-
-			-- The list layout owns the position of its children, so the card that
-			-- actually slides is one level in.
-			local item = new("Frame", {
-				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-				Size = U2(1, 0, 0, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				ZIndex = 20,
-			}, toast_host)
-
-			local card = new("Frame", {
-				BackgroundColor3 = TH.bg2,
-				BorderSizePixel = 0,
-				Size = U2(1, 0, 0, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				ZIndex = 20,
-			}, item)
-			corner(card, 10)
-			stroke(card, TH.line, 1, 0.1)
-			pad(card, 9, 9, 14, 12)
-			local card_scale = new("UIScale", { Scale = 0.85 }, card)
-
-			-- scale-height sidebar: AutomaticSize ignores it, so no feedback loop
-			local rail = new("Frame", {
-				BackgroundColor3 = tint,
-				BorderSizePixel = 0,
-				Position = U2(0, -9, 0, 2),
-				Size = U2(0, 3, 1, -4),
-				ZIndex = 21,
-			}, card)
-			corner(rail, UD(1, 0))
-
-			label(card, string.upper(head or "SYSTEM"), 10, TH.font.bold, tint, {
-				Size = U2(1, 0, 0, 13),
-				ZIndex = 21,
-			})
-			label(card, text or "", 11, TH.font.med, TH.tx2, {
-				Position = U2(0, 0, 0, 15),
-				Size = U2(1, 0, 0, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				TextWrapped = true,
-				TextYAlignment = Enum.TextYAlignment.Top,
-				LineHeight = 1.12,
-				ZIndex = 21,
-			})
-
-			fx.set(card, "Position", U2(0, 46, 0, 0))
-			fx.to(card, "Position", U2(0, 0, 0, 0), "bounce")
-			fx.to(card_scale, "Scale", 1, "bounce")
-			fx.spring(rail, "BackgroundTransparency", 0.85, { k = 1.2, d = 2.4 })
-
-			task.delay(dur or 3.2, function()
-				if not item.Parent then
-					return
-				end
-				fx.to(card, "Position", U2(0, 64, 0, 0), "flow")
-				fx.spring(card_scale, "Scale", 0.8, {
-					k = 300,
-					d = 30,
-					done = function()
-						toast_live = mmax(0, toast_live - 1)
-						item:Destroy()
-					end,
-				})
-			end)
-		end
-
-		------------------------------------------------------------------
-		-- heads-up display
-		------------------------------------------------------------------
-
-		local hud = new("Frame", {
-			Name = "StatusHUD",
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			AnchorPoint = V2(0.5, 0),
-			Position = U2(0.5, 0, 0, 14),
-			Size = U2(0, is_mobile and 244 or 300, 0, is_mobile and 30 or 34),
-			Visible = x1.ShowHUD ~= false,
-			ZIndex = 6,
-		}, sg)
-		local hud_scale = new("UIScale", {}, hud)
-		local hud_surface = new("Frame", {
-			BackgroundColor3 = TH.bg1,
-			BackgroundTransparency = 0.12,
-			BorderSizePixel = 0,
-			Size = U2(1, 0, 1, 0),
-			ZIndex = -1,
-			Active = false,
-		}, hud)
-		corner(hud_surface, UD(1, 0))
-		stroke(hud_surface, TH.line, 1, 0.1)
-
-		local hud_dot = new("Frame", {
-			BackgroundColor3 = TH.ok,
-			BorderSizePixel = 0,
-			AnchorPoint = V2(0, 0.5),
-			Position = U2(0, 13, 0.5, 0),
-			Size = U2(0, 8, 0, 8),
-			ZIndex = 7,
-		}, hud)
-		corner(hud_dot, UD(1, 0))
-		local hud_halo_stroke = stroke(hud_dot, TH.ok, 1.5, 0.45)
-
-		local hud_state = label(hud, "ACTIVE", 11, TH.font.black, TH.ok, {
-			Position = U2(0, 28, 0, 0),
-			Size = U2(0, 60, 1, 0),
-			ZIndex = 7,
-		})
-		local hud_target = label(hud, "NO TARGET", 11, TH.font.bold, TH.tx2, {
-			Position = U2(0, 90, 0, 0),
-			Size = U2(1, -166, 1, 0),
-			TextTruncate = Enum.TextTruncate.AtEnd,
-			ZIndex = 7,
-		})
-		local hud_parts = label(hud, "0 PARTS", 10, TH.font.bold, TH.acc2, {
-			AnchorPoint = V2(1, 0),
-			Position = U2(1, -14, 0, 0),
-			Size = U2(0, 68, 1, 0),
-			TextXAlignment = Enum.TextXAlignment.Right,
-			ZIndex = 7,
-		})
-
-		------------------------------------------------------------------
-		-- floating action dock
-		------------------------------------------------------------------
-
-		local dock, dock_scale = nil, nil
-		local dock_hold, dock_pause_api, dock_power_api = 0, nil, nil
-
-		local function build_dock()
-			-- Bare glyphs told nobody anything, least of all on a phone where
-			-- there is no hover tooltip to fall back on. Every control now carries
-			-- its own caption and the hold-to-repeat ones say so.
-			local slots = 6
-			local DOCK_W = is_mobile and 116 or 106
-			local BTN_H = is_mobile and 38 or 36
-			local PAD = 8
-			local GRIP_H = 14
-			local gap = 5
-			local height = PAD * 2 + GRIP_H + slots * BTN_H + (slots - 1) * gap
-
-			-- Positioned in offsets, not scale, because the drag handler works in
-			-- offsets: mixing the two makes the dock jump on the first touch.
-			local vpd = viewport()
-			dock = new("Frame", {
-				Name = "Dock",
-				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-				Position = U2(0, 16, 0, mmax(8, mfloor(vpd.Y * 0.5 - height * ui_scale * 0.5))),
-				Size = U2(0, DOCK_W, 0, height),
-				Active = true,
-				ZIndex = 8,
-			}, sg)
-			dock_scale = new("UIScale", { Scale = 0.85 }, dock)
-			fx.to(dock_scale, "Scale", ui_scale, "bounce")
-
-			local dock_surface = new("Frame", {
-				BackgroundColor3 = TH.bg1,
-				BackgroundTransparency = 0.08,
-				BorderSizePixel = 0,
-				Size = U2(1, 0, 1, 0),
-				ZIndex = -1,
-				Active = false,
-			}, dock)
-			corner(dock_surface, 16)
-			stroke(dock_surface, TH.line, 1, 0.1)
-
-			-- the only part of the dock that is not a button, so it doubles as the
-			-- drag handle and looks like one
-			local grip = new("Frame", {
-				BackgroundColor3 = TH.line2,
-				BackgroundTransparency = 0.35,
-				BorderSizePixel = 0,
-				AnchorPoint = V2(0.5, 0),
-				Position = U2(0.5, 0, 0, PAD),
-				Size = U2(0, 28, 0, 4),
-				ZIndex = 9,
-				Active = false,
-			}, dock)
-			corner(grip, UD(1, 0))
-
-			-- the buttons live one level in so the padding and list layout stay
-			-- off the draggable dock frame itself
-			local rack = new("Frame", {
-				BackgroundTransparency = 1,
-				Position = U2(0, PAD, 0, PAD + GRIP_H),
-				Size = U2(1, -PAD * 2, 1, -(PAD * 2 + GRIP_H)),
-				ZIndex = 9,
-			}, dock)
-			list(rack, gap)
-
-			local function place()
-				local cam = v4.CurrentCamera
-				if not cam or not context.x4 then
-					return
-				end
-				local vp = cam.ViewportSize
-				local ray = cam:ViewportPointToRay(vp.X / 2, vp.Y / 2)
-				local rp = RaycastParams.new()
-				rp.FilterType = Enum.RaycastFilterType.Exclude
-				rp.FilterDescendantsInstances = { v8.Character }
-				local res = workspace:Raycast(ray.Origin, ray.Direction * 2000, rp)
-				context.x4.f4(res and res.Position or (ray.Origin + ray.Direction * 30))
-			end
-
-			local defs = {
-				{ glyph = GLYPH.plus, caption = "PLACE", color = TH.acc2, action = place },
-				{
-					glyph = GLYPH.close,
-					caption = "CLEAR",
-					color = TH.bad,
-					action = function()
-						if not context.x4 then
-							return
-						end
-						if context.x4.clean_physics then
-							context.x4.clean_physics()
-						elseif context.x4.f5 then
-							context.x4.f5()
-						end
-					end,
-				},
-				{ glyph = GLYPH.up, caption = "RAISE", color = TH.tx1, hold = 1 },
-				{ glyph = GLYPH.down, caption = "LOWER", color = TH.tx1, hold = -1 },
-				{ glyph = GLYPH.pause, caption = "PAUSE", color = TH.warn, pause = true, action = function()
-					x1.Paused = not x1.Paused
-				end },
-				{ glyph = GLYPH.power, caption = "ONLINE", color = TH.ok, power = true, action = function()
-					x1.Disabled = not x1.Disabled
-					apply_disabled(x1.Disabled)
-					save_settings()
-				end },
-			}
-
-			local function dock_button(def)
-				local wrap = new("Frame", {
-					BackgroundTransparency = 1,
-					Size = U2(1, 0, 0, BTN_H),
-					ZIndex = 10,
-				}, rack)
-				local b = new("TextButton", {
-					BackgroundColor3 = TH.bg2,
-					BorderSizePixel = 0,
-					AutoButtonColor = false,
-					Size = U2(1, 0, 1, 0),
-					Text = "",
-					ClipsDescendants = true,
-					ZIndex = 10,
-				}, wrap)
-				corner(b, 10)
-				local bs = stroke(b, TH.line, 1, 0.2)
-				local sc = new("UIScale", {}, b)
-
-				local gl = label(b, def.glyph, mfloor(BTN_H * 0.38), TH.font.bold, def.color, {
-					Position = U2(0, 2, 0, 0),
-					Size = U2(0, 24, 1, 0),
-					TextXAlignment = Enum.TextXAlignment.Center,
-					ZIndex = 11,
-				})
-				local cap = label(b, def.caption, is_mobile and 10 or 9, TH.font.black, TH.tx2, {
-					Position = U2(0, 28, 0, 0),
-					Size = U2(1, -32, 1, 0),
-					ZIndex = 11,
-					TextTruncate = Enum.TextTruncate.AtEnd,
-				})
-				if def.hold then
-					cap.Size = U2(1, -66, 1, 0)
-					label(b, "HOLD", 8, TH.font.med, TH.tx3, {
-						AnchorPoint = V2(1, 0.5),
-						Position = U2(1, -8, 0.5, 0),
-						Size = U2(0, 30, 0, 12),
-						TextXAlignment = Enum.TextXAlignment.Right,
-						ZIndex = 11,
-					})
-				end
-
-				local hovered = false
-				E.interactive(b, {
-					scale = sc,
-					lift = 1.05,
-					press = 0.94,
-					ripple_color = def.color,
-					paint = function(hover)
-						hovered = hover
-						fx.to(b, "BackgroundColor3", hover and TH.bg4 or TH.bg2, "snap")
-						fx.to(bs, "Color", hover and def.color or TH.line, "snap")
-						fx.to(cap, "TextColor3", hover and TH.white or TH.tx2, "snap")
-					end,
-				})
-				if def.action then
-					b.MouseButton1Click:Connect(function()
-						def.action()
-					end)
-				end
-				return {
-					frame = wrap,
-					button = b,
-					glyph = gl,
-					caption = cap,
-					stroke = bs,
-					scale = sc,
-					-- the sync pass must not fight the hover tint for the stroke
-					is_hovered = function()
-						return hovered
-					end,
-				}
-			end
-
-			for _, def in ipairs(defs) do
-				local api = dock_button(def)
-				if def.pause then
-					dock_pause_api = api
-				elseif def.power then
-					dock_power_api = api
-				end
-				if def.hold then
-					local b = api.button
-					b.InputBegan:Connect(function(io)
-						if E.is_press(io) then
-							dock_hold = def.hold
-						end
-					end)
-					b.InputEnded:Connect(function(io)
-						if E.is_press(io) then
-							dock_hold = 0
-						end
-					end)
-					b.MouseLeave:Connect(function()
-						dock_hold = 0
-					end)
-				end
-			end
-
-			local dragging, grab = false, V2(0, 0)
-			dock.InputBegan:Connect(function(io)
-				if E.is_press(io) then
-					dragging = true
-					grab = V2(io.Position.X, io.Position.Y) - dock.AbsolutePosition
-				end
-			end)
-			dock.InputEnded:Connect(function(io)
-				if E.is_press(io) then
-					dragging = false
-				end
-			end)
-			table.insert(
-				x6.c,
-				v1.InputChanged:Connect(function(io)
-					if dragging and E.is_move(io) then
-						local vp = viewport()
-						local size = dock.AbsoluteSize
-						-- direct, like the panel: a spring here just lags the finger
-						fx.set(dock, "Position", U2(
-							0,
-							mclamp(io.Position.X - grab.X, 4, mmax(4, vp.X - size.X - 4)),
-							0,
-							mclamp(io.Position.Y - grab.Y, 4, mmax(4, vp.Y - size.Y - 4))
-						))
-					end
-				end)
-			)
-
-			on_sync(function()
-				if dock_pause_api then
-					local paused = x1.Paused and true or false
-					dock_pause_api.caption.Text = paused and "RESUME" or "PAUSE"
-					fx.to(dock_pause_api.glyph, "TextColor3", paused and TH.white or TH.warn, "snap")
-					if not dock_pause_api.is_hovered() then
-						fx.to(dock_pause_api.stroke, "Color", paused and TH.warn or TH.line, "snap")
-					end
-				end
-				if dock_power_api then
-					local off = x1.Disabled and true or false
-					dock_power_api.caption.Text = off and "OFFLINE" or "ONLINE"
-					fx.to(dock_power_api.glyph, "TextColor3", off and TH.bad or TH.ok, "snap")
-					if not dock_power_api.is_hovered() then
-						fx.to(dock_power_api.stroke, "Color", off and TH.bad or TH.line, "snap")
-					end
-				end
-			end)
-		end
-
-		local function set_dock(on)
-			on = on and true or false
-			if on and not dock then
-				build_dock()
-			end
-			if dock then
-				dock.Visible = on
-			end
-		end
-
-		------------------------------------------------------------------
-		-- pooled list rendering
-		------------------------------------------------------------------
-		-- Filtering never destroys rows any more; they are created once and
-		-- rebound, so typing in a search box costs nothing.
-
-		local function pooled(host, factory)
-			local rows, high = {}, 0
-			return function(items)
-				local n = #items
-				for i = 1, n do
-					local row = rows[i]
-					if not row then
-						row = factory(host)
-						rows[i] = row
-					end
-					row.frame.LayoutOrder = i
-					row.frame.Visible = true
-					row.bind(items[i], i)
-				end
-				for i = n + 1, high do
-					if rows[i] then
-						rows[i].frame.Visible = false
-					end
-				end
-				high = mmax(high, n)
-				return n
-			end
-		end
-
-		------------------------------------------------------------------
-		-- page content
-		------------------------------------------------------------------
-
-		local shape_controls_host, rebuild_shape_controls
-		local render_shapes, render_players
-		local shape_card_name
-		local select_shape_tab = function()
-			select_tab(2)
-		end
-
-		-- CORE ---------------------------------------------------------
-		local function build_core(page)
-			eh(page, "Active Formation")
-
-			local card = new("TextButton", {
-				BackgroundColor3 = TH.bg2,
-				BorderSizePixel = 0,
-				Size = U2(1, 0, 0, is_mobile and 56 or 62),
-				Text = "",
-				AutoButtonColor = false,
-				ClipsDescendants = true,
-			}, page)
-			corner(card, TH.radius_card)
-			local card_stroke = stroke(card, TH.line, 1, 0.05)
-			grad(card, CS({ CSK(0, TH.bg2), CSK(1, TH.bg3) }), 90)
-
-			local pip = new("Frame", {
-				BackgroundColor3 = TH.acc,
-				BorderSizePixel = 0,
-				AnchorPoint = V2(0, 0.5),
-				Position = U2(0, 12, 0.5, 0),
-				Size = U2(0, 4, 0, is_mobile and 30 or 34),
-				ZIndex = 2,
-			}, card)
-			corner(pip, UD(1, 0))
-			grad(pip, TH.accent_seq(), 90)
-
-			shape_card_name = label(card, string.upper(x1.k6), is_mobile and 13 or 14, TH.font.black, TH.white, {
-				Position = U2(0, 26, 0, is_mobile and 10 or 12),
-				Size = U2(1, -70, 0, 18),
-				ZIndex = 2,
-				TextTruncate = Enum.TextTruncate.AtEnd,
-			})
-			label(card, "browse all formations", 10, TH.font.med, TH.tx3, {
-				Position = U2(0, 26, 0, is_mobile and 29 or 33),
-				Size = U2(1, -70, 0, 14),
-				ZIndex = 2,
-			})
-			local chev = label(card, GLYPH.chevron, 20, TH.font.bold, TH.tx3, {
-				AnchorPoint = V2(1, 0.5),
-				Position = U2(1, -14, 0.5, 0),
-				Size = U2(0, 14, 0, 24),
-				TextXAlignment = Enum.TextXAlignment.Center,
-				ZIndex = 2,
-			})
-
-			E.interactive(card, {
-				ripple_color = TH.acc,
-				paint = function(hover)
-					fx.to(card_stroke, "Color", hover and TH.acc or TH.line, "snap")
-					fx.to(card_stroke, "Thickness", hover and 1.6 or 1, "snap")
-					fx.to(chev, "Position", U2(1, hover and -9 or -14, 0.5, 0), "pop")
-					fx.to(chev, "TextColor3", hover and TH.acc2 or TH.tx3, "snap")
-				end,
-			})
-			card.MouseButton1Click:Connect(select_shape_tab)
-
-			eh(page, "Engine")
-
-			local _, pow_api = E.button(page, "GRAVITY ONLINE", function()
-				x1.Disabled = not x1.Disabled
-				apply_disabled(x1.Disabled)
-				save_settings()
-			end, "ok", is_mobile and 40 or 42)
-
-			local _, pause_api = E.button(page, "PAUSE PHYSICS", function()
-				x1.Paused = not x1.Paused
-				save_settings()
-			end, "ghost", is_mobile and 36 or 38)
-
-			local launch_btn, launch_api = E.button(page, "FORCE LAUNCH", function()
-				x1.IsLaunching = not x1.IsLaunching
-			end, "danger", is_mobile and 36 or 38)
-			launch_btn.Visible = false
-
-			local last_off, last_paused, last_launch = nil, nil, nil
-			on_sync(function()
-				local off = x1.Disabled and true or false
-				if off ~= last_off then
-					last_off = off
-					pow_api.set_text(off and "GRAVITY OFFLINE" or "GRAVITY ONLINE")
-					pow_api.set_variant(off and "danger" or "ok")
-				end
-				local paused = x1.Paused and true or false
-				if paused ~= last_paused then
-					last_paused = paused
-					pause_api.set_text(paused and "RESUME PHYSICS" or "PAUSE PHYSICS")
-					pause_api.set_variant(paused and "accent" or "ghost")
-				end
-				local show = (x1.k6 == "Slingshot" and x1.SlingshotManual) and true or false
-				if launch_btn.Visible ~= show then
-					launch_btn.Visible = show
-				end
-				if show and x1.IsLaunching ~= last_launch then
-					last_launch = x1.IsLaunching
-					launch_api.set_text(x1.IsLaunching and "RESET SYSTEM" or "FORCE LAUNCH")
-					launch_api.set_variant(x1.IsLaunching and "accent" or "danger")
-				end
-			end)
-
-			eh(page, "Behaviour")
-
-			local grp = E.card(page, 6)
-
-			et(grp, "Simplified Interface", x1.SimpleMode, function(v)
-				x1.SimpleMode = v
-				save_settings()
-				if x5.up then
-					x5.up()
-				end
-			end, "Hides the deeper physics options and formation parameters.")
-
-			et(grp, "Show Status HUD", x1.ShowHUD ~= false, function(v)
-				x1.ShowHUD = v
-				hud.Visible = v
-				save_settings()
-			end)
-
-			et(grp, "Preserve Collisions", x1.PreserveCollisions, function(v)
-				x1.PreserveCollisions = v
-				for part, data in pairs(x6.a) do
-					if part and part.Parent then
-						part.CanCollide = v and data.original_can_collide or false
-					end
-				end
-				save_settings()
-			end)
-
-			local _, anti_api = et(grp, "Anti-Fling", x1.AntiFling, function(v)
-				x1.AntiFling = v
-				save_settings()
-			end)
-			local _, smooth_api = et(grp, "Force Smooth (Lags)", x1["Force Smooth (Lags)"], function(v)
-				x1["Force Smooth (Lags)"] = v
-				save_settings()
-			end, "Updates every part every frame. Looks perfect, costs frames.")
-			local _, lift_api = et(grp, "Realistic Liftoff", x1["Realistic Liftoff"], function(v)
-				x1["Realistic Liftoff"] = v
-				save_settings()
-			end)
-			local _, sling_api = et(grp, "Manual Slingshot", x1.SlingshotManual, function(v)
-				x1.SlingshotManual = v
-				save_settings()
-			end, "Hold the charge until you press Force Launch instead of firing on a timer.")
-
-			local last_advanced, last_sling = nil, nil
-			on_sync(function()
-				local advanced = not x1.SimpleMode
-				if advanced ~= last_advanced then
-					last_advanced = advanced
-					anti_api.frame.Visible = advanced
-					smooth_api.frame.Visible = advanced
-					lift_api.frame.Visible = advanced
-				end
-				local sling = advanced and x1.k6 == "Slingshot"
-				if sling ~= last_sling then
-					last_sling = sling
-					sling_api.frame.Visible = sling
-				end
-			end)
-
-			if ai_chat_module and ai_chat_module.toggle then
-				local ai_btn = E.button(page, "PROJECT GRAVITY AI", function()
-					ai_chat_module.toggle(sg)
-				end, "accent", is_mobile and 40 or 42)
-				ai_btn.LayoutOrder = 900
-			end
-
-			local ctrl_head = eh(page, "Formation Parameters")
-			ctrl_head.LayoutOrder = 950
-			shape_controls_host = new("Frame", {
-				BackgroundTransparency = 1,
-				Size = U2(1, 0, 0, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				LayoutOrder = 960,
-			}, page)
-			list(shape_controls_host, 4)
-
-			rebuild_shape_controls = function()
-				if not shape_controls_host or not shape_controls_host.Parent then
-					return
-				end
-				for _, kid in ipairs(shape_controls_host:GetChildren()) do
-					if kid:IsA("GuiObject") then
-						kid:Destroy()
-					end
-				end
-				local simple = x1.SimpleMode and true or false
-				ctrl_head.Visible = not simple
-				shape_controls_host.Visible = not simple
-				if simple then
-					return
-				end
-				local mod = get_shape(x1.k6)
-				local cfg = x1.S[x1.k6]
-				if not cfg then
-					cfg = {}
-					x1.S[x1.k6] = cfg
-				end
-				if not (mod and mod.Controls) then
-					label(shape_controls_host, "This formation has no adjustable parameters.", 10, TH.font.body, TH.tx3, {
-						Size = U2(1, 0, 0, 26),
-						TextWrapped = true,
-					})
-					return
-				end
-				for _, ctrl in ipairs(mod.Controls) do
-					local value = cfg[ctrl.Key]
-					if ctrl.Type == "Slider" then
-						if ctrl.LegacyToggle and type(value) == "boolean" then
-							value = value and 2 or 1
-							cfg[ctrl.Key] = value
-						end
-						if value == nil then
-							value = ctrl.Default ~= nil and ctrl.Default or ctrl.Min
-						end
-						local max_val = ctrl.Max
-						if not ctrl.ExactMax and string.find(string.lower(ctrl.Name), "speed") then
-							max_val = max_val + 300
-						end
-						if ctrl.Div then
-							value = value * ctrl.Div
-						end
-						value = mclamp(value, ctrl.Min, max_val)
-						cfg[ctrl.Key] = ctrl.Div and (value / ctrl.Div) or value
-						es(shape_controls_host, ctrl.Name, ctrl.Min, max_val, value, function(v)
-							cfg[ctrl.Key] = ctrl.Div and (v / ctrl.Div) or v
-						end, ctrl.IntOnly, ctrl.Desc)
-					elseif ctrl.Type == "Toggle" then
-						if value == nil then
-							value = ctrl.Default ~= nil and ctrl.Default or false
-						end
-						et(shape_controls_host, ctrl.Name, value and true or false, function(v)
-							cfg[ctrl.Key] = v
-						end, ctrl.Desc)
-					end
-				end
-			end
-			rebuild_shape_controls()
-		end
-
-		-- SHAPES -------------------------------------------------------
-		local function build_shapes(page)
-			local all, filtered = {}, {}
-			local query = ""
-
-			local function order()
-				table.clear(all)
-				for name in pairs(x2) do
-					all[#all + 1] = name
-				end
-				table.sort(all, function(a, b)
-					local fa, fb = favorites[a] and 1 or 0, favorites[b] and 1 or 0
-					if fa ~= fb then
-						return fa > fb
-					end
-					return a < b
-				end)
-				table.clear(filtered)
-				if query ~= "" then
-					local needle = string.lower(query)
-					for _, name in ipairs(all) do
-						if string.find(string.lower(name), needle, 1, true) then
-							filtered[#filtered + 1] = name
-						end
+		-- One place the setting is applied, so a popup can never be left at the
+		-- old scale. Tweened rather than snapped, and every window moves together.
+		local function apply_ui_scale()
+			local s = app_scale()
+			for win, entry in pairs(scaled_windows) do
+				if win.Parent then
+					if not entry.nested then
+						v6:Create(entry.scale, A.RESCALE, { Scale = entry.pop * s }):Play()
 					end
 				else
-					table.move(all, 1, #all, 1, filtered)
+					scaled_windows[win] = nil
 				end
-				return filtered
 			end
+		end
+		x5.apply_ui_scale = apply_ui_scale
 
-			E.search(page, "Search formations", function(text)
-				query = text
-				render_shapes()
-			end)
-
-			local count_label = label(page, "", 9, TH.font.med, TH.tx3, {
-				Size = U2(1, 0, 0, 16),
-			})
-
-			local holder = new("Frame", {
-				BackgroundTransparency = 1,
-				Size = U2(1, 0, 0, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-			}, page)
-			list(holder, 4)
-
-			local function shape_row(parent)
-				local frame = new("TextButton", {
-					BackgroundColor3 = TH.bg2,
-					BorderSizePixel = 0,
-					Size = U2(1, 0, 0, is_mobile and 40 or 42),
-					Text = "",
-					AutoButtonColor = false,
-					ClipsDescendants = true,
-				}, parent)
-				corner(frame, TH.radius_row)
-				local row_stroke = stroke(frame, TH.line, 1, 0.45)
-
-				local mark = new("Frame", {
-					BackgroundColor3 = TH.acc,
-					BackgroundTransparency = 1,
-					BorderSizePixel = 0,
-					AnchorPoint = V2(0, 0.5),
-					Position = U2(0, 8, 0.5, 0),
-					Size = U2(0, 3, 0, 18),
-					ZIndex = 2,
-				}, frame)
-				corner(mark, UD(1, 0))
-
-				local name = label(frame, "", is_mobile and 11 or 12, TH.font.bold, TH.tx2, {
-					Position = U2(0, 18, 0, 0),
-					Size = U2(1, -60, 1, 0),
-					ZIndex = 2,
-					TextTruncate = Enum.TextTruncate.AtEnd,
-				})
-
-				local star = new("TextButton", {
-					BackgroundTransparency = 1,
-					AnchorPoint = V2(1, 0.5),
-					Position = U2(1, -6, 0.5, 0),
-					Size = U2(0, 30, 1, 0),
-					Text = GLYPH.star_off,
-					TextColor3 = TH.tx3,
-					TextSize = 14,
-					Font = TH.font.bold,
-					AutoButtonColor = false,
-					ZIndex = 3,
-				}, frame)
-				local star_scale = new("UIScale", {}, star)
-
-				local current
-				local function paint()
-					local selected = current == x1.k6
-					fx.to(frame, "BackgroundColor3", selected and TH.bg4 or TH.bg2, "flow")
-					fx.to(row_stroke, "Color", selected and TH.acc or TH.line, "flow")
-					fx.to(row_stroke, "Transparency", selected and 0 or 0.45, "flow")
-					fx.to(mark, "BackgroundTransparency", selected and 0 or 1, "flow")
-					fx.to(name, "TextColor3", selected and TH.white or TH.tx2, "flow")
-				end
-
-				E.interactive(frame, {
-					ripple_color = TH.acc,
-					paint = function(hover)
-						if current ~= x1.k6 then
-							fx.to(row_stroke, "Color", hover and TH.line2 or TH.line, "snap")
-							fx.to(frame, "BackgroundColor3", hover and TH.bg3 or TH.bg2, "snap")
-							fx.to(name, "TextColor3", hover and TH.white or TH.tx2, "snap")
-						end
-					end,
-				})
-
-				frame.MouseButton1Click:Connect(function()
-					if not current or current == x1.k6 then
-						return
-					end
-					if not get_shape(current) then
-						x5.toast("Formation", "Could not load " .. current, "bad")
-						return
-					end
-					x1.k6 = current
-					x6.transition_time = time()
-					x6.transition_dur = 1.5
-					for _, d in pairs(x6.a) do
-						d.trans_vl = d.vl or Vector3.zero
-						d.v1, d.v2, d.v3, d.v4, d.v5, d.v6, d.v7, d.v8, d.v9 =
-							nil, nil, nil, nil, nil, nil, nil, nil, nil
-						d.integral = Vector3.zero
-					end
-					save_settings()
-					if x5.up then
-						x5.up()
-					end
-					x5.toast("Formation", current, "ok", 2)
-					select_tab(1)
+		local function toggle_window(win, state, nested)
+			if not scaled_windows[win] then
+				register_window(win, win.Visible and 1 or 0.8, nested)
+			end
+			local prop = win:IsA("CanvasGroup") and "GroupTransparency" or "BackgroundTransparency"
+			if state then
+				win.Visible = true
+				v6:Create(win, A.OPEN, {[prop] = 0}):Play()
+				set_pop(win, 1, A.OPEN_POP, nested)
+			else
+				local tw = v6:Create(win, A.CLOSE, {[prop] = 1})
+				set_pop(win, 0.8, A.CLOSE_POP, nested)
+				local conn
+				conn = tw.Completed:Connect(function()
+					if win.Parent and win[prop] >= 0.99 then win.Visible = false end
+					if conn then conn:Disconnect() end
 				end)
-
-				star.MouseButton1Click:Connect(function()
-					if not current then
-						return
-					end
-					favorites[current] = (not favorites[current]) or nil
-					save_favs()
-					fx.punch(star_scale, "Scale", 1.7, 1, "bounce")
-					render_shapes()
-				end)
-
-				return {
-					frame = frame,
-					bind = function(item)
-						current = item
-						name.Text = item
-						local fav = favorites[item] and true or false
-						star.Text = fav and GLYPH.star_on or GLYPH.star_off
-						star.TextColor3 = fav and TH.warn or TH.tx3
-						paint()
-					end,
-				}
+				tw:Play()
 			end
-
-			local draw = pooled(holder, shape_row)
-			render_shapes = function()
-				if not page.Parent then
-					return
-				end
-				local n = draw(order())
-				count_label.Text = n .. (n == 1 and " FORMATION" or " FORMATIONS")
-			end
-			render_shapes()
 		end
 
-		-- TARGET -------------------------------------------------------
-		local function build_target(page)
-			eh(page, "Focus")
+		-- Dragging, done by hand rather than with the legacy Draggable property.
+		-- Draggable applies to the whole frame, so on Main -- which is mostly a tall
+		-- scrolling list of sliders and toggles -- a drag that began on the body moved
+		-- the window instead of reaching the control under the cursor. Binding the
+		-- drag to the header is the actual fix; the clamp is the second half of it,
+		-- because Draggable also happily parked a window fully outside the viewport
+		-- where nothing could reach it again. Only Main had a rescue for that
+		-- (unfold_header), and only by way of minimizing.
+		--
+		-- Deltas go straight onto Position's offset and stay 1:1 with the cursor even
+		-- under UIScale: a UIScale scales the window's own size and its descendants,
+		-- while Position still resolves against the parent, which is the ScreenGui.
+		-- The scale components are preserved, so a window anchored to the viewport
+		-- centre still tracks a resize.
+		local KEEP_ON_SCREEN = 60
+		local function make_draggable(win, handle)
+			handle = handle or win
+			-- A transparent Frame header still reports input; Active makes it consume
+			-- the press so it cannot fall through to whatever sits behind. Buttons
+			-- inside the header consume their own input, so minb and closeb never
+			-- start a drag.
+			handle.Active = true
 
-			local grp = E.card(page, 6)
-			local _, self_api = et(grp, "Anchor To Self", x1.AnchorSelf, function(v)
+			local dragging = false
+			local origin, start_pos
+
+			local function commit(delta)
+				local parent = win.Parent
+				if not parent then
+					return
+				end
+				local avail = parent.AbsoluteSize
+				local size = win.AbsoluteSize
+				local want_x = start_pos.X.Scale * avail.X + start_pos.X.Offset + delta.X
+				local want_y = start_pos.Y.Scale * avail.Y + start_pos.Y.Offset + delta.Y
+				-- Leave a grabbable sliver on screen in both axes. Vertically the
+				-- floor is 0: a header dragged above the top edge is a window that
+				-- can never be picked up again.
+				local max_x = avail.X - KEEP_ON_SCREEN
+				local min_x = math.min(-(size.X - KEEP_ON_SCREEN), max_x)
+				win.Position = UDim2.new(
+					start_pos.X.Scale,
+					math.clamp(want_x, min_x, max_x) - start_pos.X.Scale * avail.X,
+					start_pos.Y.Scale,
+					math.clamp(want_y, 0, math.max(0, avail.Y - 30)) - start_pos.Y.Scale * avail.Y
+				)
+			end
+
+			table.insert(x6.c, handle.InputBegan:Connect(function(input)
+				local ty = input.UserInputType
+				if ty ~= Enum.UserInputType.MouseButton1 and ty ~= Enum.UserInputType.Touch then
+					return
+				end
+				dragging = true
+				origin = input.Position
+				start_pos = win.Position
+				-- Latched off the input itself rather than a global InputEnded: a
+				-- release over another GUI still ends this input, and without it the
+				-- window would stay stuck to the cursor.
+				local conn
+				conn = input.Changed:Connect(function()
+					if input.UserInputState == Enum.UserInputState.End then
+						dragging = false
+						if conn then
+							conn:Disconnect()
+						end
+					end
+				end)
+			end))
+
+			table.insert(x6.c, v1.InputChanged:Connect(function(input)
+				if not dragging or not start_pos then
+					return
+				end
+				local ty = input.UserInputType
+				if ty ~= Enum.UserInputType.MouseMovement and ty ~= Enum.UserInputType.Touch then
+					return
+				end
+				commit(input.Position - origin)
+			end))
+		end
+
+		local hud = Instance.new("Frame", sg)
+		hud.Name = "StatusHUD"
+		hud.BackgroundTransparency = 1
+		hud.Position = UDim2.new(0.5, -200, 0, 20)
+		hud.Size = UDim2.new(0, 400, 0, 30)
+
+		-- Scaled like every other element. The HUD was the one thing never registered,
+		-- so at UI Scale 2.0 every window doubled and the status line stayed at 14px,
+		-- against the setting's own description ("Scales the entire interface").
+		register_window(hud, 1)
+
+		local hud_l = Instance.new("TextLabel", hud)
+		hud_l.BackgroundTransparency = 1
+		hud_l.Size = UDim2.new(1, 0, 1, 0)
+		hud_l.Font = Enum.Font.GothamBold
+		hud_l.TextSize = 14
+		hud_l.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+		local hud_target, hud_state
+		local HUD_ACTIVE = Color3.fromRGB(80, 255, 150)
+		local HUD_PAUSED = Color3.fromRGB(255, 180, 80)
+		local HUD_DISABLED = Color3.fromRGB(255, 80, 80)
+		table.insert(
+			x6.c,
+			v3.RenderStepped:Connect(function()
+				if not x5.g then
+					return
+				end
+				-- x1.Targets, not x1.Tgt: multi-targeting replaced the single slot and
+				-- nothing has written Tgt since, so this field read "NONE" even with
+				-- a target locked. main.lua strips Tgt from the save file outright.
+				local tgt = "None"
+				local sel = x1.Targets
+				if x1.PI_All then
+					tgt = "Everyone"
+				elseif sel and #sel > 0 then
+					if #sel == 1 then
+						tgt = sel[1].DisplayName or sel[1].Name
+					else
+						tgt = "Multi (" .. tostring(#sel) .. ")"
+					end
+				elseif x1.AnchorSelf then
+					tgt = "Self"
+				end
+				local state = x1.Disabled and "DISABLED" or (x1.Paused and "PAUSED" or "ACTIVE")
+				if tgt ~= hud_target or state ~= hud_state then
+					hud_target, hud_state = tgt, state
+					hud_l.Text = string.format("TARGET: %s  |  STATUS: %s", tgt:upper(), state)
+					hud_l.TextColor3 = x1.Disabled and HUD_DISABLED or (x1.Paused and HUD_PAUSED or HUD_ACTIVE)
+				end
+			end)
+		)
+		
+		hud.Visible = x1.ShowHUD ~= false
+
+		local m = Instance.new("Frame", sg)
+		m.Name = "Main"
+		m.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+		m.Position = UDim2.new(0, 30, 0.5, -250)
+		m.Size = UDim2.new(0, PANEL_W, 0, PANEL_H)
+		m.Active = true
+		-- Dragged by its header only; see make_draggable. The old Draggable made
+		-- the whole scrolling body a drag handle.
+		local mcorner = Instance.new("UICorner", m)
+		mcorner.CornerRadius = UDim.new(0, 10)
+		local ms = Instance.new("UIStroke", m)
+		ms.Color = Color3.fromRGB(40, 40, 45)
+		ms.Thickness = 1
+
+		-- Main is always open, so it starts at full pop.
+		register_window(m, 1)
+
+		local h = Instance.new("Frame", m)
+		h.BackgroundTransparency = 1
+		h.Size = UDim2.new(1, 0, 0, HEADER_H)
+		-- The header is also the whole surface of the collapsed pill, so binding
+		-- the drag here keeps the pill draggable without a second code path.
+		make_draggable(m, h)
+
+		local t = Instance.new("TextLabel", h)
+		t.BackgroundTransparency = 1
+		t.Position = UDim2.new(0, 20, 0, 0)
+		t.Size = UDim2.new(0.6, 0, 1, 0)
+		t.Text = "PROJECT GRAVITY"
+		t.TextColor3 = Color3.fromRGB(255, 255, 255)
+		t.Font = Enum.Font.GothamBlack
+		t.TextSize = 16
+		t.TextXAlignment = 0
+
+		local c = Instance.new("ScrollingFrame", m)
+		c.BackgroundTransparency = 1
+		c.Position = UDim2.new(0, 0, 0, HEADER_H + CONTENT_GAP)
+		c.Size = UDim2.new(1, 0, 1, -(HEADER_H + CONTENT_GAP * 2))
+		c.ScrollBarThickness = 0
+		c.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		c.CanvasSize = UDim2.new(0, 0, 0, 0)
+		local l = Instance.new("UIListLayout", c)
+		l.Padding = UDim.new(0, 12)
+		l.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		local p = Instance.new("UIPadding", c)
+		p.PaddingLeft = UDim.new(0, 20)
+		p.PaddingRight = UDim.new(0, 20)
+		p.PaddingBottom = UDim.new(0, 20)
+
+		local am = Instance.new("CanvasGroup", sg)
+		am.Name = "Advanced"
+		am.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+		am.Position = UDim2.new(0, 360, 0.5, -200)
+		am.Size = UDim2.new(0, 260, 0, 380)
+		am.Visible = false
+		am.GroupTransparency = 1
+		am.Active = true
+		Instance.new("UICorner", am).CornerRadius = UDim.new(0, 10)
+		local ams = Instance.new("UIStroke", am)
+		ams.Color = Color3.fromRGB(40, 40, 45)
+		ams.Thickness = 1
+
+		-- Starts hidden, so it starts at the closed pop factor and toggle_window
+		-- tweens it up to the app scale rather than to a hardcoded 1.
+		register_window(am, 0.8)
+
+		local ah = Instance.new("Frame", am)
+		ah.BackgroundTransparency = 1
+		ah.Size = UDim2.new(1, 0, 0, 50)
+		make_draggable(am, ah)
+		local at = Instance.new("TextLabel", ah)
+		at.BackgroundTransparency = 1
+		at.Position = UDim2.new(0, 20, 0, 0)
+		at.Size = UDim2.new(0.6, 0, 1, 0)
+		at.Text = "ADVANCED"
+		at.TextColor3 = Color3.fromRGB(255, 255, 255)
+		at.Font = Enum.Font.GothamBold
+		at.TextSize = 14
+		at.TextXAlignment = 0
+
+		local ac = Instance.new("ScrollingFrame", am)
+		ac.BackgroundTransparency = 1
+		ac.Position = UDim2.new(0, 0, 0, 50)
+		ac.Size = UDim2.new(1, 0, 1, -60)
+		ac.ScrollBarThickness = 0
+		ac.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		ac.CanvasSize = UDim2.new(0, 0, 0, 0)
+		-- Rebuildable, so a reset can repaint it. Every control in here caches its
+		-- value at build time -- UI_elements M.s keeps `current` as a private local --
+		-- and this block used to be built exactly once. After "Reset All Settings" the
+		-- knobs therefore kept the old numbers while x1 held the defaults, and nudging
+		-- UI Scale committed from the stale value: a reset from 2.0 then one step down
+		-- gave 1.9 instead of 1.1.
+		local function populate_advanced()
+			ac:ClearAllChildren()
+			local acl = Instance.new("UIListLayout", ac)
+			acl.Padding = UDim.new(0, 10)
+			acl.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			local ap = Instance.new("UIPadding", ac)
+			ap.PaddingLeft = UDim.new(0, 20)
+			ap.PaddingRight = UDim.new(0, 20)
+
+			et(ac, "Predictive Tracking", x1.PredictiveTracking ~= false, function(v)
+				x1.PredictiveTracking = v
+				save_settings()
+			end, "Predicts player movement to smooth out parts when targeting them.")
+		
+			es(ac, "Prediction Factor", 0, 500, x1.PredictionFactor or 150, function(v)
+				x1.PredictionFactor = v
+				save_settings()
+			end, false, "How far ahead the script predicts the target's movement.")
+		
+			es(ac, "Damping", 0, 5, x1.Damping, function(v)
+				x1.Damping = v
+				save_settings()
+			end, false, "Slows down parts to reduce jittering. Higher values = smoother but slower.")
+		
+			es(ac, "Integral Gain", 0, 10, x1.Ki, function(v)
+				x1.Ki = v
+				save_settings()
+			end, false, "Helps parts reach their exact target position faster (fixes sagging).")
+		
+			es(ac, "Max Speed", 50, 2000, x1.MaxSpeed or 500, function(v)
+				x1.MaxSpeed = v
+				save_settings()
+			end, false, "Caps the maximum velocity of all parts to prevent them from flinging.")
+		
+			es(ac, "Angular Damp", 0, 1, x1.AngularDamping or 0.5, function(v)
+				x1.AngularDamping = v
+				save_settings()
+			end, false, "Stops parts from spinning uncontrollably on their own axis.")
+		
+			es(ac, "Vert Stiffness", 0.1, 5, x1.VerticalStiffness or 1.0, function(v)
+				x1.VerticalStiffness = v
+				save_settings()
+			end, false, "Multiplies vertical pull to fight Roblox's gravity. Use 1.0 for normal.")
+
+			es(ac, "UI Scale", 0.5, 2.0, x1.UIScale or 1.0, function(v)
+				x1.UIScale = v
+				-- Every registered window, not just these two: the mode selector and
+				-- the target list are nested under Main and only carry their pop
+				-- factor, so Main's UIScale covers them; Advanced, Keybinds and the
+				-- dialogs are siblings and used to be missed or overwritten.
+				apply_ui_scale()
+				save_settings()
+			end, false, "Scales the entire interface. 1.0 is default.")
+
+			et(ac, "Aggressive Claiming", x1.AggressiveClaim, function(v)
+				x1.AggressiveClaim = v
+				save_settings()
+			end, "WARNING: Spams CFrames into your character to forcefully steal Network Ownership from other scripts.")
+		
+			et(ac, "Void Protection", x1.VoidProtection, function(v)
+				x1.VoidProtection = v
+				save_settings()
+			end, "Automatically ignores targets that fall into the void to prevent your parts from being destroyed.")
+
+			et(ac, "Disable Shadows", x1.Perf_DisableShadows, function(v)
+				x1.Perf_DisableShadows = v
+				ApplyPerfShadows(v)
+				save_settings()
+			end, "Turns off all game shadows to boost your FPS significantly.")
+		
+			et(ac, "Disable Post-FX", x1.Perf_DisablePostFX, function(v)
+				x1.Perf_DisablePostFX = v
+				ApplyPerfPostFX(v)
+				save_settings()
+			end, "Disables Bloom, Blur, SunRays, and ColorCorrection to save performance.")
+		
+			et(ac, "Potato Materials", x1.Perf_PotatoMaterials, function(v)
+				x1.Perf_PotatoMaterials = v
+				ApplyPerfMaterials(v)
+				save_settings()
+			end, "Forces all parts in the game to use SmoothPlastic to lower rendering load.")
+		
+			et(ac, "Hide Particles", x1.Perf_HideParticles, function(v)
+				x1.Perf_HideParticles = v
+				ApplyPerfParticles(v)
+				save_settings()
+			end, "Hides fire, smoke, beams, trails, and particle emitters.")
+		
+			ApplyPerfShadows(x1.Perf_DisableShadows)
+			ApplyPerfPostFX(x1.Perf_DisablePostFX)
+			ApplyPerfMaterials(x1.Perf_PotatoMaterials)
+			ApplyPerfParticles(x1.Perf_HideParticles)
+		
+			local function update_color()
+				if x6.b then
+					x6.b.Color = x1.k3
+					if x6.b:FindFirstChild("Visual") and x6.b.Visual:FindFirstChildOfClass("ImageLabel") then
+						x6.b.Visual:FindFirstChildOfClass("ImageLabel").ImageColor3 = x1.k3
+					end
+				end
+				save_settings()
+			end
+
+			-- Each channel slider rebuilds the whole colour, so it has to hand the other
+			-- two back as the same integers they came in as. Color3 stores 0-1 floats and
+			-- v/255 does not round-trip exactly, so passing the bare product re-quantised
+			-- the untouched channels on every drag and walked the colour off over a
+			-- session of tweaking.
+			local function ch(x)
+				return math.floor(x * 255 + 0.5)
+			end
+			es(ac, "Center Color R", 0, 255, ch(x1.k3.R), function(v)
+				x1.k3 = Color3.fromRGB(v, ch(x1.k3.G), ch(x1.k3.B))
+				update_color()
+			end, true)
+			es(ac, "Center Color G", 0, 255, ch(x1.k3.G), function(v)
+				x1.k3 = Color3.fromRGB(ch(x1.k3.R), v, ch(x1.k3.B))
+				update_color()
+			end, true)
+			es(ac, "Center Color B", 0, 255, ch(x1.k3.B), function(v)
+				x1.k3 = Color3.fromRGB(ch(x1.k3.R), ch(x1.k3.G), v)
+				update_color()
+			end, true)
+		end
+		populate_advanced()
+		x5.refresh_advanced = populate_advanced
+
+		local km = Instance.new("CanvasGroup", sg)
+		km.Name = "Keybinds"
+		km.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+		km.Position = UDim2.new(0, 360, 0.5, -220)
+		km.Size = UDim2.new(0, 300, 0, 440)
+		km.Visible = false
+		km.GroupTransparency = 1
+		km.Active = true
+		Instance.new("UICorner", km).CornerRadius = UDim.new(0, 10)
+		local kms = Instance.new("UIStroke", km)
+		kms.Color = Color3.fromRGB(40, 40, 45)
+		kms.Thickness = 1
+		register_window(km, 0.8)
+
+		local kh = Instance.new("Frame", km)
+		kh.BackgroundTransparency = 1
+		kh.Size = UDim2.new(1, 0, 0, 44)
+		make_draggable(km, kh)
+		local kt = Instance.new("TextLabel", kh)
+		kt.BackgroundTransparency = 1
+		kt.Position = UDim2.new(0, 20, 0, 0)
+		kt.Size = UDim2.new(0.6, 0, 1, 0)
+		kt.Text = "KEYBINDS"
+		kt.TextColor3 = Color3.fromRGB(255, 255, 255)
+		kt.Font = Enum.Font.GothamBold
+		kt.TextSize = 14
+		kt.TextXAlignment = 0
+
+		local kclose = Instance.new("TextButton", kh)
+		kclose.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+		kclose.Position = UDim2.new(1, -30, 0.5, -10)
+		kclose.Size = UDim2.new(0, 20, 0, 20)
+		kclose.Text = ""
+		Instance.new("UICorner", kclose).CornerRadius = UDim.new(1, 0)
+		kclose.MouseButton1Click:Connect(function()
+			toggle_window(km, false)
+		end)
+
+		local ksearch = Instance.new("TextBox", km)
+		ksearch.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+		ksearch.Position = UDim2.new(0, 20, 0, 44)
+		ksearch.Size = UDim2.new(1, -40, 0, 30)
+		ksearch.PlaceholderText = "Search shapes..."
+		ksearch.PlaceholderColor3 = Color3.fromRGB(110, 110, 120)
+		ksearch.Text = ""
+		ksearch.TextColor3 = Color3.fromRGB(255, 255, 255)
+		ksearch.Font = Enum.Font.Gotham
+		ksearch.TextSize = 12
+		ksearch.ClearTextOnFocus = false
+		Instance.new("UICorner", ksearch).CornerRadius = UDim.new(0, 6)
+
+		local kc = Instance.new("ScrollingFrame", km)
+		kc.BackgroundTransparency = 1
+		kc.Position = UDim2.new(0, 0, 0, 82)
+		kc.Size = UDim2.new(1, 0, 1, -92)
+		kc.ScrollBarThickness = 0
+		kc.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		kc.CanvasSize = UDim2.new(0, 0, 0, 0)
+		local kcl = Instance.new("UIListLayout", kc)
+		kcl.Padding = UDim.new(0, 8)
+		kcl.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		local kcp = Instance.new("UIPadding", kc)
+		kcp.PaddingLeft = UDim.new(0, 20)
+		kcp.PaddingRight = UDim.new(0, 20)
+		kcp.PaddingBottom = UDim.new(0, 20)
+
+		-- Notifications go through System's x7.n when it is up so a rejected key
+		-- reads like every other message; before then there is nowhere to show it.
+		local function notify(title, text, dur)
+			local x8 = context.x8
+			if x8 and x8.notify then
+				x8.notify(title, text, dur)
+				return
+			end
+			pcall(function()
+				v5:SetCore("SendNotification", { Title = title, Text = text, Duration = dur or 3 })
+			end)
+		end
+
+		local function keybinds_table()
+			if type(x1.Keybinds) ~= "table" then
+				x1.Keybinds = { Recenter = "E", Reset = "Q", Pause = "P", Disable = "L", Shapes = {} }
+			end
+			if type(x1.Keybinds.Shapes) ~= "table" then
+				x1.Keybinds.Shapes = {}
+			end
+			return x1.Keybinds
+		end
+
+		-- Shared by both kinds of row. exclude_id keeps re-picking the key a row
+		-- already holds from being reported as a conflict with itself.
+		local function accept_key(key_name, exclude_id, assign)
+			local kb = keybinds_table()
+			if key_name == "" then
+				assign(kb, "")
+				save_settings()
+				return true
+			end
+			local x8 = context.x8
+			local conflict = x8 and x8.find_conflict and x8.find_conflict(key_name, exclude_id)
+			if conflict then
+				notify("Keybinds", key_name .. " is already bound to " .. conflict .. ".", 3)
+				return false
+			end
+			assign(kb, key_name)
+			save_settings()
+			return true
+		end
+
+		local function populate_keybinds(filter)
+			kc:ClearAllChildren()
+			local layout = Instance.new("UIListLayout", kc)
+			layout.Padding = UDim.new(0, 8)
+			layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			local pad = Instance.new("UIPadding", kc)
+			pad.PaddingLeft = UDim.new(0, 20)
+			pad.PaddingRight = UDim.new(0, 20)
+			pad.PaddingBottom = UDim.new(0, 20)
+
+			local x8 = context.x8
+			filter = (filter or ""):lower()
+
+			if filter == "" then
+				eh(kc, "Core")
+				local core = (x8 and x8.core_actions) or {}
+				for _, entry in ipairs(core) do
+					local id = entry.id
+					ekb(kc, entry.label, function()
+						return keybinds_table()[id]
+					end, function(key_name)
+						return accept_key(key_name, id, function(kb, v)
+							kb[id] = v
+						end)
+					end, entry.desc)
+				end
+			end
+
+			eh(kc, filter == "" and "Shapes" or "Shapes matching \"" .. filter .. "\"")
+			local names = {}
+			for shape_name in pairs(x2) do
+				if filter == "" or shape_name:lower():find(filter, 1, true) then
+					names[#names + 1] = shape_name
+				end
+			end
+			-- Bound shapes first, then alphabetical, so what the user has set is
+			-- at the top of a list this long instead of buried in it.
+			table.sort(names, function(a, b)
+				local shapes = keybinds_table().Shapes
+				local ba = (shapes[a] and shapes[a] ~= "") and 1 or 0
+				local bb = (shapes[b] and shapes[b] ~= "") and 1 or 0
+				if ba ~= bb then
+					return ba > bb
+				end
+				return a < b
+			end)
+
+			if #names == 0 then
+				local none = Instance.new("TextLabel", kc)
+				none.BackgroundTransparency = 1
+				none.Size = UDim2.new(1, 0, 0, 24)
+				none.Text = "No shapes match."
+				none.TextColor3 = Color3.fromRGB(120, 120, 130)
+				none.TextXAlignment = Enum.TextXAlignment.Left
+				none.Font = Enum.Font.Gotham
+				none.TextSize = 11
+			end
+
+			for _, shape_name in ipairs(names) do
+				local captured = shape_name
+				ekb(kc, captured, function()
+					return keybinds_table().Shapes[captured]
+				end, function(key_name)
+					return accept_key(key_name, "shape:" .. captured, function(kb, v)
+						-- "" is how a core action records "unbound", but a shape
+						-- with no key does not need an entry at all: dropping it
+						-- keeps the settings file from growing a line per shape
+						-- the user merely looked at.
+						kb.Shapes[captured] = (v ~= "" and v) or nil
+					end)
+				end)
+			end
+		end
+
+		ksearch:GetPropertyChangedSignal("Text"):Connect(function()
+			populate_keybinds(ksearch.Text)
+		end)
+
+		local kb_btn = eb(c, "Keybinds", function()
+			local opening = not km.Visible
+			toggle_window(km, opening)
+			if opening then
+				populate_keybinds(ksearch.Text)
+			end
+		end)
+		kb_btn.Size = UDim2.new(1, 0, 0, 36)
+
+		local ab = eb(c, "Advanced Settings", function()
+			toggle_window(am, not am.Visible)
+		end)
+		ab.Size = UDim2.new(1, 0, 0, 36)
+
+		local ai_btn = eb(c, "PROJECT GRAVITY AI", function()
+			if ai_chat_module and ai_chat_module.toggle then
+				ai_chat_module.toggle(sg)
+			end
+		end)
+		ai_btn.Size = UDim2.new(1, 0, 0, 36)
+
+		local mode_f = Instance.new("Frame", c)
+		mode_f.BackgroundTransparency = 1
+		mode_f.Size = UDim2.new(1, 0, 0, 44)
+		local db = Instance.new("TextButton", mode_f)
+		db.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+		db.Size = UDim2.new(1, 0, 1, 0)
+		db.Text = "  " .. x1.k6:upper()
+		db.TextColor3 = Color3.fromRGB(255, 255, 255)
+		db.Font = Enum.Font.GothamBold
+		db.TextSize = 13
+		db.TextXAlignment = 0
+		Instance.new("UICorner", db).CornerRadius = UDim.new(0, 6)
+		local dst = Instance.new("UIStroke", db)
+		dst.Color = Color3.fromRGB(40, 40, 45)
+
+		local arr = Instance.new("TextLabel", db)
+		arr.BackgroundTransparency = 1
+		arr.Position = UDim2.new(1, -30, 0, 0)
+		arr.Size = UDim2.new(0, 30, 1, 0)
+		arr.Text = "▼"
+		arr.TextColor3 = Color3.fromRGB(150, 150, 160)
+		arr.TextSize = 10
+
+		db.MouseButton1Click:Connect(function()
+			if x6.dlst_container then
+				local new_state = not x6.dlst_container.Visible
+				if m:FindFirstChild("TargetListContainer") and m.TargetListContainer.Visible then
+					toggle_window(m.TargetListContainer, false, true)
+				end
+				toggle_window(x6.dlst_container, new_state, true)
+				if new_state and x6.populate_modes then
+					-- The typed filter, not a hardcoded "". msb lives outside f1 so its
+					-- text persists for the session: reopening the dropdown showed the
+					-- full list while the box still read the old search.
+					x6.populate_modes(x6.mode_filter and x6.mode_filter() or "")
+				end
+			end
+		end)
+
+		local gsc = Instance.new("Frame", c)
+		gsc.BackgroundTransparency = 1
+		gsc.Size = UDim2.new(1, 0, 0, 0)
+		gsc.AutomaticSize = Enum.AutomaticSize.Y
+		local gscl = Instance.new("UIListLayout", gsc)
+		gscl.Padding = UDim.new(0, 8)
+		gscl.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		local sc = Instance.new("Frame", c)
+		sc.BackgroundTransparency = 1
+		sc.Size = UDim2.new(1, 0, 0, 0)
+		sc.AutomaticSize = Enum.AutomaticSize.Y
+		local scl = Instance.new("UIListLayout", sc)
+		scl.Padding = UDim.new(0, 8)
+		scl.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		local function f1()
+			if x6.f1_connections then
+				for _, conn in ipairs(x6.f1_connections) do
+					if conn then conn:Disconnect() end
+				end
+				table.clear(x6.f1_connections)
+			else
+				x6.f1_connections = {}
+			end
+			sc:ClearAllChildren()
+			gsc:ClearAllChildren()
+			local gscl = Instance.new("UIListLayout", gsc)
+			gscl.Padding = UDim.new(0, 10)
+			gscl.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			local scl = Instance.new("UIListLayout", sc)
+			scl.Padding = UDim.new(0, 8)
+			scl.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			local s = x1.S[x1.k6] or {}
+
+			et(gsc, "Simplified Interface", x1.SimpleMode, function(v)
+				x1.SimpleMode = v
+				save_settings()
+				f1()
+			end)
+
+			et(gsc, "Show Status HUD", x1.ShowHUD ~= false, function(v)
+				x1.ShowHUD = v
+				if hud then hud.Visible = v end
+				save_settings()
+			end)
+
+			et(gsc, "Preserve Collisions", x1.PreserveCollisions, function(v)
+				x1.PreserveCollisions = v
+				-- while disabled every part already holds its original collision, so
+				-- turning this off there would undo that until the next enable
+				local keep = v or x1.Disabled
+				for part, data in pairs(x6.a) do
+					if part and part.Parent then
+						part.CanCollide = keep and data.original_can_collide or false
+					end
+				end
+				save_settings()
+			end)
+
+			et(gsc, "Anchor to Self", x1.AnchorSelf, function(v)
 				x1.AnchorSelf = v
 				if v then
 					x1.PI_All = false
 					table.clear(x1.Targets)
 					x1.TgtActive = false
+					f1()
 				end
 				save_settings()
-				if render_players then
-					render_players()
-				end
-			end, "Locks the gravitational centre onto your own character.")
-
-			local _, all_api = et(grp, "Target Everyone", x1.PI_All, function(v)
-				x1.PI_All = v
-				if v then
-					x1.AnchorSelf = false
-					table.clear(x1.Targets)
-					x1.TgtActive = false
-				end
-				save_settings()
-				if render_players then
-					render_players()
-				end
-			end, "Spreads the formation across every player in the server.")
-
-			on_sync(function()
-				self_api.set(x1.AnchorSelf)
-				all_api.set(x1.PI_All)
 			end)
 
-			eh(page, "Players")
-
-			local clear_btn = E.button(page, "CLEAR TARGETS", function()
-				table.clear(x1.Targets)
-				x1.TgtActive = false
-				save_settings()
-				if render_players then
-					render_players()
-				end
-			end, "danger", is_mobile and 32 or 34)
-			clear_btn.Visible = false
-
-			local roster, filtered = {}, {}
-			local query = ""
-
-			local function collect()
-				table.clear(roster)
-				for _, pl in ipairs(v2:GetPlayers()) do
-					if pl ~= v8 then
-						roster[#roster + 1] = pl
-					end
-				end
-				table.sort(roster, function(a, b)
-					local sa = table.find(x1.Targets, a) and 1 or 0
-					local sb = table.find(x1.Targets, b) and 1 or 0
-					if sa ~= sb then
-						return sa > sb
-					end
-					return string.lower(a.DisplayName) < string.lower(b.DisplayName)
-				end)
-				table.clear(filtered)
-				if query ~= "" then
-					local needle = string.lower(query)
-					for _, pl in ipairs(roster) do
-						if
-							string.find(string.lower(pl.DisplayName), needle, 1, true)
-							or string.find(string.lower(pl.Name), needle, 1, true)
-						then
-							filtered[#filtered + 1] = pl
-						end
-					end
-				else
-					table.move(roster, 1, #roster, 1, filtered)
-				end
-				return filtered
-			end
-
-			E.search(page, "Search players", function(text)
-				query = text
-				render_players()
-			end)
-
-			local empty = label(page, "No other players in this server.", 10, TH.font.body, TH.tx3, {
-				Size = U2(1, 0, 0, 30),
-				TextXAlignment = Enum.TextXAlignment.Center,
-			})
-
-			local holder = new("Frame", {
-				BackgroundTransparency = 1,
-				Size = U2(1, 0, 0, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-			}, page)
-			list(holder, 4)
-
-			local highlight = nil
-			local function clear_highlight()
-				if highlight then
-					pcall(function()
-						highlight:Destroy()
-					end)
-					highlight = nil
-				end
-			end
-
-			local function player_row(parent)
-				local frame = new("TextButton", {
-					BackgroundColor3 = TH.bg2,
-					BorderSizePixel = 0,
-					Size = U2(1, 0, 0, is_mobile and 46 or 48),
-					Text = "",
-					AutoButtonColor = false,
-					ClipsDescendants = true,
-				}, parent)
-				corner(frame, TH.radius_row)
-				local row_stroke = stroke(frame, TH.line, 1, 0.45)
-
-				local avatar = new("ImageLabel", {
-					BackgroundColor3 = TH.bg3,
-					BorderSizePixel = 0,
-					AnchorPoint = V2(0, 0.5),
-					Position = U2(0, 8, 0.5, 0),
-					Size = U2(0, 32, 0, 32),
-					ZIndex = 2,
-				}, frame)
-				corner(avatar, UD(1, 0))
-				local avatar_stroke = stroke(avatar, TH.line, 1.5, 0.2)
-
-				local dname = label(frame, "", 12, TH.font.bold, TH.tx1, {
-					Position = U2(0, 48, 0, 8),
-					Size = U2(1, -84, 0, 16),
-					ZIndex = 2,
-					TextTruncate = Enum.TextTruncate.AtEnd,
-				})
-				local uname = label(frame, "", 10, TH.font.med, TH.tx3, {
-					Position = U2(0, 48, 0, 24),
-					Size = U2(1, -84, 0, 14),
-					ZIndex = 2,
-					TextTruncate = Enum.TextTruncate.AtEnd,
-				})
-
-				local pip = new("Frame", {
-					BackgroundColor3 = TH.bg4,
-					BorderSizePixel = 0,
-					AnchorPoint = V2(1, 0.5),
-					Position = U2(1, -12, 0.5, 0),
-					Size = U2(0, 12, 0, 12),
-					ZIndex = 2,
-				}, frame)
-				corner(pip, UD(1, 0))
-				local pip_stroke = stroke(pip, TH.line, 1.5, 0)
-				local pip_scale = new("UIScale", {}, pip)
-
-				local who
-				local function paint(selected)
-					fx.to(pip, "BackgroundColor3", selected and TH.ok or TH.bg4, "flow")
-					fx.to(pip_stroke, "Color", selected and TH.ok or TH.line, "flow")
-					fx.to(row_stroke, "Color", selected and TH.ok or TH.line, "flow")
-					fx.to(row_stroke, "Transparency", selected and 0.1 or 0.45, "flow")
-					fx.to(avatar_stroke, "Color", selected and TH.ok or TH.line, "flow")
-				end
-
-				E.interactive(frame, {
-					ripple_color = TH.ok,
-					paint = function(hover)
-						fx.to(frame, "BackgroundColor3", hover and TH.bg3 or TH.bg2, "snap")
-						if hover and who and who.Character then
-							clear_highlight()
-							local ok, h = pcall(function()
-								local inst = Instance.new("Highlight")
-								inst.FillColor = TH.acc2
-								inst.OutlineColor = TH.white
-								inst.FillTransparency = 0.65
-								inst.Parent = who.Character
-								return inst
-							end)
-							highlight = ok and h or nil
-						elseif not hover then
-							clear_highlight()
-						end
-					end,
-				})
-
-				frame.MouseButton1Click:Connect(function()
-					if not who then
-						return
-					end
-					local idx = table.find(x1.Targets, who)
-					if idx then
-						table.remove(x1.Targets, idx)
-					else
-						table.insert(x1.Targets, who)
-						x1.AnchorSelf = false
-						x1.PI_All = false
-					end
-					x1.TgtActive = #x1.Targets > 0
-					fx.punch(pip_scale, "Scale", 1.8, 1, "bounce")
-					paint(idx == nil)
-					clear_btn.Visible = #x1.Targets > 0
+			if not x1.SimpleMode then
+				et(gsc, "Anti-Fling", x1.AntiFling, function(v)
+					x1.AntiFling = v
 					save_settings()
 				end)
-
-				return {
-					frame = frame,
-					bind = function(item)
-						who = item
-						dname.Text = item.DisplayName
-						uname.Text = "@" .. item.Name
-						avatar.Image = "rbxthumb://type=AvatarHeadShot&id=" .. item.UserId .. "&w=48&h=48"
-						paint(table.find(x1.Targets, item) ~= nil)
-					end,
-				}
+				et(gsc, "Force Smooth (Lags)", x1["Force Smooth (Lags)"], function(v)
+					x1["Force Smooth (Lags)"] = v
+					save_settings()
+				end)
+				et(gsc, "Realistic Liftoff", x1["Realistic Liftoff"], function(v)
+					x1["Realistic Liftoff"] = v
+					save_settings()
+				end)
 			end
 
-			local draw = pooled(holder, player_row)
-			render_players = function()
-				if not page.Parent then
-					return
+			x6.disable_btn = et(gsc, "Disable Gravity", x1.Disabled, function(v)
+				-- System owns the switch: parts get their collision back and stop
+				-- being driven while disabled, and both are undone on enable. Doing
+				-- it here as well would only be a second, partial copy.
+				if context.x4 and context.x4.apply_disabled then
+					context.x4.apply_disabled(v)
+				else
+					x1.Disabled = v
 				end
-				local n = draw(collect())
-				empty.Visible = n == 0
-				clear_btn.Visible = x1.Targets and #x1.Targets > 0
+				save_settings()
+			end)
+
+			if not x1.SimpleMode then
+				et(gsc, "Target Everyone", x1.PI_All, function(v)
+					x1.PI_All = v
+					if v then
+						x1.AnchorSelf = false
+						table.clear(x1.Targets)
+						x1.TgtActive = false
+						f1()
+					end
+					save_settings()
+				end)
 			end
-			render_players()
+
+			local l_btn = Instance.new("TextButton", gsc)
+			l_btn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+			l_btn.Size = UDim2.new(1, 0, 0, 36)
+			l_btn.Text = "FORCE LAUNCH"
+			l_btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+			l_btn.Font = Enum.Font.GothamBold
+			l_btn.TextSize = 13
+			Instance.new("UICorner", l_btn).CornerRadius = UDim.new(0, 6)
+			-- == true, not the bare value: Visible rejects nil, and an unset
+			-- SlingshotManual made this whole expression nil whenever Slingshot was
+			-- the live shape, which threw here and abandoned the rest of f1 --
+			-- taking the target selector, the shape controls and reset with it.
+			l_btn.Visible = x1.k6 == "Slingshot" and x1.SlingshotManual == true
+
+			l_btn.MouseButton1Click:Connect(function()
+				x1.IsLaunching = not x1.IsLaunching
+				l_btn.Text = x1.IsLaunching and "RESET SYSTEM" or "FORCE LAUNCH"
+				l_btn.BackgroundColor3 = x1.IsLaunching and Color3.fromRGB(50, 150, 200) or Color3.fromRGB(200, 50, 50)
+			end)
 
 			table.insert(
-				x6.c,
-				v2.PlayerAdded:Connect(function()
-					if render_players then
-						render_players()
+				x6.f1_connections,
+				v3.Heartbeat:Connect(function()
+					if x1.k6 == "Slingshot" and x1.SlingshotManual == true then
+						l_btn.Visible = true
+						l_btn.Text = x1.IsLaunching and "RESET SYSTEM" or "FORCE LAUNCH"
+						l_btn.BackgroundColor3 = x1.IsLaunching and Color3.fromRGB(50, 150, 200)
+							or Color3.fromRGB(200, 50, 50)
+					else
+						l_btn.Visible = false
 					end
 				end)
 			)
-			table.insert(
-				x6.c,
-				v2.PlayerRemoving:Connect(function()
-					task.defer(function()
-						if render_players then
-							render_players()
+
+			local tn = "Select Target"
+			if x1.Targets and #x1.Targets > 0 then
+				if #x1.Targets == 1 then
+					tn = "Target: " .. (x1.Targets[1].DisplayName or x1.Targets[1].Name)
+				else
+					tn = "Multi-Target (" .. tostring(#x1.Targets) .. ")"
+				end
+			end
+
+			local tdb = Instance.new("TextButton", gsc)
+			tdb.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+			tdb.Size = UDim2.new(1, 0, 0, 38)
+			tdb.Text = "  " .. tn:upper()
+			tdb.TextColor3 = Color3.fromRGB(255, 255, 255)
+			tdb.Font = Enum.Font.GothamBold
+			tdb.TextSize = 12
+			tdb.TextXAlignment = 0
+			Instance.new("UICorner", tdb).CornerRadius = UDim.new(0, 6)
+			local dst2 = Instance.new("UIStroke", tdb)
+			dst2.Color = Color3.fromRGB(40, 40, 45)
+
+			-- Repaints only what the target list feeds -- this button's label and the
+			-- HUD -- so a selection does not have to go through f1(), which destroys
+			-- and rebuilds the picker hidden. Re-closed over tdb on every f1, so it
+			-- always points at the live button. The × affordance appears on the next
+			-- real rebuild, which is enough: clearing is one click on an open list.
+			x5.refresh_body = function()
+				local label = "Select Target"
+				if x1.Targets and #x1.Targets > 0 then
+					if #x1.Targets == 1 then
+						local t1 = x1.Targets[1]
+						label = "Target: " .. (t1.DisplayName or t1.Name)
+					else
+						label = "Multi-Target (" .. tostring(#x1.Targets) .. ")"
+					end
+				end
+				if tdb and tdb.Parent then
+					tdb.Text = "  " .. label:upper()
+				end
+			end
+
+			if x1.Targets and #x1.Targets > 0 then
+				local ctb = Instance.new("TextButton", tdb)
+				ctb.BackgroundTransparency = 1
+				ctb.Position = UDim2.new(1, -30, 0, 0)
+				ctb.Size = UDim2.new(0, 30, 1, 0)
+				ctb.Text = "×"
+				ctb.TextColor3 = Color3.fromRGB(200, 80, 80)
+				ctb.TextSize = 20
+				ctb.MouseButton1Click:Connect(function()
+					table.clear(x1.Targets)
+					x1.TgtActive = false
+					f1()
+				end)
+			end
+
+			if m:FindFirstChild("TargetListContainer") then
+				m.TargetListContainer:Destroy()
+			end
+			local tdlst = Instance.new("CanvasGroup", m)
+			tdlst.Name = "TargetListContainer"
+			tdlst.Visible = false
+			tdlst.GroupTransparency = 1
+			tdlst.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+			tdlst.Position = UDim2.new(1, 15, 0, 0)
+			tdlst.Size = UDim2.new(0, 220, 1, 0)
+			Instance.new("UICorner", tdlst).CornerRadius = UDim.new(0, 10)
+			local ts = Instance.new("UIStroke", tdlst)
+			ts.Color = Color3.fromRGB(40, 40, 45)
+
+			local search_bar = Instance.new("TextBox", tdlst)
+			search_bar.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+			search_bar.Position = UDim2.new(0, 10, 0, 10)
+			search_bar.Size = UDim2.new(1, -20, 0, 34)
+			search_bar.PlaceholderText = "Search players..."
+			search_bar.Text = ""
+			search_bar.TextColor3 = Color3.fromRGB(255, 255, 255)
+			search_bar.Font = Enum.Font.Gotham
+			search_bar.TextSize = 13
+			Instance.new("UICorner", search_bar).CornerRadius = UDim.new(0, 6)
+
+			local scroll_frame = Instance.new("ScrollingFrame", tdlst)
+			scroll_frame.BackgroundTransparency = 1
+			scroll_frame.Position = UDim2.new(0, 0, 0, 55)
+			scroll_frame.Size = UDim2.new(1, 0, 1, -65)
+			scroll_frame.ScrollBarThickness = 0
+			scroll_frame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+			local tdll = Instance.new("UIListLayout", scroll_frame)
+			tdll.Padding = UDim.new(0, 5)
+			tdll.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+			local active_highlight = nil
+			local function clear_highlight()
+				if active_highlight then
+					active_highlight:Destroy()
+					active_highlight = nil
+				end
+			end
+
+			local function update_list(filter_text)
+				clear_highlight()
+				scroll_frame:ClearAllChildren()
+				local tdll = Instance.new("UIListLayout", scroll_frame)
+				tdll.Padding = UDim.new(0, 5)
+				tdll.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+				for _, pl in ipairs(v2:GetPlayers()) do
+					if pl == v8 then
+						continue
+					end
+					if
+						filter_text ~= ""
+						and not (
+							pl.DisplayName:lower():find(filter_text:lower(), 1, true) or pl.Name:lower():find(filter_text:lower(), 1, true)
+						)
+					then
+						continue
+					end
+
+					local ib = Instance.new("TextButton", scroll_frame)
+					ib.Size = UDim2.new(1, -16, 0, 44)
+					ib.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+					ib.Text = ""
+					ib.AutoButtonColor = false
+					Instance.new("UICorner", ib).CornerRadius = UDim.new(0, 6)
+					
+					local is_selected = table.find(x1.Targets, pl) ~= nil
+					local sel_indicator = Instance.new("Frame", ib)
+					sel_indicator.Position = UDim2.new(1, -24, 0.5, -6)
+					sel_indicator.Size = UDim2.new(0, 12, 0, 12)
+					sel_indicator.BackgroundColor3 = is_selected and Color3.fromRGB(60, 200, 100) or Color3.fromRGB(60, 60, 65)
+					Instance.new("UICorner", sel_indicator).CornerRadius = UDim.new(1, 0)
+
+					local pfp = Instance.new("ImageLabel", ib)
+					pfp.Size = UDim2.new(0, 32, 0, 32)
+					pfp.Position = UDim2.new(0, 6, 0.5, -16)
+					pfp.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+					pfp.Image = "rbxthumb://type=AvatarHeadShot&id=" .. pl.UserId .. "&w=48&h=48"
+					Instance.new("UICorner", pfp).CornerRadius = UDim.new(1, 0)
+
+					local dname = Instance.new("TextLabel", ib)
+					dname.BackgroundTransparency = 1
+					dname.Position = UDim2.new(0, 46, 0, 6)
+					dname.Size = UDim2.new(1, -54, 0, 16)
+					dname.Text = pl.DisplayName
+					dname.TextColor3 = Color3.fromRGB(255, 255, 255)
+					dname.Font = Enum.Font.GothamBold
+					dname.TextSize = 13
+					dname.TextXAlignment = 0
+
+					local uname = Instance.new("TextLabel", ib)
+					uname.BackgroundTransparency = 1
+					uname.Position = UDim2.new(0, 46, 0, 22)
+					uname.Size = UDim2.new(1, -54, 0, 14)
+					uname.Text = "@" .. pl.Name
+					uname.TextColor3 = Color3.fromRGB(150, 150, 150)
+					uname.Font = Enum.Font.GothamMedium
+					uname.TextSize = 10
+					uname.TextXAlignment = 0
+
+					ib.MouseEnter:Connect(function()
+						ib.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+						-- Cleared first: moving the pointer fast enough gets the next
+						-- row's MouseEnter in before this row's MouseLeave, and the
+						-- single-slot handle would otherwise drop the older one
+						-- unreachable while it stayed parented to its character.
+						clear_highlight()
+						if pl.Character then
+							local h = Instance.new("Highlight")
+							h.FillColor = Color3.fromRGB(255, 255, 255)
+							h.OutlineColor = Color3.fromRGB(255, 255, 255)
+							-- Adopted by the row rather than the character, so the
+							-- teardown below takes it with it. Clicking a row calls
+							-- f1(), which Destroy()s this whole list, and a Destroy
+							-- fires no MouseLeave -- so a highlight parented to the
+							-- character outlived the only handle to it and left that
+							-- player glowing for the rest of the session.
+							h.Adornee = pl.Character
+							h.Parent = ib
+							active_highlight = h
 						end
 					end)
-				end)
-			)
-			page.AncestryChanged:Connect(function(_, p)
-				if not p then
-					clear_highlight()
-				end
-			end)
-		end
+					ib.MouseLeave:Connect(function()
+						ib.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+						clear_highlight()
+					end)
 
-		-- TUNING -------------------------------------------------------
-		local function build_tuning(page)
-			eh(page, "Tracking")
-			local trk = E.card(page, 6)
-			et(trk, "Predictive Tracking", x1.PredictiveTracking ~= false, function(v)
-				x1.PredictiveTracking = v
-				save_settings()
-			end, "Leads the target's movement so parts stop trailing behind them.")
-			es(trk, "Prediction Factor", 0, 500, x1.PredictionFactor or 150, function(v)
-				x1.PredictionFactor = v
-				save_settings()
-			end, false, "How far ahead of the target the formation aims.")
-
-			eh(page, "Solver")
-			local slv = E.card(page, 6)
-			es(slv, "Damping", 0, 5, x1.Damping, function(v)
-				x1.Damping = v
-				save_settings()
-			end, false, "Bleeds off velocity. Higher is smoother but slower to settle.")
-			es(slv, "Integral Gain", 0, 10, x1.Ki, function(v)
-				x1.Ki = v
-				save_settings()
-			end, false, "Drives parts onto their exact target position, fixing sag.")
-			es(slv, "Max Speed", 50, 2000, x1.MaxSpeed or 500, function(v)
-				x1.MaxSpeed = v
-				save_settings()
-			end, false, "Velocity ceiling that keeps parts from flinging away.")
-			es(slv, "Angular Damping", 0, 1, x1.AngularDamping or 0.5, function(v)
-				x1.AngularDamping = v
-				save_settings()
-			end, false, "Stops parts spinning on their own axis.")
-			es(slv, "Vertical Stiffness", 0.1, 5, x1.VerticalStiffness or 1.0, function(v)
-				x1.VerticalStiffness = v
-				save_settings()
-			end, false, "Multiplies vertical pull to fight world gravity. 1.0 is neutral.")
-			es(slv, "Smoothing", 0, 1, x1.k8 or 0.8, function(v)
-				x1.k8 = v
-				save_settings()
-			end, false, "Blends each frame's velocity into the last. Lower is snappier.")
-
-			eh(page, "Ownership")
-			local own = E.card(page, 6)
-			et(own, "Aggressive Claiming", x1.AggressiveClaim, function(v)
-				x1.AggressiveClaim = v
-				save_settings()
-			end, "Forces network ownership by teleporting parts to you. Very loud.")
-			et(own, "Void Protection", x1.VoidProtection, function(v)
-				x1.VoidProtection = v
-				save_settings()
-			end, "Ignores targets that have fallen out of the world.")
-			es(own, "Claim Radius", 200, 8000, x1.k1 or 2000, function(v)
-				x1.k1 = v
-				save_settings()
-			end, true, "Parts further than this from the centre are left alone.")
-
-			eh(page, "Core")
-			local core_card = E.card(page, 8)
-			E.color(core_card, x1.k3, function(c)
-				x1.k3 = c
-				update_core_color()
-			end)
-			es(core_card, "Core Size", 1, 40, (x1.k2 and x1.k2.X) or 5, update_core_size, false)
-		end
-
-		-- SYSTEM -------------------------------------------------------
-		local function build_system(page)
-			eh(page, "Interface")
-			local iface = E.card(page, 6)
-
-			es(iface, "UI Scale", 0.6, 1.6, tonumber(x1.UIScale) or 1, function(v)
-				x1.UIScale = v
-				if x5.relayout then
-					x5.relayout()
-				end
-			end, false)
-
-			local fx_index = 2
-			if (x1.FX or 2) == 0 then
-				fx_index = 1
-			elseif x1.FXAuto == false then
-				fx_index = 3
-			end
-			E.segmented(iface, { "LOW FX", "BALANCED", "MAX FX" }, fx_index, function(i)
-				if i == 1 then
-					x1.FX, x1.FXAuto = 0, false
-				elseif i == 2 then
-					x1.FX, x1.FXAuto = 2, true
-				else
-					x1.FX, x1.FXAuto = 2, false
-				end
-				save_settings()
-			end)
-			label(iface, "Balanced sheds effects automatically when frames get tight.", 10, TH.font.body, TH.tx3, {
-				Size = U2(1, 0, 0, 24),
-				TextWrapped = true,
-			})
-
-			et(iface, "Action Dock", x1.ShowDock and true or false, function(v)
-				x1.ShowDock = v
-				set_dock(v)
-				save_settings()
-			end, "A floating cluster of place, clear, raise and lower controls.")
-
-			eh(page, "Game Performance")
-			local perf = E.card(page, 6)
-			et(perf, "Disable Shadows", x1.Perf_DisableShadows, function(v)
-				x1.Perf_DisableShadows = v
-				ApplyPerfShadows(v)
-				save_settings()
-			end, "Turns off world shadows. Usually the single biggest FPS win.")
-			et(perf, "Disable Post-FX", x1.Perf_DisablePostFX, function(v)
-				x1.Perf_DisablePostFX = v
-				ApplyPerfPostFX(v)
-				save_settings()
-			end, "Kills bloom, blur, sun rays and colour correction.")
-			et(perf, "Potato Materials", x1.Perf_PotatoMaterials, function(v)
-				x1.Perf_PotatoMaterials = v
-				ApplyPerfMaterials(v)
-				save_settings()
-			end, "Forces every part in the world to SmoothPlastic.")
-			et(perf, "Hide Particles", x1.Perf_HideParticles, function(v)
-				x1.Perf_HideParticles = v
-				ApplyPerfParticles(v)
-				save_settings()
-			end, "Hides fire, smoke, beams, trails and emitters.")
-			es(perf, "FPS Cap", 30, 360, mclamp(tonumber(x1.FPSCap) or 240, 30, 360), function(v)
-				x1.FPSCap = v
-				if setfpscap then
-					pcall(setfpscap, v >= 360 and 0 or v)
-				end
-				save_settings()
-			end, true, "360 removes the cap entirely.")
-			es(perf, "Physics Stride", 1, 20, x1.k7 or 4, function(v)
-				x1.k7 = v
-				save_settings()
-			end, true, "Frames between updates for each part. Higher is cheaper.")
-
-			eh(page, "Controls")
-			local keys = E.card(page, 8)
-			local KEYS = {
-				{ "E", "Place the gravitational core at your cursor" },
-				{ "Q", "Release every claimed part and reset" },
-				{ "P", "Pause and resume physics" },
-				{ "L", "Disable and enable the engine" },
-				{ "R CTRL", "Hide or show this interface" },
-			}
-			for _, entry in ipairs(KEYS) do
-				local wide = #entry[1] > 2
-				local r = new("Frame", { BackgroundTransparency = 1, Size = U2(1, 0, 0, 24) }, keys)
-				local cap = new("Frame", {
-					BackgroundColor3 = TH.bg3,
-					BorderSizePixel = 0,
-					AnchorPoint = V2(0, 0.5),
-					Position = U2(0, 0, 0.5, 0),
-					Size = U2(0, wide and 54 or 26, 0, 18),
-				}, r)
-				corner(cap, 5)
-				stroke(cap, TH.line, 1, 0.2)
-				label(cap, entry[1], 9, TH.font.bold, TH.acc2, { TextXAlignment = Enum.TextXAlignment.Center })
-				label(r, entry[2], 10, TH.font.body, TH.tx3, {
-					Position = U2(0, wide and 64 or 36, 0, 0),
-					Size = U2(1, wide and -64 or -36, 1, 0),
-					TextTruncate = Enum.TextTruncate.AtEnd,
-				})
-			end
-
-			eh(page, "Community")
-			E.button(page, "COPY DISCORD INVITE", function()
-				local copied = false
-				pcall(function()
-					if setclipboard then
-						setclipboard("https://discord.gg/9xYyyYuKap")
-						copied = true
-					elseif toclipboard then
-						toclipboard("https://discord.gg/9xYyyYuKap")
-						copied = true
-					end
-				end)
-				x5.toast(
-					"Discord",
-					copied and "Invite copied to clipboard" or "Clipboard is unavailable here",
-					copied and "ok" or "warn"
-				)
-			end, "quiet", is_mobile and 34 or 36)
-
-			eh(page, "Danger Zone")
-			E.button(page, "RESET ALL SETTINGS", function()
-				x5.confirm(
-					"RESET EVERYTHING?",
-					"Every global option and every formation parameter returns to its default. This cannot be undone.",
-					function()
-						if not reset_config then
-							return
+					ib.MouseButton1Click:Connect(function()
+						local idx = table.find(x1.Targets, pl)
+						if idx then
+							table.remove(x1.Targets, idx)
+							sel_indicator.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
+						else
+							table.insert(x1.Targets, pl)
+							sel_indicator.BackgroundColor3 = Color3.fromRGB(60, 200, 100)
+							x1.AnchorSelf = false
+							x1.PI_All = false
 						end
+						x1.TgtActive = (#x1.Targets > 0)
+						-- Repaint the HUD and the panel body, but leave this list alone.
+						-- f1() destroys and rebuilds the picker hidden, so selecting three
+						-- players meant reopening it three times -- and the two
+						-- sel_indicator writes above were dead work, overwritten by a
+						-- rebuild microseconds later. Any typed search text survives too.
+						if x5.refresh_body then
+							x5.refresh_body()
+						end
+					end)
+				end
+			end
+
+			table.insert(x6.f1_connections, search_bar:GetPropertyChangedSignal("Text"):Connect(function()
+				update_list(search_bar.Text)
+			end))
+			tdb.MouseButton1Click:Connect(function()
+				local new_state = not tdlst.Visible
+				if x6.dlst_container and x6.dlst_container.Visible then
+					toggle_window(x6.dlst_container, false, true)
+				end
+				toggle_window(tdlst, new_state, true)
+				if new_state then
+					update_list("")
+				end
+			end)
+
+			if not x1.SimpleMode then
+				local shape_mod = get_shape(x1.k6)
+				if shape_mod and shape_mod.Controls then
+					for _, ctrl in ipairs(shape_mod.Controls) do
+						local current_val = s[ctrl.Key]
+						local p_frame = ctrl.Parent == "gsc" and gsc or sc
+						if ctrl.Type == "Slider" then
+							if ctrl.LegacyToggle and type(current_val) == "boolean" then
+								current_val = current_val and 2 or 1
+								s[ctrl.Key] = current_val
+							end
+							if current_val == nil then
+								if ctrl.Default ~= nil then
+									current_val = ctrl.Default
+								else
+									current_val = ctrl.Min
+								end
+							end
+							local max_val = ctrl.Max
+							if string.find(ctrl.Name:lower(), "speed") and not ctrl.ExactMax then
+								max_val = max_val + 300
+							end
+							if ctrl.Div then current_val = current_val * ctrl.Div end
+							current_val = math.clamp(current_val, ctrl.Min, max_val)
+							s[ctrl.Key] = ctrl.Div and (current_val / ctrl.Div) or current_val
+							es(p_frame, ctrl.Name, ctrl.Min, max_val, current_val, function(v)
+								if ctrl.Div then s[ctrl.Key] = v / ctrl.Div else s[ctrl.Key] = v end
+							end, ctrl.IntOnly, ctrl.Desc)
+						elseif ctrl.Type == "Toggle" then
+							if type(current_val) ~= "boolean" then
+								current_val = ctrl.Default == true
+							end
+							-- Seated back into the config like the Slider and TextBox
+							-- branches already do. Without it a Toggle whose key is
+							-- missing from config.lua draws itself ON from its Default
+							-- while the shape keeps reading c[key] as nil and behaves
+							-- OFF, and the two only agree once the user clicks it.
+							s[ctrl.Key] = current_val
+							et(p_frame, ctrl.Name, current_val, function(v)
+								s[ctrl.Key] = v
+							end, ctrl.Desc)
+						elseif ctrl.Type == "TextBox" and etb then
+							if type(current_val) ~= "string" then
+								current_val = type(ctrl.Default) == "string" and ctrl.Default or ""
+							end
+							s[ctrl.Key] = current_val
+							etb(p_frame, ctrl.Name, current_val, function(v)
+								s[ctrl.Key] = v
+							end, ctrl.Desc, ctrl.MaxChars)
+						end
+					end
+				end
+			end
+
+			local reset_btn = Instance.new("TextButton", sc)
+		reset_btn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+		reset_btn.Size = UDim2.new(1, 0, 0, 40)
+		reset_btn.Text = "⚠ RESET ALL SETTINGS"
+		reset_btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+		reset_btn.Font = Enum.Font.GothamBold
+		reset_btn.TextSize = 13
+		reset_btn.AutoButtonColor = false
+		Instance.new("UICorner", reset_btn).CornerRadius = UDim.new(0, 6)
+		local reset_stroke = Instance.new("UIStroke", reset_btn)
+		reset_stroke.Color = Color3.fromRGB(255, 80, 80)
+		reset_stroke.Thickness = 1
+
+		reset_btn.MouseEnter:Connect(function()
+			v6:Create(reset_btn, A.HOVER, { BackgroundColor3 = Color3.fromRGB(220, 50, 50) }):Play()
+			v6:Create(reset_stroke, A.HOVER, { Color = Color3.fromRGB(255, 120, 120) }):Play()
+		end)
+		reset_btn.MouseLeave:Connect(function()
+			v6:Create(reset_btn, A.HOVER, { BackgroundColor3 = Color3.fromRGB(180, 40, 40) }):Play()
+			v6:Create(reset_stroke, A.HOVER, { Color = Color3.fromRGB(255, 80, 80) }):Play()
+		end)
+
+			reset_btn.MouseButton1Click:Connect(function()
+				if x6.reset_confirm then
+					x6.reset_confirm:Destroy()
+					x6.reset_confirm = nil
+				end
+
+				local confirm = Instance.new("CanvasGroup", sg)
+				confirm.Name = "ResetConfirm"
+				confirm.BackgroundColor3 = Color3.fromRGB(12, 12, 15)
+				confirm.Position = UDim2.new(0.5, -160, 0.5, -100)
+				confirm.Size = UDim2.new(0, 320, 0, 200)
+				confirm.GroupTransparency = 1
+				confirm.ZIndex = 100
+				Instance.new("UICorner", confirm).CornerRadius = UDim.new(0, 12)
+				local confirm_stroke = Instance.new("UIStroke", confirm)
+				confirm_stroke.Color = Color3.fromRGB(120, 40, 40)
+				confirm_stroke.Thickness = 1
+
+				local warning_icon = Instance.new("TextLabel", confirm)
+				warning_icon.BackgroundTransparency = 1
+				warning_icon.Position = UDim2.new(0.5, -15, 0, 15)
+				warning_icon.Size = UDim2.new(0, 30, 0, 30)
+				warning_icon.Text = "⚠"
+				warning_icon.TextColor3 = Color3.fromRGB(255, 100, 100)
+				warning_icon.TextSize = 24
+				warning_icon.ZIndex = 101
+
+				local confirm_title = Instance.new("TextLabel", confirm)
+				confirm_title.BackgroundTransparency = 1
+				confirm_title.Position = UDim2.new(0, 20, 0, 50)
+				confirm_title.Size = UDim2.new(1, -40, 0, 30)
+				confirm_title.Text = "RESET ALL SETTINGS?"
+				confirm_title.TextColor3 = Color3.fromRGB(255, 255, 255)
+				confirm_title.Font = Enum.Font.GothamBold
+				confirm_title.TextSize = 16
+				confirm_title.ZIndex = 101
+
+				local confirm_desc = Instance.new("TextLabel", confirm)
+				confirm_desc.BackgroundTransparency = 1
+				confirm_desc.Position = UDim2.new(0, 20, 0, 80)
+				confirm_desc.Size = UDim2.new(1, -40, 0, 40)
+				confirm_desc.Text = "This will reset all settings and shape configurations to their default values. This cannot be undone."
+				confirm_desc.TextColor3 = Color3.fromRGB(150, 150, 160)
+				confirm_desc.Font = Enum.Font.Gotham
+				confirm_desc.TextSize = 12
+				confirm_desc.TextWrapped = true
+				confirm_desc.ZIndex = 101
+
+				local cancel_btn = Instance.new("TextButton", confirm)
+				cancel_btn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+				cancel_btn.Position = UDim2.new(0, 20, 1, -50)
+				cancel_btn.Size = UDim2.new(0.5, -30, 0, 36)
+				cancel_btn.Text = "CANCEL"
+				cancel_btn.TextColor3 = Color3.fromRGB(200, 200, 210)
+				cancel_btn.Font = Enum.Font.GothamBold
+				cancel_btn.TextSize = 12
+				cancel_btn.AutoButtonColor = false
+				cancel_btn.ZIndex = 101
+				Instance.new("UICorner", cancel_btn).CornerRadius = UDim.new(0, 6)
+				local cancel_stroke = Instance.new("UIStroke", cancel_btn)
+				cancel_stroke.Color = Color3.fromRGB(50, 50, 55)
+
+				local confirm_reset_btn = Instance.new("TextButton", confirm)
+				confirm_reset_btn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+				confirm_reset_btn.Position = UDim2.new(0.5, 10, 1, -50)
+				confirm_reset_btn.Size = UDim2.new(0.5, -30, 0, 36)
+				confirm_reset_btn.Text = "RESET"
+				confirm_reset_btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+				confirm_reset_btn.Font = Enum.Font.GothamBold
+				confirm_reset_btn.TextSize = 12
+				confirm_reset_btn.AutoButtonColor = false
+				confirm_reset_btn.ZIndex = 101
+				Instance.new("UICorner", confirm_reset_btn).CornerRadius = UDim.new(0, 6)
+				local confirm_reset_stroke = Instance.new("UIStroke", confirm_reset_btn)
+				confirm_reset_stroke.Color = Color3.fromRGB(120, 30, 30)
+
+				-- Both buttons dismiss the same way, and the destroy has to wait out
+				-- the fade -- so the delay is read off the curve rather than
+				-- repeating its duration as a literal that drifts when A.CLOSE
+				-- changes.
+				local function dismiss_confirm()
+					v6:Create(confirm, A.CLOSE, { GroupTransparency = 1 }):Play()
+					set_pop(confirm, 0.9, A.CLOSE_POP)
+					task.delay(A.CLOSE.Time, function()
+						if confirm.Parent then confirm:Destroy() end
+						if x6.reset_confirm == confirm then x6.reset_confirm = nil end
+					end)
+				end
+
+				cancel_btn.MouseButton1Click:Connect(dismiss_confirm)
+
+				confirm_reset_btn.MouseButton1Click:Connect(function()
+					if reset_config then
 						reset_config()
 						save_settings()
-						update_core_color()
+						-- The four Perf_* flags describe changes already made to the
+						-- game -- Lighting.GlobalShadows, every part's Material, every
+						-- emitter -- and reset_config only puts the flags back to
+						-- false. Without this the config and the save file said
+						-- "shadows on" while the game still had them off, and the
+						-- toggle needed a manual extra click before it would actually
+						-- undo anything.
+						RestoreAllPerf()
+						-- Keybinds and UIScale are both part of the reset, and
+						-- neither takes effect on its own: the hotkeys have to be
+						-- rebound from the restored table and every window
+						-- rescaled, or the panel keeps the old values until the
+						-- next launch.
+						local x8 = context.x8
+						if x8 and x8.rebind_all then
+							pcall(x8.rebind_all)
+						end
+						apply_ui_scale()
+						-- Repaint the two windows that are built once and never rebuilt
+						-- by f1. Every control in them cached its value at build time,
+						-- so without this they all sat showing pre-reset numbers while
+						-- x1 held the defaults.
+						if x5.refresh_advanced then
+							pcall(x5.refresh_advanced)
+						end
+						pcall(populate_keybinds, ksearch.Text)
 						if x5.up then
 							x5.up()
 						end
-						x5.toast("Settings", "Restored to defaults", "ok")
+						if x6.b then
+							x6.b.Color = x1.k3
+							if x6.b:FindFirstChild("Visual") and x6.b.Visual:FindFirstChildOfClass("ImageLabel") then
+								x6.b.Visual:FindFirstChildOfClass("ImageLabel").ImageColor3 = x1.k3
+							end
+						end
 					end
-				)
-			end, "danger", is_mobile and 38 or 40)
-		end
+					dismiss_confirm()
+				end)
 
-		build_page = function(i, page)
-			if i == 1 then
-				build_core(page)
-			elseif i == 2 then
-				build_shapes(page)
-			elseif i == 3 then
-				build_target(page)
-			elseif i == 4 then
-				build_tuning(page)
-			else
-				build_system(page)
+				x6.reset_confirm = confirm
+
+				-- Registered like every other window so it opens at the user's
+				-- scale instead of always at 1. AnchorPoint moves to the middle
+				-- because a UIScale grows a frame from its top-left corner, which
+				-- would walk a centred dialog off-centre as the scale went up.
+				confirm.AnchorPoint = Vector2.new(0.5, 0.5)
+				confirm.Position = UDim2.new(0.5, 0, 0.5, 0)
+				register_window(confirm, 0.9)
+				-- Split the way every other window opens: the fade rides OPEN
+				-- because transparency has no momentum to overshoot -- Back on it
+				-- just drives the value past 0 where it clamps and stalls -- while
+				-- the scale gets OPEN_POP, which is where the spring belongs.
+				v6:Create(confirm, A.OPEN, { GroupTransparency = 0 }):Play()
+				set_pop(confirm, 1, A.OPEN_POP)
+			end)
+		end
+		x5.up = f1
+
+		local dlst_container = Instance.new("CanvasGroup", m)
+		dlst_container.Name = "ModeSelector"
+		dlst_container.Visible = false
+		dlst_container.GroupTransparency = 1
+		dlst_container.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+		dlst_container.Position = UDim2.new(1, 15, 0, 0)
+		dlst_container.Size = UDim2.new(0, 220, 1, 0)
+		Instance.new("UICorner", dlst_container).CornerRadius = UDim.new(0, 10)
+		local dls = Instance.new("UIStroke", dlst_container)
+		dls.Color = Color3.fromRGB(40, 40, 45)
+
+		local msb = Instance.new("TextBox", dlst_container)
+		msb.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+		msb.Position = UDim2.new(0, 10, 0, 10)
+		msb.Size = UDim2.new(1, -20, 0, 34)
+		msb.PlaceholderText = "Search modes..."
+		msb.Text = ""
+		msb.TextColor3 = Color3.fromRGB(255, 255, 255)
+		msb.Font = Enum.Font.Gotham
+		msb.TextSize = 13
+		Instance.new("UICorner", msb).CornerRadius = UDim.new(0, 6)
+
+		local dlst = Instance.new("ScrollingFrame", dlst_container)
+		dlst.BackgroundTransparency = 1
+		dlst.Position = UDim2.new(0, 0, 0, 55)
+		dlst.Size = UDim2.new(1, 0, 1, -65)
+		dlst.ScrollBarThickness = 0
+		dlst.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		dlst.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+		x6.dlst_container = dlst_container
+
+		local function populate_modes(filter)
+			dlst:ClearAllChildren()
+			local dll = Instance.new("UIListLayout", dlst)
+			dll.Padding = UDim.new(0, 5)
+			dll.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+			local modes = {}
+			for mn, _ in pairs(x2) do
+				table.insert(modes, mn)
+			end
+
+			table.sort(modes, function(a, b)
+				local fa, fb = favorites[a] and 1 or 0, favorites[b] and 1 or 0
+				if fa ~= fb then
+					return fa > fb
+				end
+				return a < b
+			end)
+
+			for _, mn in ipairs(modes) do
+				-- Plain search, like populate_keybinds:756. Without the flag the typed
+				-- text is a Lua pattern, so a single "(" throws "unfinished capture"
+				-- out of the Text callback -- after dlst:ClearAllChildren() has already
+				-- run, so the list stays empty and every further keystroke re-errors.
+				if filter ~= "" and not mn:lower():find(filter:lower(), 1, true) then
+					continue
+				end
+
+				local f = Instance.new("Frame", dlst)
+				f.Size = UDim2.new(1, -16, 0, 40)
+				f.BackgroundColor3 = mn == x1.k6 and Color3.fromRGB(40, 40, 180) or Color3.fromRGB(25, 25, 30)
+				Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
+
+				local ib = Instance.new("TextButton", f)
+				ib.Size = UDim2.new(1, -40, 1, 0)
+				ib.Position = UDim2.new(0, 8, 0, 0)
+				ib.BackgroundTransparency = 1
+				ib.Text = "  " .. mn
+				ib.TextColor3 = Color3.fromRGB(255, 255, 255)
+				ib.Font = Enum.Font.GothamBold
+				ib.TextSize = 12
+				ib.TextXAlignment = 0
+
+				local sb = Instance.new("TextButton", f)
+				sb.Position = UDim2.new(1, -35, 0, 0)
+				sb.Size = UDim2.new(0, 35, 1, 0)
+				sb.BackgroundTransparency = 1
+				sb.Text = favorites[mn] and "★" or "☆"
+				sb.TextColor3 = favorites[mn] and Color3.fromRGB(255, 200, 50) or Color3.fromRGB(80, 80, 85)
+				sb.Font = Enum.Font.GothamBold
+				sb.TextSize = 14
+
+				sb.MouseButton1Click:Connect(function()
+					favorites[mn] = not favorites[mn]
+					save_favs()
+					populate_modes(filter)
+				end)
+
+				ib.MouseButton1Click:Connect(function()
+					local x4 = context.x4
+					if x4 and x4.switch_shape then
+						if x4.switch_shape(mn) and db then
+							db.Text = "  " .. mn:upper()
+						end
+					else
+						-- fallback before System is up
+						local shape = get_shape(mn)
+						if shape then
+							-- switch_shape owns this notice on the normal path; repeat it
+							-- here because this branch sets k6 itself and never reaches it.
+							if shape.Testing and context.x8 and context.x8.notify then
+								context.x8.notify("Testing", mn .. " is still in testing.", 4)
+							end
+							x1.k6 = mn
+							x6.transition_time = time()
+							x6.transition_dur = 1.5
+							for _, d in pairs(x6.a) do
+								d.trans_vl = d.vl or Vector3.zero
+								d.v1, d.v2, d.v3, d.v4, d.v5, d.v6, d.v7, d.v8, d.v9 = nil, nil, nil, nil, nil, nil, nil, nil, nil
+								d.integral = Vector3.zero
+							end
+							if db then
+								db.Text = "  " .. mn:upper()
+							end
+							save_settings()
+							if x5.up then
+								x5.up()
+							end
+						end
+					end
+					toggle_window(dlst_container, false, true)
+				end)
 			end
 		end
 
-		------------------------------------------------------------------
-		-- confirmation modal
-		------------------------------------------------------------------
+		msb:GetPropertyChangedSignal("Text"):Connect(function()
+			populate_modes(msb.Text)
+		end)
 
-		function x5.confirm(head, body_text, on_yes)
+		x6.populate_modes = populate_modes
+		x6.mode_filter = function()
+			return msb and msb.Text or ""
+		end
+		populate_modes("")
+
+		-- System calls this after every shape switch, including one driven by a
+		-- hotkey while the mode list was never opened, so the dropdown label and
+		-- the highlighted row cannot fall out of step with x1.k6.
+		function x5.sync_shape(name)
+			if db then
+				db.Text = "  " .. tostring(name):upper()
+			end
+			if dlst_container and dlst_container.Visible then
+				populate_modes(msb.Text)
+			end
+		end
+
+		-- Declared ahead of the header buttons because their click handlers close
+		-- over it: while the panel is a pill every extra is invisible but still
+		-- hit-testable, and stacked on top of minb. See set_header_extras below.
+		local collapsed = false
+
+		local minb = Instance.new("TextButton", h)
+		minb.BackgroundColor3 = Color3.fromRGB(60, 200, 100)
+		minb.Position = UDim2.new(1, -60, 0.5, -10)
+		minb.Size = UDim2.new(0, 20, 0, 20)
+		minb.Text = ""
+		Instance.new("UICorner", minb).CornerRadius = UDim.new(1, 0)
+		
+		local dcb = Instance.new("TextButton", h)
+		dcb.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+		dcb.Position = UDim2.new(1, -120, 0.5, -10)
+		dcb.Size = UDim2.new(0, 20, 0, 20)
+		dcb.Text = "D"
+		dcb.TextColor3 = Color3.fromRGB(255, 255, 255)
+		dcb.Font = Enum.Font.GothamBold
+		dcb.TextSize = 11
+		Instance.new("UICorner", dcb).CornerRadius = UDim.new(1, 0)
+		dcb.MouseButton1Click:Connect(function()
+			if collapsed then return end
+			pcall(function()
+				if setclipboard then
+					setclipboard("https://discord.gg/9xYyyYuKap")
+				elseif toclipboard then
+					toclipboard("https://discord.gg/9xYyyYuKap")
+				end
+			end)
+			pcall(function()
+				v5:SetCore("SendNotification", { Title = "Discord", Text = "Invite link copied to clipboard!", Duration = 3 })
+			end)
+		end)
+
+		local tutb = Instance.new("TextButton", h)
+		tutb.BackgroundColor3 = Color3.fromRGB(50, 150, 200)
+		tutb.Position = UDim2.new(1, -90, 0.5, -10)
+		tutb.Size = UDim2.new(0, 20, 0, 20)
+		tutb.Text = "?"
+		tutb.TextColor3 = Color3.fromRGB(255, 255, 255)
+		tutb.Font = Enum.Font.GothamBold
+		tutb.TextSize = 14
+		Instance.new("UICorner", tutb).CornerRadius = UDim.new(1, 0)
+
+		local tut_container = Instance.new("CanvasGroup", sg)
+		tut_container.Name = "Tutorial"
+		tut_container.Visible = false
+		tut_container.GroupTransparency = 1
+		tut_container.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+		tut_container.Position = UDim2.new(0.5, -200, 0.5, -150)
+		tut_container.Size = UDim2.new(0, 400, 0, 300)
+		tut_container.Active = true
+		Instance.new("UICorner", tut_container).CornerRadius = UDim.new(0, 10)
+		local tuls = Instance.new("UIStroke", tut_container)
+		tuls.Color = Color3.fromRGB(40, 40, 45)
+
+		local tut_header = Instance.new("Frame", tut_container)
+		tut_header.BackgroundTransparency = 1
+		tut_header.Size = UDim2.new(1, 0, 0, 40)
+		make_draggable(tut_container, tut_header)
+		
+		local tut_title = Instance.new("TextLabel", tut_header)
+		tut_title.BackgroundTransparency = 1
+		tut_title.Position = UDim2.new(0, 20, 0, 0)
+		tut_title.Size = UDim2.new(0.8, 0, 1, 0)
+		tut_title.Text = "HOW TO USE PROJECT GRAVITY"
+		tut_title.TextColor3 = Color3.fromRGB(255, 255, 255)
+		tut_title.Font = Enum.Font.GothamBlack
+		tut_title.TextSize = 14
+		tut_title.TextXAlignment = 0
+
+		local tut_close = Instance.new("TextButton", tut_header)
+		tut_close.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+		tut_close.Position = UDim2.new(1, -30, 0.5, -10)
+		tut_close.Size = UDim2.new(0, 20, 0, 20)
+		tut_close.Text = ""
+		Instance.new("UICorner", tut_close).CornerRadius = UDim.new(1, 0)
+		tut_close.MouseButton1Click:Connect(function()
+			toggle_window(tut_container, false)
+		end)
+
+		local tut_text = Instance.new("TextLabel", tut_container)
+		tut_text.BackgroundTransparency = 1
+		tut_text.Position = UDim2.new(0, 20, 0, 50)
+		tut_text.Size = UDim2.new(1, -40, 1, -70)
+		tut_text.Text = "• Core Controls: Press 'E' to reposition the gravitational center. Press 'Q' to wipe all parts and reset.\n\n• Targeting: Click 'Select Target' to focus the gravitational pull onto a specific player.\n\n• Hotkeys: Press 'P' to instantly Pause physics (freezing parts). Press 'L' to toggle Disable mode.\n\n• Modes: The Mode Selector allows you to morph between different geometrical formations.\n\n• Configuration: Scroll down the main menu to tune the shape config (radius, spin, etc.). Open 'Advanced Settings' to tweak global physics limits."
+		tut_text.TextColor3 = Color3.fromRGB(200, 200, 205)
+		tut_text.Font = Enum.Font.GothamMedium
+		tut_text.TextSize = 13
+		tut_text.TextXAlignment = 0
+		tut_text.TextYAlignment = 0
+		tut_text.TextWrapped = true
+
+		tutb.MouseButton1Click:Connect(function()
+			if collapsed then return end
+			toggle_window(tut_container, not tut_container.Visible)
+		end)
+
+		local closeb = Instance.new("TextButton", h)
+		closeb.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+		closeb.Position = UDim2.new(1, -30, 0.5, -10)
+		closeb.Size = UDim2.new(0, 20, 0, 20)
+		closeb.Text = ""
+		Instance.new("UICorner", closeb).CornerRadius = UDim.new(1, 0)
+
+		-- Minimize runs in two stages: the body rolls up into the header, then
+		-- the header folds left into a round pill holding just this button.
+		-- Maximize is the inverse, and the order matters -- the header has to be
+		-- back at full width before the body rolls down, or the content is laid
+		-- out against a 44px frame and every label wraps.
+		local im = false
+		-- The stages are chained on Completed, so a second click mid-flight would
+		-- start the opposite sequence while tweens from the first are still
+		-- running and leave the panel stuck at an intermediate size.
+		local anim_busy = false
+		-- Where the body was scrolled to when the panel collapsed; nil when the
+		-- panel is open and there is nothing banked. See roll_up.
+		local saved_canvas = nil
+
+		local ROLL, FOLD, UNFOLD = A.ROLL, A.FOLD, A.UNFOLD
+
+		-- The header extras all vanish for the pill and come back with it.
+		-- Transparency alone is not enough: a fully transparent TextButton still
+		-- takes clicks, and once the panel is pill-width closeb's (1,-30) anchor
+		-- lands on top of minb -- so a click meant to restore would tear the UI
+		-- down instead. Visible is the only thing that removes them from
+		-- hit-testing, but it cannot be driven off the fade alone: the fade runs
+		-- 0.4s while the panel is already narrowing underneath it, and the
+		-- unfold has to make them visible again up front so they can fade in.
+		-- collapsed (declared above the header buttons) is the authority for
+		-- hit-testing, flipped the instant the button is pressed.
+		local extras = { dcb, tutb, closeb }
+		local function set_header_extras(hidden)
+			local a = hidden and 1 or 0
+			-- Deliberately not UNFOLD on the way back. UNFOLD is Back/Out, and a
+			-- transparency has nowhere to overshoot to: the curve drives the value
+			-- below 0, Roblox clamps it, and the fade finishes early then sits
+			-- frozen for the rest of the tween instead of easing in. The geometry
+			-- below still gets UNFOLD -- that is where the spring belongs.
+			local info = hidden and FOLD or A.OPEN
+			v6:Create(t, info, { TextTransparency = a }):Play()
+			for _, b in ipairs(extras) do
+				if not hidden then
+					b.Visible = true
+				end
+				local tw = v6:Create(b, info, {
+					BackgroundTransparency = a,
+					TextTransparency = a,
+				})
+				if hidden then
+					local conn
+					conn = tw.Completed:Connect(function()
+						if conn then conn:Disconnect() end
+						-- Not if a fast re-click already started fading them back.
+						if collapsed then b.Visible = false end
+					end)
+				end
+				tw:Play()
+			end
+		end
+
+		local function fold_to_pill()
+			set_header_extras(true)
+			-- 0.5 is resolved against the width as it animates, so the button
+			-- curves rather than sliding straight in. Endpoints are what matter.
+			v6:Create(minb, FOLD, { Position = UDim2.new(0.5, -10, 0.5, -10) }):Play()
+			-- h carries an absolute height, so it has to come down with the panel
+			-- or minb's 0.5 anchor centres against 50px inside a 44px pill.
+			v6:Create(h, FOLD, { Size = UDim2.new(1, 0, 0, PILL_SIZE) }):Play()
+			v6:Create(mcorner, FOLD, { CornerRadius = UDim.new(0, PILL_SIZE / 2) }):Play()
+			local tw = v6:Create(m, FOLD, { Size = UDim2.new(0, PILL_SIZE, 0, PILL_SIZE) })
+			local conn
+			conn = tw.Completed:Connect(function()
+				anim_busy = false
+				if conn then conn:Disconnect() end
+			end)
+			tw:Play()
+		end
+
+		local function roll_up()
+			-- Clipped rather than hidden, so the body is cut off as the panel
+			-- shrinks instead of vanishing a frame before the tween starts.
+			m.ClipsDescendants = true
+			-- The scroll offset has to be banked before the body shrinks. c is
+			-- sized against m, so collapsing drives its height to zero, and a
+			-- ScrollingFrame clamps CanvasPosition against its own window size --
+			-- at zero height that clamp stops holding the offset anywhere sensible.
+			-- Restoring from a stale value is what left the panel reopening onto
+			-- the middle of the list, or past the end of it entirely, whenever it
+			-- was minimized from anywhere but the very top.
+			saved_canvas = c.CanvasPosition
+			c.CanvasPosition = Vector2.new(0, 0)
+			if am.Visible then toggle_window(am, false) end
+			if km.Visible then toggle_window(km, false) end
+			if tut_container.Visible then toggle_window(tut_container, false) end
+			if x6.dlst_container and x6.dlst_container.Visible then
+				toggle_window(x6.dlst_container, false, true)
+			end
+			if m:FindFirstChild("TargetListContainer") and m.TargetListContainer.Visible then
+				toggle_window(m.TargetListContainer, false, true)
+			end
+			-- The AI chat is a sibling of the panel, not a child, and it stays up
+			-- when the panel collapses: a long generation is worth watching while
+			-- the panel is out of the way. The reset dialog still goes, since it is
+			-- a modal belonging to a panel that is no longer on screen.
 			if x6.reset_confirm then
-				pcall(function()
+				if x6.reset_confirm.Parent then
 					x6.reset_confirm:Destroy()
-				end)
+				end
 				x6.reset_confirm = nil
 			end
-
-			local veil = new("TextButton", {
-				Name = "Modal",
-				BackgroundColor3 = TH.black,
-				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-				Size = U2(1, 0, 1, 0),
-				Text = "",
-				AutoButtonColor = false,
-				ZIndex = 30,
-			}, sg)
-			x6.reset_confirm = veil
-			fx.to(veil, "BackgroundTransparency", 0.5, "flow")
-
-			local box = new("Frame", {
-				BackgroundColor3 = TH.bg1,
-				BorderSizePixel = 0,
-				AnchorPoint = V2(0.5, 0.5),
-				Position = U2(0.5, 0, 0.5, 0),
-				Size = U2(0, is_mobile and 284 or 334, 0, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				Active = true,
-				ZIndex = 31,
-			}, veil)
-			corner(box, 14)
-			stroke(box, TH.bad, 1.2, 0.3)
-			pad(box, 18, 16, 18, 18)
-			local box_scale = new("UIScale", { Scale = 0.88 }, box)
-			fx.to(box_scale, "Scale", 1, "bounce")
-			list(box, 10)
-
-			label(box, head, 15, TH.font.black, TH.white, { Size = U2(1, 0, 0, 20), ZIndex = 31 })
-			label(box, body_text, 11, TH.font.body, TH.tx2, {
-				Size = U2(1, 0, 0, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				TextWrapped = true,
-				TextYAlignment = Enum.TextYAlignment.Top,
-				LineHeight = 1.15,
-				ZIndex = 31,
-			})
-
-			local buttons = new("Frame", { BackgroundTransparency = 1, Size = U2(1, 0, 0, 38), ZIndex = 31 }, box)
-
-			local closing = false
-			local function close()
-				if closing then
-					return
-				end
-				closing = true
-				fx.to(veil, "BackgroundTransparency", 1, "flow")
-				fx.spring(box_scale, "Scale", 0.88, {
-					k = 320,
-					d = 30,
-					done = function()
-						if x6.reset_confirm == veil then
-							x6.reset_confirm = nil
-						end
-						veil:Destroy()
-					end,
-				})
-			end
-
-			local cancel = E.button(buttons, "CANCEL", close, "ghost", 38)
-			cancel.Size = U2(0.5, -5, 0, 38)
-			cancel.ZIndex = 31
-			local yes = E.button(buttons, "CONFIRM", function()
-				close()
-				if on_yes then
-					on_yes()
-				end
-			end, "danger", 38)
-			yes.Size = U2(0.5, -5, 0, 38)
-			yes.Position = U2(0.5, 5, 0, 0)
-			yes.ZIndex = 31
-
-			veil.MouseButton1Click:Connect(close)
-		end
-
-		------------------------------------------------------------------
-		-- title bar buttons + minimise
-		------------------------------------------------------------------
-
-		local minimized = false
-		local set_minimized
-
-		local expand_hit = new("TextButton", {
-			BackgroundTransparency = 1,
-			Size = U2(1, 0, 1, 0),
-			Text = "",
-			AutoButtonColor = false,
-			Visible = false,
-			ZIndex = 12,
-		}, panel)
-
-		local close_btn = E.icon(btn_row, GLYPH.close, function()
-			fx.to(hud_surface, "BackgroundTransparency", 1, "flow")
-			fx.to(surface, "BackgroundTransparency", 1, "flow")
-			fx.spring(panel_scale, "Scale", ui_scale * 0.82, {
-				k = 320,
-				d = 26,
-				done = function()
-					RestoreAllPerf()
-					if context.x4 and context.x4.f5 then
-						pcall(context.x4.f5)
-					end
-					if sg.Parent then
-						sg:Destroy()
-					end
-				end,
-			})
-		end, TH.bad)
-		close_btn.LayoutOrder = 4
-
-		local min_btn, min_api = E.icon(btn_row, GLYPH.minus, function()
-			set_minimized(not minimized)
-		end, TH.ok)
-		min_btn.LayoutOrder = 3
-
-		local help_btn = E.icon(btn_row, "?", function()
-			select_tab(5)
-		end, TH.acc2)
-		help_btn.LayoutOrder = 2
-
-		local ai_btn
-		if ai_chat_module and ai_chat_module.toggle then
-			local b, api = E.icon(btn_row, "AI", function()
-				ai_chat_module.toggle(sg)
-			end, TH.acc)
-			api.label.TextSize = 10
-			b.LayoutOrder = 1
-			ai_btn = b
-		end
-
-		set_minimized = function(state)
-			minimized = state and true or false
-			body.Visible = not minimized
-			footer.Visible = not minimized
-			tabstrip.Visible = not minimized
-			title.Visible = not minimized
-			subtitle.Visible = not minimized
-			btn_row.Visible = not minimized
-			expand_hit.Visible = minimized
-			if minimized then
-				fx.to(panel, "Size", U2(0, MIN_PX, 0, MIN_PX), "pop")
-				fx.to(panel_corner, "CornerRadius", UD(0, MIN_PX / 2), "pop")
-				fx.to(aurora_corner, "CornerRadius", UD(0, MIN_PX / 2), "pop")
-				-- let the bar own the whole orb so the logo lands dead centre
-				titlebar.Size = U2(1, 0, 1, 0)
-				orb.AnchorPoint = V2(0.5, 0.5)
-				fx.to(orb, "Position", U2(0.5, 1, 0.5, 0), "pop")
-				fx.to(orb, "Size", U2(0, 28, 0, 28), "pop")
-			else
-				fx.to(panel, "Size", U2(0, BASE_W, 0, panel_h), "pop")
-				fx.to(panel_corner, "CornerRadius", UD(0, TH.radius_panel), "pop")
-				fx.to(aurora_corner, "CornerRadius", UD(0, TH.radius_panel), "pop")
-				titlebar.Size = U2(1, 0, 0, TITLE_H)
-				orb.AnchorPoint = V2(0, 0.5)
-				fx.to(orb, "Position", U2(0, 0, 0.5, 0), "pop")
-				fx.to(orb, "Size", U2(0, 24, 0, 24), "pop")
-			end
-			min_api.label.Text = minimized and GLYPH.plus or GLYPH.minus
-			fx.punch(orb_scale, "Scale", 1.35, 1, "bounce")
-		end
-
-		------------------------------------------------------------------
-		-- dragging
-		------------------------------------------------------------------
-		-- The panel tracks the pointer exactly: no spring, no inertial tilt. A
-		-- lagging or rotating window reads as the interface coming apart, which
-		-- is the opposite of responsive.
-
-		local drag_active, drag_grab, drag_last_x, drag_travel = false, V2(0, 0), 0, 0
-
-		local function clamp_panel(px, py)
-			local vp = viewport()
-			local size = panel.AbsoluteSize
-			return mclamp(px, -size.X + 76, mmax(0, vp.X - 76)), mclamp(py, 0, mmax(0, vp.Y - 46))
-		end
-
-		local function begin_drag(io)
-			drag_active = true
-			drag_travel = 0
-			drag_grab = V2(io.Position.X, io.Position.Y) - panel.AbsolutePosition
-			drag_last_x = io.Position.X
-		end
-
-		titlebar.InputBegan:Connect(function(io)
-			if not E.is_press(io) then
-				return
-			end
-			-- don't start a drag when the press landed on the window buttons
-			local a, s = btn_row.AbsolutePosition, btn_row.AbsoluteSize
-			if
-				btn_row.Visible
-				and io.Position.X >= a.X
-				and io.Position.X <= a.X + s.X
-				and io.Position.Y >= a.Y
-				and io.Position.Y <= a.Y + s.Y
-			then
-				return
-			end
-			begin_drag(io)
-		end)
-
-		expand_hit.InputBegan:Connect(function(io)
-			if E.is_press(io) then
-				begin_drag(io)
-			end
-		end)
-
-		table.insert(
-			x6.c,
-			v1.InputChanged:Connect(function(io)
-				if not drag_active or not E.is_move(io) then
-					return
-				end
-				local px, py = clamp_panel(io.Position.X - drag_grab.X, io.Position.Y - drag_grab.Y)
-				fx.set(panel, "Position", U2(0, px, 0, py))
-				drag_travel = drag_travel + mabs(io.Position.X - drag_last_x)
-				drag_last_x = io.Position.X
-			end)
-		)
-		table.insert(
-			x6.c,
-			v1.InputEnded:Connect(function(io)
-				if not drag_active or not E.is_press(io) then
-					return
-				end
-				drag_active = false
-				if minimized and drag_travel < 8 then
-					set_minimized(false)
-				end
-			end)
-		)
-
-		------------------------------------------------------------------
-		-- layout
-		------------------------------------------------------------------
-
-		local laid_out = false
-
-		function x5.relayout()
-			ui_scale = compute_scale()
-			local vp = viewport()
-			panel_h = mclamp(BASE_H, 250, mmax(250, vp.Y / ui_scale - 40))
-			fx.to(panel_scale, "Scale", ui_scale, "flow")
-			fx.to(hud_scale, "Scale", ui_scale, "flow")
-			if dock_scale then
-				fx.to(dock_scale, "Scale", ui_scale, "flow")
-			end
-			if not minimized then
-				fx.to(panel, "Size", U2(0, BASE_W, 0, panel_h), "flow")
-			end
-			if laid_out then
-				local px, py = clamp_panel(panel.AbsolutePosition.X, panel.AbsolutePosition.Y)
-				fx.to(panel, "Position", U2(0, px, 0, py), "flow")
-			end
-		end
-
-		table.insert(
-			x6.c,
-			sg:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-				x5.relayout()
-			end)
-		)
-
-		------------------------------------------------------------------
-		-- ambient motion
-		------------------------------------------------------------------
-
-		ambient(function(dt, t, lvl)
-			if minimized then
-				ring_a.Rotation = (ring_a.Rotation + dt * 60) % 360
-				ring_b.Rotation = (ring_b.Rotation - dt * 90) % 360
-				return
-			end
-			aurora_a.Rotation = (aurora_a.Rotation + dt * 7) % 360
-			aurora_b.Rotation = (aurora_b.Rotation - dt * 5) % 360
-			ring_a.Rotation = (ring_a.Rotation + dt * 70) % 360
-			ring_b.Rotation = (ring_b.Rotation - dt * 105) % 360
-			edge_grad.Offset = V2(((t * 0.18) % 2) - 1, 0)
-			if lvl > 1 then
-				title_grad.Offset = V2(((t * 0.22) % 2.6) - 1.3, 0)
-				local pulse = 5 + 2.5 * (0.5 + 0.5 * math.sin(t * 2.2))
-				core_dot.Size = U2(0, pulse, 0, pulse)
-			end
-		end)
-
-		------------------------------------------------------------------
-		-- readouts and state sync
-		------------------------------------------------------------------
-
-		local HUD_TINT = { TH.ok, TH.warn, TH.bad }
-		local HUD_WORD = { "ACTIVE", "PAUSED", "OFFLINE" }
-		local last_state, last_target, last_parts, last_shape = -1, "", -1, ""
-		local sync_timer, foot_timer = 0, 0
-
-		ambient(function(dt)
-			if dock_hold ~= 0 and x6.b then
-				x6.b.Position = x6.b.Position + Vector3.new(0, dock_hold * dt * 48, 0)
-			end
-		end, true)
-
-		ambient(function(dt)
-			sync_timer = sync_timer - dt
-			if sync_timer > 0 then
-				return
-			end
-			sync_timer = 0.15
-
-			local state = x1.Disabled and 3 or (x1.Paused and 2 or 1)
-			if state ~= last_state then
-				last_state = state
-				local tint = HUD_TINT[state]
-				hud_state.Text = HUD_WORD[state]
-				fx.to(hud_state, "TextColor3", tint, "snap")
-				fx.to(hud_dot, "BackgroundColor3", tint, "snap")
-				fx.to(hud_halo_stroke, "Color", tint, "snap")
-				fx.set(hud_halo_stroke, "Thickness", 5)
-				fx.to(hud_halo_stroke, "Thickness", 1.5, "glide")
-				fx.punch(hud_scale, "Scale", ui_scale * 1.05, ui_scale, "bounce")
-			end
-
-			local summary = target_summary()
-			if summary ~= last_target then
-				last_target = summary
-				hud_target.Text = summary
-			end
-
-			if x1.k6 ~= last_shape then
-				last_shape = x1.k6
-				subtitle.Text = string.lower(x1.k6)
-				if shape_card_name then
-					shape_card_name.Text = string.upper(x1.k6)
-				end
-			end
-
-			for i = 1, #sync do
-				sync[i]()
-			end
-		end, true)
-
-		ambient(function(dt)
-			foot_timer = foot_timer - dt
-			if foot_timer > 0 then
-				return
-			end
-			foot_timer = 0.34
-			local parts = x6.n or 0
-			if parts ~= last_parts then
-				last_parts = parts
-				hud_parts.Text = parts .. " PARTS"
-			end
-			foot_left.Text = string.format("%d parts  %s  %d fps", parts, GLYPH.dot, mfloor(fx.fps() + 0.5))
-			local running = x6.o and true or false
-			foot_right.Text = running and "ENGINE RUNNING" or "PRESS E TO PLACE"
-			fx.to(foot_right, "TextColor3", running and TH.ok or TH.tx3, "flow")
-		end, true)
-
-		------------------------------------------------------------------
-		-- refresh entry point
-		------------------------------------------------------------------
-
-		function x5.up()
-			if rebuild_shape_controls then
-				rebuild_shape_controls()
-			end
-			if render_shapes then
-				render_shapes()
-			end
-			if render_players then
-				render_players()
-			end
-			sync_timer = 0
-		end
-
-		------------------------------------------------------------------
-		-- hide / show hotkey
-		------------------------------------------------------------------
-
-		local hidden = false
-		table.insert(
-			x6.c,
-			v1.InputBegan:Connect(function(io, processed)
-				if processed or io.KeyCode ~= Enum.KeyCode.RightControl then
-					return
-				end
-				hidden = not hidden
-				if hidden then
-					fx.to(panel_scale, "Scale", ui_scale * 0.8, "flow")
-					task.delay(0.16, function()
-						if hidden then
-							panel.Visible = false
-						end
-					end)
-					hud.Visible = false
-					if dock then
-						dock.Visible = false
-					end
+			local tw = v6:Create(m, ROLL, { Size = UDim2.new(0, PANEL_W, 0, HEADER_H) })
+			local conn
+			conn = tw.Completed:Connect(function()
+				if conn then conn:Disconnect() end
+				-- The else is unreachable while anim_busy holds across both
+				-- stages, but skipping stage 2 without clearing the guard would
+				-- wedge the button dead with the panel stranded half-collapsed.
+				if im then
+					fold_to_pill()
 				else
-					panel.Visible = true
-					fx.set(panel_scale, "Scale", ui_scale * 0.8)
-					fx.to(panel_scale, "Scale", ui_scale, "bounce")
-					hud.Visible = x1.ShowHUD ~= false
-					if dock then
-						dock.Visible = x1.ShowDock and true or false
-					end
+					anim_busy = false
 				end
 			end)
-		)
-
-		------------------------------------------------------------------
-		-- boot
-		------------------------------------------------------------------
-
-		ApplyPerfShadows(x1.Perf_DisableShadows)
-		ApplyPerfPostFX(x1.Perf_DisablePostFX)
-		ApplyPerfMaterials(x1.Perf_PotatoMaterials)
-		ApplyPerfParticles(x1.Perf_HideParticles)
-
-		if x1.ShowDock == nil then
-			x1.ShowDock = is_mobile
+			tw:Play()
 		end
 
-		ui_scale = compute_scale()
-		local vp0 = viewport()
-		panel_h = mclamp(BASE_H, 250, mmax(250, vp0.Y / ui_scale - 40))
-		panel.Size = U2(0, BASE_W, 0, panel_h)
-		local start_x = mfloor(mmin(30, vp0.X * 0.04))
-		local start_y = mmax(12, mfloor(vp0.Y * 0.5 - panel_h * ui_scale * 0.5))
-		panel.Position = U2(0, start_x, 0, start_y + 26)
-		laid_out = true
+		local function roll_down()
+			local tw = v6:Create(m, ROLL, { Size = UDim2.new(0, PANEL_W, 0, PANEL_H) })
+			local conn
+			conn = tw.Completed:Connect(function()
+				if conn then conn:Disconnect() end
+				-- Only now: the nested mode selector and target list sit outside
+				-- Main's bounds, so leaving this on would clip them away.
+				m.ClipsDescendants = false
+				-- Put the reader back where they left off, now that the body is at
+				-- full height again and the clamp means something. Deferred to the
+				-- end of the tween for the same reason.
+				if saved_canvas then
+					c.CanvasPosition = saved_canvas
+					saved_canvas = nil
+				end
+				if ai_chat_module and ai_chat_module.showWidget then
+					pcall(ai_chat_module.showWidget)
+				end
+				anim_busy = false
+			end)
+			tw:Play()
+		end
 
-		set_dock(x1.ShowDock)
-		select_tab(1, true)
+		local function unfold_header()
+			-- The pill is draggable, so it can be anywhere by now. Expanding from
+			-- near an edge would put most of the panel off-screen.
+			--
+			-- Measured, not computed. Deriving the offset from ViewportSize is
+			-- wrong twice over: sg does not set IgnoreGuiInset, so the parent is
+			-- 36px shorter than the viewport, and the expanded panel is
+			-- PANEL_* * app_scale() because UIScale grows m from its top-left.
+			-- AbsolutePosition and AbsoluteSize are both post-scale and relative
+			-- to the real parent, so they carry the inset and the scale already.
+			local parent = m.Parent
+			local avail = (parent and parent.AbsoluteSize) or Vector2.new(1280, 720)
+			local scale = app_scale()
+			local pw, ph = PANEL_W * scale, PANEL_H * scale
+			local origin = (parent and parent.AbsolutePosition) or Vector2.new(0, 0)
+			local ax = m.AbsolutePosition.X - origin.X
+			local ay = m.AbsolutePosition.Y - origin.Y
+			-- A panel taller than the screen cannot be fully fitted; pin it to the
+			-- top edge rather than letting max() shove the header out of reach.
+			local cx = math.max(10, math.min(ax, avail.X - pw - 10))
+			local cy = math.max(10, math.min(ay, avail.Y - ph - 10))
+			if avail.X - pw - 10 < 10 then cx = 10 end
+			if avail.Y - ph - 10 < 10 then cy = 10 end
+			-- Snapped, not tweened: UNFOLD is Back/Out, and overshoot on a
+			-- correction meant to pull the panel on-screen would push it further
+			-- off first. The move is hidden by the size tween starting alongside.
+			if math.abs(cx - ax) > 0.5 or math.abs(cy - ay) > 0.5 then
+				m.Position = UDim2.new(0, cx, 0, cy)
+			end
 
-		fx.to(panel, "Position", U2(0, start_x, 0, start_y), "pop")
-		fx.set(panel_scale, "Scale", ui_scale * 0.9)
-		fx.spring(panel_scale, "Scale", ui_scale, { k = 340, d = 20 })
-		fx.set(hud_scale, "Scale", ui_scale * 0.8)
-		fx.spring(hud_scale, "Scale", ui_scale, { k = 320, d = 22, delay = 0.12 })
-		fx.punch(orb_scale, "Scale", 0.2, 1, "bounce")
+			set_header_extras(false)
+			v6:Create(minb, UNFOLD, { Position = UDim2.new(1, -60, 0.5, -10) }):Play()
+			v6:Create(h, UNFOLD, { Size = UDim2.new(1, 0, 0, HEADER_H) }):Play()
+			v6:Create(mcorner, UNFOLD, { CornerRadius = UDim.new(0, 10) }):Play()
+			local tw = v6:Create(m, UNFOLD, { Size = UDim2.new(0, PANEL_W, 0, HEADER_H) })
+			local conn
+			conn = tw.Completed:Connect(function()
+				if conn then conn:Disconnect() end
+				-- As in roll_up: unreachable today, but skipping stage 2 here
+				-- would also strand ClipsDescendants on, and that is the one
+				-- thing that hides the mode selector on an expanded panel.
+				if not im then
+					roll_down()
+				else
+					m.ClipsDescendants = false
+					anim_busy = false
+				end
+			end)
+			tw:Play()
+		end
 
+		minb.MouseButton1Click:Connect(function()
+			if anim_busy then return end
+			anim_busy = true
+			im = not im
+			-- Set before any tween starts: the extras overlap minb for the whole
+			-- fold, and this is what makes their handlers ignore the press.
+			collapsed = im
+			if im then
+				roll_up()
+			else
+				unfold_header()
+			end
+		end)
+
+		closeb.MouseButton1Click:Connect(function()
+			-- Invisible on the pill but still hit-testable, and stacked over minb.
+			if collapsed then return end
+			RestoreAllPerf()
+			if context.x4 and context.x4.f5 then
+				context.x4.f5()
+			end
+			if sg.Parent then sg:Destroy() end
+		end)
+		
 		pcall(function()
 			sg.Destroying:Connect(function()
-				for i = 1, #handles do
-					fx.cancel(handles[i])
-				end
-				table.clear(handles)
-				table.clear(sync)
-				toast_push = nil
-				render_shapes, render_players, rebuild_shape_controls = nil, nil, nil
 				RestoreAllPerf()
-				if x5.g == sg then
-					x5.g = nil
-				end
-				if x6.sg == sg then
-					x6.sg = nil
-				end
+				if x5.g == sg then x5.g = nil end
+				if x6.sg == sg then x6.sg = nil end
 			end)
 		end)
 
-		task.delay(0.3, function()
-			if sg.Parent then
-				x5.toast("Project Gravity", "Ready. Press E to place the core.", "ok", 4)
-			end
-		end)
+		-- The body lives entirely inside f1, so without this the panel comes up
+		-- holding only the header buttons and the mode dropdown: no toggles, no
+		-- target selector, no shape controls, no reset. It used to fill in only
+		-- once something called x5.st() a second time -- recenter or stop -- which
+		-- read as the panel being half-built until the first keypress.
+		f1()
 	end
 
 	return x5

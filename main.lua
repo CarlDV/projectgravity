@@ -67,7 +67,6 @@ local loading_sg = Instance.new("ScreenGui")
 loading_sg.Name = "GravityLoading"
 loading_sg.DisplayOrder = 99999
 loading_sg.IgnoreGuiInset = true
-loading_sg.ResetOnSpawn = false
 if gethui then
 	loading_sg.Parent = gethui()
 elseif syn and syn.protect_gui then
@@ -76,124 +75,39 @@ elseif syn and syn.protect_gui then
 else
 	loading_sg.Parent = v8:WaitForChild("PlayerGui")
 end
-
-local ACCENT = Color3.fromRGB(126, 92, 255)
-local ACCENT2 = Color3.fromRGB(56, 214, 255)
-
-local veil = Instance.new("Frame", loading_sg)
-veil.BackgroundColor3 = Color3.fromRGB(6, 7, 11)
-veil.BackgroundTransparency = 0.35
-veil.BorderSizePixel = 0
-veil.Size = UDim2.new(1, 0, 1, 0)
-
-local stage = Instance.new("Frame", loading_sg)
-stage.BackgroundTransparency = 1
-stage.AnchorPoint = Vector2.new(0.5, 0.5)
-stage.Position = UDim2.new(0.5, 0, 0.5, 0)
-stage.Size = UDim2.new(0, 220, 0, 130)
-
-local spinner = Instance.new("Frame", stage)
+local spinner = Instance.new("Frame", loading_sg)
+spinner.Size = UDim2.new(0, 36, 0, 36)
+spinner.Position = UDim2.new(0.5, -18, 0.5, -18)
 spinner.BackgroundTransparency = 1
-spinner.AnchorPoint = Vector2.new(0.5, 0)
-spinner.Position = UDim2.new(0.5, 0, 0, 0)
-spinner.Size = UDim2.new(0, 40, 0, 40)
-Instance.new("UICorner", spinner).CornerRadius = UDim.new(1, 0)
+local uic = Instance.new("UICorner", spinner)
+uic.CornerRadius = UDim.new(1, 0)
 local uis = Instance.new("UIStroke", spinner)
-uis.Thickness = 2.5
-uis.Color = ACCENT
+uis.Thickness = 3
+uis.Color = Color3.fromRGB(255, 255, 255)
 local uig = Instance.new("UIGradient", uis)
-uig.Color = ColorSequence.new({
-	ColorSequenceKeypoint.new(0, ACCENT),
-	ColorSequenceKeypoint.new(1, ACCENT2),
-})
 uig.Transparency = NumberSequence.new({
 	NumberSequenceKeypoint.new(0, 0),
-	NumberSequenceKeypoint.new(0.45, 0.1),
-	NumberSequenceKeypoint.new(1, 1),
+	NumberSequenceKeypoint.new(0.5, 0),
+	NumberSequenceKeypoint.new(1, 1)
 })
-
-local inner = Instance.new("Frame", spinner)
-inner.BackgroundTransparency = 1
-inner.AnchorPoint = Vector2.new(0.5, 0.5)
-inner.Position = UDim2.new(0.5, 0, 0.5, 0)
-inner.Size = UDim2.new(0, 20, 0, 20)
-Instance.new("UICorner", inner).CornerRadius = UDim.new(1, 0)
-local inner_stroke = Instance.new("UIStroke", inner)
-inner_stroke.Thickness = 1.5
-inner_stroke.Color = Color3.fromRGB(255, 94, 188)
-inner_stroke.Transparency = 0.3
-local inner_grad = Instance.new("UIGradient", inner_stroke)
-inner_grad.Transparency = NumberSequence.new({
-	NumberSequenceKeypoint.new(0, 1),
-	NumberSequenceKeypoint.new(0.5, 0.05),
-	NumberSequenceKeypoint.new(1, 1),
-})
-
-local core = Instance.new("Frame", spinner)
-core.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-core.BorderSizePixel = 0
-core.AnchorPoint = Vector2.new(0.5, 0.5)
-core.Position = UDim2.new(0.5, 0, 0.5, 0)
-core.Size = UDim2.new(0, 6, 0, 6)
-Instance.new("UICorner", core).CornerRadius = UDim.new(1, 0)
-
-local wordmark = Instance.new("TextLabel", stage)
-wordmark.BackgroundTransparency = 1
-wordmark.Position = UDim2.new(0, 0, 0, 58)
-wordmark.Size = UDim2.new(1, 0, 0, 20)
-wordmark.Text = "PROJECT GRAVITY"
-wordmark.TextColor3 = Color3.fromRGB(240, 242, 252)
-wordmark.Font = Enum.Font.GothamBlack
-wordmark.TextSize = 15
-
-local loading_text = Instance.new("TextLabel", stage)
-loading_text.BackgroundTransparency = 1
-loading_text.Position = UDim2.new(0, 0, 0, 80)
-loading_text.Size = UDim2.new(1, 0, 0, 14)
-loading_text.Text = "initialising"
-loading_text.TextColor3 = Color3.fromRGB(120, 126, 152)
-loading_text.Font = Enum.Font.GothamMedium
-loading_text.TextSize = 11
-
-local bar_bed = Instance.new("Frame", stage)
-bar_bed.BackgroundColor3 = Color3.fromRGB(25, 27, 39)
-bar_bed.BorderSizePixel = 0
-bar_bed.AnchorPoint = Vector2.new(0.5, 0)
-bar_bed.Position = UDim2.new(0.5, 0, 0, 104)
-bar_bed.Size = UDim2.new(0, 140, 0, 3)
-Instance.new("UICorner", bar_bed).CornerRadius = UDim.new(1, 0)
-
-local bar = Instance.new("Frame", bar_bed)
-bar.BackgroundColor3 = ACCENT
-bar.BorderSizePixel = 0
-bar.Size = UDim2.new(0.08, 0, 1, 0)
-Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
-local bar_grad = Instance.new("UIGradient", bar)
-bar_grad.Color = ColorSequence.new({
-	ColorSequenceKeypoint.new(0, ACCENT),
-	ColorSequenceKeypoint.new(1, ACCENT2),
-})
-
-local boot_progress, boot_shown = 0.08, 0.08
-local function boot_status(text, progress)
-	loading_text.Text = text
-	boot_progress = progress or boot_progress
-end
-
 local spin_t = 0
 local spin_conn = v3.RenderStepped:Connect(function(dt)
 	spin_t = spin_t + dt
-	spinner.Rotation = spin_t * 260
-	inner.Rotation = spin_t * -420
-	local pulse = 5 + 2 * (0.5 + 0.5 * math.sin(spin_t * 4))
-	core.Size = UDim2.new(0, pulse, 0, pulse)
-	boot_shown = boot_shown + (boot_progress - boot_shown) * math.min(1, dt * 6)
-	bar.Size = UDim2.new(boot_shown, 0, 1, 0)
+	spinner.Rotation = spin_t * 400
 end)
+
+local loading_text = Instance.new("TextLabel", loading_sg)
+loading_text.Size = UDim2.new(0, 100, 0, 20)
+loading_text.Position = UDim2.new(0.5, -50, 0.5, 25)
+loading_text.BackgroundTransparency = 1
+loading_text.Text = "LOADING..."
+loading_text.TextColor3 = Color3.fromRGB(200, 200, 200)
+loading_text.Font = Enum.Font.GothamMedium
+loading_text.TextSize = 12
 
 local x9 = { c1 = 0.15, c2 = 0.05, c3 = 0.01, c4 = 0.2, c5 = 0.6, c6 = 0.8, c7 = 0.1, c8 = 0.25 }
 local ANTI_SLEEP = Vector3.new(0, 0.01, 0)
-local BASE_URL = "https://raw.githubusercontent.com/CarlDV/projectgravity/main/"
+local BASE_URL = "https://raw.githubusercontent.com/CarlDV/Project-Gravity-02/main/"
 
 local function safe_http_get(url)
 	local cache_buster = "?cb=" .. tostring(math.random(1000000, 9999999))
@@ -231,14 +145,23 @@ local function load_module(path)
 end
 
 local config = load_module("config.lua")
-boot_status("configuration", 0.22)
+-- load_module returns nil on a failed download or a syntax error, and this is
+-- above the init pcall, so a bare config.x1 threw with the loading spinner still
+-- on screen and its RenderStepped still connected -- no message, no way to clear
+-- it, and _GRAVITY_DESTROY not yet set for a re-execution to clean up.
+if not config or type(config.x1) ~= "table" or type(config.x2) ~= "table" then
+	if spin_conn then
+		pcall(function() spin_conn:Disconnect() end)
+	end
+	if loading_sg then
+		pcall(function() loading_sg:Destroy() end)
+	end
+	warn("Project Gravity: could not load config.lua -- aborting.")
+	return
+end
 local x1 = config.x1
 local x2 = config.x2
 x1.S = x2
-if is_mobile then
-	-- the on-screen dock is the only way to place the core without a keyboard
-	x1.ShowDock = true
-end
 
 local local_shapes = {}
 if isfolder and makefolder and listfiles and readfile then
@@ -253,27 +176,53 @@ if isfolder and makefolder and listfiles and readfile then
 				if name then
 					local_shapes[name] = file
 					if not x2[name] then
-						x2[name] = {}
+						-- The slot is claimed only after the module proves it loads.
+						-- Claiming it first left x2[name] as a truthy empty table on every
+						-- failure path, which defeated the k6 repair further down: a local
+						-- shape with a syntax error stayed selected, get_shape returned
+						-- nil, shape_f2 stayed nil, and every claimed part fell through to
+						-- ANTI_SLEEP -- the script grabbed the map and did nothing, which
+						-- is the exact failure that repair exists to prevent. The AI writes
+						-- these files, so a bad one is not a remote possibility.
 						local read_success, code = pcall(readfile, file)
+						local shape_mod
 						if read_success and code then
 							local func = loadstring(code)
 							if func then
-								local load_success, shape_mod = pcall(func)
-								if load_success and type(shape_mod) == "table" and shape_mod.Controls then
-									for _, ctrl in ipairs(shape_mod.Controls) do
-										if type(ctrl) == "table" and ctrl.Key then
-											local default_val = ctrl.Default
-											if default_val == nil then
-												default_val = ctrl.Min or 0
-											end
+								local load_success, result = pcall(func)
+								if load_success and type(result) == "table" then
+									shape_mod = result
+								end
+							end
+						end
+						if shape_mod then
+							local block = {}
+							if shape_mod.Controls then
+								for _, ctrl in ipairs(shape_mod.Controls) do
+									if type(ctrl) == "table" and ctrl.Key then
+										local default_val = ctrl.Default
+										if default_val == nil then
+											-- Min is a *display* bound, so it needs the divide to
+											-- become a stored value. Default does not: it is already
+											-- in stored units, which is why UI.lua:1223 multiplies it
+											-- by Div to get the display value. Dividing both made the
+											-- two paths disagree by Div squared, so a local shape
+											-- with Div = 10 and Default = 1.2 was seeded 0.12,
+											-- displayed as 1.2, clamped up to Min and written back
+											-- as 0.1.
+											default_val = ctrl.Min or 0
 											if ctrl.Div then
 												default_val = default_val / ctrl.Div
 											end
-											x2[name][ctrl.Key] = default_val
 										end
+										block[ctrl.Key] = default_val
 									end
-								end	
+								end
 							end
+							x2[name] = block
+						else
+							warn("Project Gravity: local shape '" .. name .. "' failed to load; skipping it.")
+							local_shapes[name] = nil
 						end
 					end
 				end
@@ -282,15 +231,36 @@ if isfolder and makefolder and listfiles and readfile then
 	end)
 end
 
+-- Copied all the way down, not one level: x1.Keybinds.Shapes is a table inside a
+-- table, and a shallow copy would hand the snapshot the *same* table the user
+-- then edits, so "Reset All Settings" would restore the defaults onto itself and
+-- leave every shape hotkey in place.
+local function copy_table(t)
+	local res = {}
+	for k, v in pairs(t) do
+		if typeof(v) == "table" then
+			res[k] = copy_table(v)
+		else
+			res[k] = v
+		end
+	end
+	return res
+end
+
+-- Forward-declared so reset_config below can reach x4 at call time. The table
+-- itself is built further down, once every field it carries exists.
+local context
+
 local default_x1 = {}
 for k, v in pairs(x1) do
-	if typeof(v) == "table" then
-		default_x1[k] = {}
-		for sk, sv in pairs(v) do
-			default_x1[k][sk] = sv
+	-- S is x2 under another name and Targets holds live Players; reset_config
+	-- skips both, so snapshotting them is pure work.
+	if k ~= "S" and k ~= "Targets" then
+		if typeof(v) == "table" then
+			default_x1[k] = copy_table(v)
+		else
+			default_x1[k] = v
 		end
-	else
-		default_x1[k] = v
 	end
 end
 local default_x2 = {}
@@ -301,14 +271,23 @@ for mk, mv in pairs(x2) do
 	end
 end
 
+-- Restores the defaults, then hands the three settings that own live state to the
+-- code that owns them. The generic loop cannot know that Disabled has to go through
+-- x4.apply_disabled (System.lua:1061 calls that "the one entry point"), that a k6
+-- change has to arm the shape transition, or that the Perf_* flags describe things
+-- already done to the game. Assigning them directly left the flag saying one thing
+-- and the world doing another.
+--
+-- context.x4 / x5 are read at call time, not captured: reset_config is built before
+-- either exists.
 local function reset_config()
+	local was_disabled = x1.Disabled
+	local was_shape = x1.k6
+
 	for k, v in pairs(default_x1) do
 		if k ~= "S" and k ~= "Targets" then
 			if typeof(v) == "table" then
-				x1[k] = {}
-				for sk, sv in pairs(v) do
-					x1[k][sk] = sv
-				end
+				x1[k] = copy_table(v)
 			else
 				x1[k] = v
 			end
@@ -320,12 +299,51 @@ local function reset_config()
 			for sk, sv in pairs(mv) do
 				x2[mk][sk] = sv
 			end
+		else
+			-- A shape registered after startup -- a local or AI-authored one -- was
+			-- never in the default_x2 snapshot, so it kept its tuned values through a
+			-- reset while every shipped shape went back. Seeding the block here means
+			-- the reset covers it too.
+			x2[mk] = {}
+			for sk, sv in pairs(mv) do
+				x2[mk][sk] = sv
+			end
 		end
 	end
 	x1.S = x2
+
+	local x4 = context and context.x4
+	-- Disabled: route the transition rather than the flag. apply_disabled re-seats
+	-- every claimed part; skipping it left them holding a whole fall's worth of
+	-- stale smoothing terms, which is the re-seat fling System.lua:1052 describes.
+	if x4 and x4.apply_disabled and was_disabled ~= x1.Disabled then
+		local target = x1.Disabled
+		x1.Disabled = was_disabled
+		pcall(x4.apply_disabled, target)
+	end
+	-- k6: switch_shape owns d.trans_vl, which System.lua:1140 notes cannot be
+	-- derived after the fact because it needs the velocity from before the switch.
+	-- Without it every part jumps between velocity fields in a single frame.
+	if x4 and x4.switch_shape and was_shape ~= x1.k6 then
+		local target = x1.k6
+		x1.k6 = was_shape
+		pcall(x4.switch_shape, target)
+	end
 end
 
 local serialization = load_module("math/serialization.lua")
+-- Same reasoning as config.lua above: this is the other hard dependency fetched
+-- outside the init pcall, and settings cannot round-trip without it.
+if not serialization or type(serialization.sanitize) ~= "function" or type(serialization.desanitize) ~= "function" then
+	if spin_conn then
+		pcall(function() spin_conn:Disconnect() end)
+	end
+	if loading_sg then
+		pcall(function() loading_sg:Destroy() end)
+	end
+	warn("Project Gravity: could not load math/serialization.lua -- aborting.")
+	return
+end
 local sanitize = serialization.sanitize
 local desanitize = serialization.desanitize
 
@@ -356,8 +374,24 @@ local function save_settings()
 	task.delay(0.5, function()
 		save_pending = false
 		local data = { x1 = sanitize(x1), x2 = sanitize(x2) }
-		data.x1.Tgt = nil
+		-- x1.S is x2 under another name (line 150) and sanitize recurses into
+		-- tables, so without this every autosave carried a second complete copy of
+		-- all 51 shape blocks -- which load_settings then desanitized and threw away
+		-- at its k ~= "S" test. Doubled the file and the encode cost on every
+		-- slider release.
+		data.x1.S = nil
+		-- Targets, not Tgt. x1.Tgt was replaced by x1.Targets and this line has been
+		-- guarding a key that does not exist; the live targets were kept out only
+		-- because sanitize drops Instance values. TgtActive goes with it, since a
+		-- restored "targeting on" with no targets means nothing.
+		data.x1.Targets = nil
+		data.x1.TgtActive = nil
 		data.x1.IsLaunching = nil
+		-- Paused is live state, not a preference. It persisted, so quitting while
+		-- paused brought the next session up frozen -- and the desktop panel has no
+		-- Paused control at all, only the rebindable P hotkey, so if that was unbound
+		-- there was no way to resume.
+		data.x1.Paused = nil
 		local success, json = pcall(function()
 			return HttpService:JSONEncode(data)
 		end)
@@ -365,6 +399,9 @@ local function save_settings()
 			pcall(function()
 				writefile("GravitySettings_Auto.json", json)
 			end)
+		else
+			-- Silence here meant settings stopped persisting with no way to tell.
+			warn("Project Gravity: could not encode settings -- not saved. " .. tostring(json))
 		end
 	end)
 end
@@ -395,67 +432,72 @@ local function load_settings()
 	end
 end
 load_settings()
-boot_status("settings", 0.34)
+
+-- A settings file can name a shape that no longer ships -- Deflect was folded
+-- into Cursed Technique Red -- and nothing downstream catches that. switch_shape
+-- checks x2 (System.lua), but only for an explicit switch; the startup path calls
+-- get_shape(x1.k6) directly, which warns, returns nil, and leaves shape_f2 nil.
+-- Every claimed part then falls through to ANTI_SLEEP, so the script grabs the
+-- map and does nothing with it, with only a warn to explain why. Falling back to
+-- the default costs one lookup and turns that into a working panel.
+if not x2[x1.k6] then
+	x1.k6 = default_x1.k6
+end
 
 if setfpscap then
 	pcall(function()
-		local cap = tonumber(x1.FPSCap) or 240
-		-- the UI treats 360 and above as "uncapped", and so does the executor hook
-		setfpscap(cap >= 360 and 0 or cap)
+		setfpscap(x1.FPSCap or 60)
 	end)
 end
 
 local loaded_shapes = {}
-local failed_shapes = {}
 local function get_shape(name)
-	local cached = loaded_shapes[name]
-	if cached then
-		return cached
-	end
-	-- Without this the physics loop would retry a broken download every single
-	-- frame, which is far worse than the shape simply not working.
-	if failed_shapes[name] then
-		return nil
-	end
-	local success, result = false, nil
+	if not loaded_shapes[name] then
+		local success, result = false, nil
 
-	if local_shapes and local_shapes[name] then
-		local read_success, code = pcall(readfile, local_shapes[name])
-		if read_success and code then
-			local func, err = loadstring(code)
-			if func then
-				success, result = pcall(func)
+		if local_shapes and local_shapes[name] then
+			local read_success, code = pcall(readfile, local_shapes[name])
+			if read_success and code then
+				local func, err = loadstring(code)
+				if func then
+					success, result = pcall(func)
+				else
+					result = "Syntax error in local shape: " .. tostring(err)
+				end
 			else
-				result = "Syntax error in local shape: " .. tostring(err)
+				result = "Failed to read local shape file"
 			end
+		end
+
+		if not success then
+			local url = BASE_URL .. "shapes/" .. HttpService:UrlEncode(name) .. ".lua"
+			local code = safe_http_get(url)
+			-- The 404 test load_module already does. Without it the literal body
+			-- "404: Not Found" went to loadstring and a missing shape was reported as
+			-- a syntax error in its source, which sends you looking in the wrong place.
+			if code and string.match(code, "^404: Not Found") then
+				code = nil
+				result = "Not found on the server"
+			end
+			if code then
+				local func, err = loadstring(code)
+				if func then
+					success, result = pcall(func)
+				else
+					result = "Syntax error in shape source: " .. tostring(err)
+				end
+			elseif not result then
+				result = "HTTP Request Failed"
+			end
+		end
+
+		if success and result then
+			loaded_shapes[name] = result
 		else
-			result = "Failed to read local shape file"
+			warn("Failed to load shape: " .. tostring(name) .. " Error: " .. tostring(result))
 		end
 	end
-
-	if not success then
-		local url = BASE_URL .. "shapes/" .. HttpService:UrlEncode(name) .. ".lua"
-		local code = safe_http_get(url)
-		if code then
-			local func, err = loadstring(code)
-			if func then
-				success, result = pcall(func)
-			else
-				result = "Syntax error in shape source: " .. tostring(err)
-			end
-		else
-			result = "HTTP Request Failed"
-		end
-	end
-
-	if success and type(result) == "table" then
-		loaded_shapes[name] = result
-		return result
-	end
-
-	failed_shapes[name] = true
-	warn("Failed to load shape: " .. tostring(name) .. " Error: " .. tostring(result))
-	return nil
+	return loaded_shapes[name]
 end
 
 local x6 = {
@@ -490,37 +532,69 @@ local x6 = {
 }
 
 get_shape(x1.k6)
-boot_status("formations", 0.5)
 
--- Warm the cache in the background: favourites first, then everything else at a
--- gentle pace. The old build fired one request per shape every 0.05s, which meant
--- roughly sixty downloads racing each other while the UI was still starting up.
 coroutine.wrap(function()
-	local queue = {}
-	for mn in pairs(x2) do
+	for mn, _ in pairs(x2) do
+		-- Stop if the session was torn down or superseded while we were waiting.
+		-- This loop runs for ten seconds or more, so it easily outlives a
+		-- re-execution, and anything it loaded afterwards was never cleaned up.
+		if x6.torn_down or getgenv()._GRAVITY_SESSION_ID ~= SESSION_ID then
+			return
+		end
 		if mn ~= x1.k6 then
-			queue[#queue + 1] = mn
-		end
-	end
-	table.sort(queue, function(a, b)
-		local fa, fb = favorites[a] and 1 or 0, favorites[b] and 1 or 0
-		if fa ~= fb then
-			return fa > fb
-		end
-		return a < b
-	end)
-	for i, mn in ipairs(queue) do
-		pcall(get_shape, mn)
-		if task and task.wait then
-			task.wait(favorites[mn] and 0.05 or 0.4)
-		end
-		if i % 8 == 0 and task and task.wait then
-			task.wait(1)
+			pcall(function()
+				get_shape(mn)
+			end)
+			if task and task.wait then
+				task.wait(0.05)
+			end
 		end
 	end
 end)()
 
-local context = {
+-- One motion vocabulary for the whole interface. Every tween in UI.lua and
+-- UI_elements.lua pulls from here, so "how does a hover feel" is answered in one
+-- place instead of by whichever TweenInfo happened to get pasted at the call
+-- site -- which is how the same hover ended up at 0.2s in one file and 0.15s in
+-- another, and how a dozen calls ended up on bare TweenInfo.new(t) (Quad/Out by
+-- Roblox default) that reads sluggish next to a deliberate curve.
+--
+-- The scale is intentionally coarse. Interactions that should feel instant
+-- (hover, press) sit under 0.12s, because past roughly 0.15s a pointer response
+-- stops reading as feedback and starts reading as lag. Structural motion
+-- (windows, panels) is slower because it is telling you where something came
+-- from. Anything that moves a large distance gets Quint/Out, which covers most
+-- of the ground early and settles softly; anything that should feel physical
+-- gets Back, which overshoots slightly.
+local ANIM = {
+	-- Pointer feedback. Fast enough to feel attached to the cursor.
+	HOVER = TweenInfo.new(0.11, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+	-- Press is faster than release: the push should feel immediate, the return
+	-- can relax. Asymmetry here is what makes a button feel clicky.
+	PRESS = TweenInfo.new(0.06, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+	RELEASE = TweenInfo.new(0.16, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+	-- A toggle knob is a physical object; Back sells the travel.
+	TOGGLE = TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+	-- Colour has no momentum, so easing it with a curve that overshoots looks
+	-- wrong. Plain and quick.
+	TINT = TweenInfo.new(0.13, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+	-- Follows the cursor during a drag, so it has to be nearly immediate or the
+	-- knob lags behind the pointer.
+	SLIDE = TweenInfo.new(0.07, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+	-- Structural motion.
+	OPEN = TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+	OPEN_POP = TweenInfo.new(0.42, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+	CLOSE = TweenInfo.new(0.19, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+	CLOSE_POP = TweenInfo.new(0.19, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+	-- Panel collapse choreography.
+	ROLL = TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+	FOLD = TweenInfo.new(0.36, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+	UNFOLD = TweenInfo.new(0.42, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+	-- Setting-driven rescale: no character wanted, just get there.
+	RESCALE = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+}
+
+context = {
 	v1 = v1,
 	v2 = v2,
 	v3 = v3,
@@ -544,9 +618,15 @@ local context = {
 	is_mobile = is_mobile,
 	SUB_DIR = SUB_DIR,
 	reset_config = reset_config,
+	ANIM = ANIM,
 }
 
 local function destroy()
+	-- Read by the preload coroutine below, which task.waits its way through every
+	-- shape and cannot otherwise be stopped: without this it keeps fetching and
+	-- writing into loaded_shapes after teardown, and anything it adds after the
+	-- cleanup sweep further down is never cleaned up at all.
+	x6.torn_down = true
 	if spin_conn then
 		pcall(function() spin_conn:Disconnect() end)
 		spin_conn = nil
@@ -562,6 +642,42 @@ local function destroy()
 	for i = #x6.run_connections, 1, -1 do
 		pcall(function() x6.run_connections[i]:Disconnect() end)
 		x6.run_connections[i] = nil
+	end
+	-- The third list. f1() disconnects the previous generation on every rebuild, so
+	-- this is bounded at one per session -- but that last one is a live Heartbeat
+	-- holding the whole f1 closure, and nothing here was releasing it.
+	if x6.f1_connections then
+		for i = #x6.f1_connections, 1, -1 do
+			pcall(function() x6.f1_connections[i]:Disconnect() end)
+			x6.f1_connections[i] = nil
+		end
+	end
+	-- SelectionBoxes the sculptor parented onto world parts. No shape owns them
+	-- (Sculptor has no cleanup) so the sweep below cannot reach them, and the next
+	-- session starts with a fresh table that has no record of them -- so if they
+	-- are not destroyed here they are in the world permanently.
+	if x6.sculptor_clear then
+		pcall(x6.sculptor_clear)
+	elseif x6.sculptor_highlights then
+		for _, hl in pairs(x6.sculptor_highlights) do
+			pcall(function() hl:Destroy() end)
+		end
+		table.clear(x6.sculptor_highlights)
+	end
+	if x6.sculptor_selected then
+		table.clear(x6.sculptor_selected)
+	end
+	if x6.sculptor_box then
+		pcall(function() x6.sculptor_box:Destroy() end)
+		x6.sculptor_box = nil
+	end
+	-- Shapes that own an instance hand it back here. Every loaded shape is asked,
+	-- not just the current one, because this is the teardown that runs when the
+	-- script is re-executed and the shape may have been switched since.
+	for _, mod in pairs(loaded_shapes) do
+		if type(mod) == "table" and mod.cleanup then
+			pcall(mod.cleanup, x6, x1)
+		end
 	end
 	for p, d in pairs(x6.a) do
 		if d then
@@ -579,73 +695,89 @@ local function destroy()
 	end
 	x6.a = setmetatable({}, {__mode = "k"})
 	if x6.b then
+		-- The core lives inside a Folder System.lua creates for it (line 944).
+		-- x4.f5 destroys the folder; this path only ever destroyed the part, so
+		-- every re-execution left an empty Workspace.AS behind -- and the next
+		-- session's seed walk picked it straight back up.
+		local holder = x6.b.Parent
 		pcall(function() x6.b:Destroy() end)
 		x6.b = nil
+		if holder and holder ~= v4 and holder.Name == "AS" then
+			pcall(function()
+				if holder:IsA("Folder") then
+					holder:Destroy()
+				end
+			end)
+		end
 	end
 	if x6.sg then
 		pcall(function() x6.sg:Destroy() end)
 		x6.sg = nil
 	end
-	getgenv()._GRAVITY_SESSION_ID = nil
-	getgenv()._GRAVITY_DESTROY = nil
+	-- Only clear the handles if they are still ours. A superseded session tears
+	-- itself down after a newer one has already registered, so clearing
+	-- unconditionally would deregister the session that is actually running and
+	-- leave the next re-execution with nothing to call.
+	if getgenv()._GRAVITY_SESSION_ID == SESSION_ID then
+		getgenv()._GRAVITY_SESSION_ID = nil
+		getgenv()._GRAVITY_DESTROY = nil
+	end
 end
 
 getgenv()._GRAVITY_DESTROY = destroy
 
 local success, err = pcall(function()
-	-- The interface is responsive and handles touch itself, so both builds share
-	-- it; only the physics system still has a device-specific variant.
-	boot_status("interface", 0.62)
-	local UI_builder = load_module("UI.lua")
+	local UI_builder = load_module(SUB_DIR .. "UI.lua")
 	if not UI_builder then error("Failed to load UI") end
 	local x5 = UI_builder(context)
 	context.x5 = x5
 
-	boot_status("physics", 0.85)
 	local system_builder = load_module(SUB_DIR .. "System.lua")
 	if not system_builder then error("Failed to load System") end
 	local sys = system_builder(context)
 	local x4 = sys.x4
 	local x8 = sys.x8
 	context.x4 = x4
+	-- The UI reaches back into x8 to rebind hotkeys, so it has to be in the
+	-- context before x5.st() builds the panel below.
+	context.x8 = x8
 
 	x4.f3()
 	x8.i()
 	x5.st()
-	boot_status("ready", 1)
+
+	-- A saved k6 can already name a testing shape, in which case it is active
+	-- without the user having picked it this session and none of the switch paths
+	-- ever fire. Announcing it here is the whole point of the notice: the case
+	-- where you did not choose the shape is the one where you most need telling.
+	local startup_shape = get_shape(x1.k6)
+	if startup_shape and startup_shape.Testing then
+		x8.notify("Testing", tostring(x1.k6) .. " is still in testing.", 4)
+	end
 end)
 
-local function dismiss_boot(fade)
-	if not fade then
-		if spin_conn then
-			spin_conn:Disconnect()
-			spin_conn = nil
-		end
-		if loading_sg then
-			loading_sg:Destroy()
-			loading_sg = nil
-		end
-		return
-	end
-	local info = TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
-	pcall(function()
-		v6:Create(veil, info, { BackgroundTransparency = 1 }):Play()
-		for _, obj in ipairs(stage:GetDescendants()) do
-			if obj:IsA("TextLabel") then
-				v6:Create(obj, info, { TextTransparency = 1 }):Play()
-			elseif obj:IsA("UIStroke") then
-				v6:Create(obj, info, { Transparency = 1 }):Play()
-			elseif obj:IsA("Frame") then
-				v6:Create(obj, info, { BackgroundTransparency = 1 }):Play()
-			end
-		end
-	end)
-	task.delay(0.36, function()
-		dismiss_boot(false)
-	end)
+-- Guarded, and nil-checked. destroy() nils these same two upvalues, and it is
+-- reachable from another thread the whole time the pcall above is yielding on its
+-- HTTP fetches: a re-execution calls this session's _GRAVITY_DESTROY (line 5), so
+-- the old thread used to resume here and throw on a nil spin_conn -- outside every
+-- pcall, which meant the lines below never ran and the superseded session was
+-- never torn down at all.
+if spin_conn then
+	pcall(function() spin_conn:Disconnect() end)
+	spin_conn = nil
+end
+if loading_sg then
+	pcall(function() loading_sg:Destroy() end)
+	loading_sg = nil
 end
 
-dismiss_boot(success)
+-- Another execution took over while this one was still loading. Everything this
+-- session built has to go; destroy() now leaves the newer session's handles alone.
+if getgenv()._GRAVITY_SESSION_ID ~= SESSION_ID then
+	pcall(destroy)
+	warn("Project Gravity: a newer execution took over during load; this one stopped.")
+	return
+end
 
 if not success then
 	destroy()

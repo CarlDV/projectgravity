@@ -4,6 +4,7 @@ return function(context)
 	local x5 = context.x5
 	local get_shape = context.get_shape
 	local load_module = context.load_module
+	local SUB_DIR = context.SUB_DIR or ""
 
 	local x4, x8 = {}, {}
 	local x7 = {}
@@ -22,6 +23,10 @@ return function(context)
 			v5:SetCore("SendNotification", { Title = t, Text = x, Duration = d or 3 })
 		end)
 	end
+
+	-- The panel needs somewhere to send a rejected-keybind message, and x7 is
+	-- local to this module.
+	x8.notify = x7.n
 
 	local EXCLUDED_NAMES = {
 		Baseplate = true,
@@ -50,6 +55,27 @@ return function(context)
 		RightFoot = true,
 	}
 
+	-- Character models, rebuilt at most once a second. Membership is checked as a
+	-- plain hash read during the ancestor walk below, which short-circuits before
+	-- the two FindFirstChildOfClass calls: a player character is by far the most
+	-- common reason a part is excluded, so the common case now costs one Lua table
+	-- read instead of an IsA plus up to two engine-side child searches per level.
+	local char_set, char_set_t = {}, 0
+	local function characters()
+		local now = time()
+		if now - char_set_t > 1 then
+			char_set_t = now
+			table.clear(char_set)
+			for _, pl in ipairs(v2:GetPlayers()) do
+				local ch = pl.Character
+				if ch then
+					char_set[ch] = true
+				end
+			end
+		end
+		return char_set
+	end
+
 	function x7.e(p)
 		if not p:IsA("BasePart") then
 			return true
@@ -60,13 +86,22 @@ return function(context)
 		if EXCLUDED_NAMES[p.Name] then
 			return true
 		end
+		-- p.Parent used to be re-read from the engine once per tag in k5, and
+		-- again to seed the ancestor walk. One read up front covers all of it.
+		local parent = p.Parent
 		for _, t in ipairs(x1.k5) do
-			if p:FindFirstChild(t) or (p.Parent and p.Parent:FindFirstChild(t)) then
+			if p:FindFirstChild(t) or (parent and parent:FindFirstChild(t)) then
 				return true
 			end
 		end
-		local target = p.Parent
+		local chars = characters()
+		local target = parent
 		while target and target ~= v4 and target ~= game do
+			-- ordered cheapest-to-dearest: Lua table read, then a bare IsA, then
+			-- the child searches. The ordering alone skips most of the old work.
+			if chars[target] then
+				return true
+			end
 			if target:IsA("Accessory") or target:IsA("Tool") then
 				return true
 			end
@@ -91,20 +126,42 @@ return function(context)
 		local pos = root.Position
 		local vel = root.AssemblyLinearVelocity
 		-- squared compare first: Magnitude's sqrt is only worth paying when the
-		-- velocity actually needs clamping
-		if vel:Dot(vel) > 62500 then
-			vel = vel.Unit * 250
+		-- velocity actually needs clamping. .Unit would then sqrt the same number
+		-- a second time, so scale by the root we already have instead.
+		local vel_sq = vel:Dot(vel)
+		if vel_sq > 62500 then
+			vel = vel * (250 / math.sqrt(vel_sq))
 		end
 		local y_vel = math.clamp(vel.Y, -50, 15)
 		vel = Vector3.new(vel.X, y_vel, vel.Z)
 		return pos + (vel * (factor / 1000))
 	end
 
-	local no_damp = { ["Slingshot"] = true, ["Point Impact"] = true, ["Deflect"] = true, ["Light Light no Mi"] = true }
+	local no_damp = { ["Slingshot"] = true, ["Point Impact"] = true, ["Light Light no Mi"] = true }
 
 	-- NetworkOwnerV3 values that mean somebody else is simulating the part. One
 	-- hash lookup instead of a four-way comparison chain, per part per frame.
 	local NO3_SKIP = { [-1] = true, [1] = true, [2] = true, [3] = true }
+
+	-- Most shapes are pure functions of the part and the clock, but one that owns
+	-- an instance -- Platform's anchored pad -- needs somewhere to give it back, or
+	-- it outlives the shape that made it. Read straight out of loaded_shapes rather
+	-- than through get_shape: this runs on the disable and stop paths, and
+	-- get_shape would happily block on an HTTP fetch for a shape that never loaded.
+	-- A shape with no cleanup costs one nil check.
+	local function cleanup_shape(name)
+		local cache = context.loaded_shapes
+		local mod = name and cache and cache[name]
+		if mod and mod.cleanup then
+			pcall(mod.cleanup, x6, x1)
+		end
+	end
+
+	-- Forward-declared: f3_body's drop branch restores a part whose Parent went away,
+	-- and the definition lives further down next to x4.f2. Without this the name
+	-- resolved to a nil global inside f3_body and the pcall around it swallowed the
+	-- failure, so the restore silently did nothing.
+	local f2_restore
 
 	-- The hot loop lives in its own function so the per-frame pcall does not have
 	-- to allocate a fresh closure sixty times a second.
@@ -112,6 +169,7 @@ return function(context)
 			local c = x6.b.Position
 			x6.f = x6.f + 1
 			if x6.last_shape ~= x1.k6 then
+				cleanup_shape(x6.last_shape)
 				x6.last_shape = x1.k6
 				for _, d in pairs(x6.a) do
 					d.v1 = nil
@@ -135,6 +193,11 @@ return function(context)
 					d.hit_wall = nil
 					d.hover_anchor = nil
 					d.cursed_hover_mode = nil
+					-- room_slot is the field ROOM Ope Ope no Mi actually parks; the two
+					-- names below are left over from an earlier version of that shape and
+					-- are written by nothing, so the list was clearing the dead names and
+					-- missing the live one.
+					d.room_slot = nil
 					d.room_target = nil
 					d.room_orbit_phase = nil
 					d.pika_direction = nil
@@ -186,29 +249,40 @@ return function(context)
 				end
 
 				for _, pl in ipairs(v2:GetPlayers()) do
-					if pl.Character and pl.Character:FindFirstChild("Head") then
-						local head = pl.Character.Head
+					-- pl.Character was read twice and the Head lookup was thrown
+					-- away and re-fetched as a property; two engine crossings per
+					-- player per second for values we already had in hand.
+					local char = pl.Character
+					local head = char and char:FindFirstChild("Head")
+					if head then
 						local is_tgt = target_set[pl] == true
 						local marker = head:FindFirstChild("GravityTargetMarker")
 
+						-- Built bottom-up and parented last. Instance.new(class,
+						-- parent) attaches before the properties are assigned, so
+						-- every set after it schedules a layout/render pass the
+						-- engine then throws away; assembling off-tree and
+						-- parenting once costs a single pass for the whole marker.
 						if is_tgt and not marker then
-							local bg = Instance.new("BillboardGui")
-							bg.Name = "GravityTargetMarker"
-							bg.Size = UDim2.new(1.5, 0, 1.5, 0)
-							bg.StudsOffset = Vector3.new(0, 2.5, 0)
-							bg.AlwaysOnTop = true
-							
-							local txt = Instance.new("TextLabel", bg)
+							local txt = Instance.new("TextLabel")
 							txt.BackgroundTransparency = 1
 							txt.Size = UDim2.new(1, 0, 1, 0)
 							txt.Text = "▼"
 							txt.TextColor3 = Color3.fromRGB(255, 60, 60)
 							txt.TextScaled = true
 							txt.Font = Enum.Font.GothamBlack
-							
-							local str = Instance.new("UIStroke", txt)
+
+							local str = Instance.new("UIStroke")
 							str.Color = Color3.fromRGB(0, 0, 0)
 							str.Thickness = 2
+							str.Parent = txt
+
+							local bg = Instance.new("BillboardGui")
+							bg.Name = "GravityTargetMarker"
+							bg.Size = UDim2.new(1.5, 0, 1.5, 0)
+							bg.StudsOffset = Vector3.new(0, 2.5, 0)
+							bg.AlwaysOnTop = true
+							txt.Parent = bg
 							bg.Parent = head
 						elseif not is_tgt and marker then
 							marker:Destroy()
@@ -237,7 +311,10 @@ return function(context)
 				table.clear(target_positions)
 			end
 			local valid_targets = 0
-			local fallen_height = workspace.FallenPartsDestroyHeight + 50
+			-- v4 is already the (cloneref'd) Workspace service, so reaching it as
+			-- an upvalue is a register read where `workspace` is an _ENV hash
+			-- lookup. Same instance, three fewer global lookups per frame.
+			local fallen_height = v4.FallenPartsDestroyHeight + 50
 			if #x6.pi_targets > 0 then
 				local predictive = x1.PredictiveTracking
 				local pfactor = x1.PredictionFactor or 150
@@ -296,7 +373,7 @@ return function(context)
 			end
 			
 			if x6.f % 60 == 0 or x6.water_level == nil then
-				local water_part = workspace:FindFirstChild("WaterLevel")
+				local water_part = v4:FindFirstChild("WaterLevel")
 				if water_part and water_part:IsA("BasePart") then
 					x6.water_level = water_part.Position.Y + (water_part.Size.Y / 2) + 5
 				else
@@ -305,7 +382,7 @@ return function(context)
 			end
 			local water_level = x6.water_level ~= false and x6.water_level or nil
 			local ghp = gethiddenproperty
-			local workspace_gravity = workspace.Gravity or 196.2
+			local workspace_gravity = v4.Gravity or 196.2
 			local shape_f2 = cur_shape_mod and cur_shape_mod.f2
 			local is_drop_shape = cur_shape_mod and cur_shape_mod.Drop
 			local is_self_bounded_shape = shape_name == "ROOM Ope Ope no Mi" or shape_name == "Light Light no Mi"
@@ -328,22 +405,50 @@ return function(context)
 			local do_damping = damping > 0 and not cur_no_damp and not force_smooth
 			local integral_on = ki > 0
 
-			for k = #x6.active_array, 1, -1 do
-				local p = x6.active_array[k]
-				local d = x6.a[p]
+			-- The sweep reached both of these through x6 on every single
+			-- iteration: at 5000 parts that was ~20k extra hash lookups a frame,
+			-- 1.2M a second, for two fields that cannot change mid-sweep. Nothing
+			-- outside main.lua's teardown ever reassigns them (shapes and the
+			-- sculptor only read), so holding them as locals is safe.
+			local arr = x6.active_array
+			local data = x6.a
+			-- gethiddenproperty is one of the pricier executor calls and this was
+			-- refreshing every 0.15s per part no matter the load: ~33k pcall+read
+			-- pairs a second at 5000 parts. Widening it with the same part-count
+			-- stride the sweep already uses cuts that ~4x, capped at 0.6s so an
+			-- ownership change is still picked up quickly.
+			local no3_interval = 0.15 * (dt > 4 and 4 or dt)
+
+			for k = #arr, 1, -1 do
+				local p = arr[k]
+				local d = data[p]
 
 				if not d or not p.Parent then
 					if d then
+						-- d holds the only copy of this part's original CanCollide,
+						-- Anchored and CustomPhysicalProperties. Dropping it without
+						-- restoring is unrecoverable: plenty of games pool parts by
+						-- setting Parent = nil and putting them back later, and the
+						-- DescendantAdded hook then re-queues the part, at which point
+						-- x4.f1 re-snapshots the *forced* values -- CanCollide false and
+						-- LIGHT_PHYSICS -- as if they were the originals. That part can
+						-- never be restored again by any release path, including
+						-- teardown. Deliberately not guarded on p.Parent -- this branch
+						-- fires *because* Parent is nil, and an unparented part still
+						-- accepts property writes, which is the whole point. The pcall
+						-- covers the other case, where the part was fully destroyed and
+						-- there is nothing left to write to.
+						pcall(f2_restore, p, d, false)
 						if d.at and d.at.Parent then d.at:Destroy() end
 						if d.lv and d.lv.Parent then d.lv:Destroy() end
 						if d.av and d.av.Parent then d.av:Destroy() end
-						x6.a[p] = nil
+						data[p] = nil
 					end
-					local last = #x6.active_array
+					local last = #arr
 					if k ~= last then
-						x6.active_array[k] = x6.active_array[last]
+						arr[k] = arr[last]
 					end
-					x6.active_array[last] = nil
+					arr[last] = nil
 					x6.n = math.max(0, x6.n - 1)
 					continue
 				end
@@ -352,7 +457,7 @@ return function(context)
 					continue
 				end
 				if check_no3 then
-					if d.no3_val == nil or ft - (d.no3_tick or 0) > 0.15 then
+					if d.no3_val == nil or ft - (d.no3_tick or 0) > no3_interval then
 						d.no3_tick = ft
 						local success, no3_val = pcall(ghp, p, 'NetworkOwnerV3')
 						d.no3_val = success and no3_val or 0
@@ -369,7 +474,23 @@ return function(context)
 				local tc = active_c - p_pos
 				local distance_sq = tc:Dot(tc)
 				if distance_sq > k1_sq and not always_process then
+					-- Skipping the part leaves its LinearVelocity alone, and with MaxForce
+					-- at k4 the constraint keeps applying it: anything that overshoots the
+					-- radius coasts outward for good, and it can never come back because
+					-- this same test culls it before the shape runs again. Park it once on
+					-- the way out instead. The flag keeps that from becoming a physics
+					-- property write per out-of-range part per frame, and clearing d.vl
+					-- means a part that does drift back in starts from a standstill rather
+					-- than resuming the velocity that threw it out.
+					if not d.parked and d.lv then
+						d.parked = true
+						d.vl = ZERO_VECTOR
+						d.lv.VectorVelocity = ZERO_VECTOR
+					end
 					continue
+				end
+				if d.parked then
+					d.parked = nil
 				end
 				if distance_sq > c7_sq or always_process or is_cursed_red then
 					local target_pos_delta = ANTI_SLEEP
@@ -412,8 +533,23 @@ return function(context)
 						if d.last_target_pos and d.sys_last_t then
 							local actual_dt = ft - d.sys_last_t
 							if actual_dt > 0.001 then
-								local target_velocity = (pure_target_pos - d.last_target_pos) / actual_dt
-								tv = tv + target_velocity
+								-- This differentiates a target that shapes only restamp once per
+								-- bucket cycle, so it means something only while the target moves
+								-- continuously. A control change that re-seats parts onto
+								-- different targets teleports it instead: Hover Text's message box
+								-- reshuffles the whole part-id -> pixel map, so every part's
+								-- target jumps most of the banner width in one step, and dividing
+								-- that by a ~0.066s cycle injects thousands of studs/s. Parts
+								-- thrown past k1 then fail the distance test above and are parked
+								-- out of range, so the banner never recovers. Capping the term at
+								-- the part's own speed limit keeps the smoothing for real motion
+								-- and turns a re-seat into a fast glide instead of a fling.
+								local tvel = (pure_target_pos - d.last_target_pos) / actual_dt
+								local tvel_sq = tvel:Dot(tvel)
+								if tvel_sq > base_limit * base_limit then
+									tvel = tvel * (base_limit / math.sqrt(tvel_sq))
+								end
+								tv = tv + tvel
 							end
 						end
 						d.last_target_pos = pure_target_pos
@@ -484,10 +620,21 @@ return function(context)
 			return
 		end
 		if x1.Paused then
+			-- ANTI_SLEEP is a constant, so the old code wrote the same value to
+			-- every constraint 60 times a second: 300k physics property writes a
+			-- second at 5000 parts, all of them no-ops. 20 Hz is enough to keep
+			-- assemblies from sleeping, and at 0.01 studs/s nothing drifts
+			-- visibly between nudges. f3_body does not run while paused, so this
+			-- needs its own counter rather than x6.f.
+			x6.pause_tick = (x6.pause_tick or 0) + 1
+			if x6.pause_tick % 3 ~= 0 then
+				return
+			end
 			-- walking the dense array beats iterating the weak part table
 			local arr = x6.active_array
+			local data = x6.a
 			for i = #arr, 1, -1 do
-				local d = x6.a[arr[i]]
+				local d = data[arr[i]]
 				if d and d.lv then
 					d.lv.VectorVelocity = ANTI_SLEEP
 				end
@@ -499,22 +646,31 @@ return function(context)
 
 	function x4.ProcessQueue()
 		local queue = x6.claim_queue
-		if #queue == 0 then
+		-- Luau's # is a binary search, not a stored field, and the old loop paid
+		-- for it four times per item (the while test, the read, the clear, and
+		-- once inside every table.insert). Carrying the length in a local drops
+		-- all of them. This runs every frame during the initial workspace sweep,
+		-- when the queue is thousands of entries deep, so it is the difference
+		-- between a smooth start and a stutter.
+		local n = #queue
+		if n == 0 then
 			return
 		end
 		local start = os.clock()
 		local processed = 0
 		local claimed = 0
-		while #queue > 0 do
+		while n > 0 do
 			if processed >= 100 or claimed >= 8 or os.clock() - start > 0.001 then
 				break
 			end
-			local instance = queue[#queue]
-			queue[#queue] = nil
+			local instance = queue[n]
+			queue[n] = nil
+			n = n - 1
 			processed = processed + 1
 			if instance and instance:IsDescendantOf(v4) then
 				for _, child in ipairs(instance:GetChildren()) do
-					table.insert(queue, child)
+					n = n + 1
+					queue[n] = child
 				end
 				if instance:IsA("BasePart") then
 					if x4.f1(instance) then
@@ -537,7 +693,7 @@ return function(context)
 		if x1.TgtActive and x1.Targets and #x1.Targets > 0 then
 			local tgt = x1.Targets[1]
 			local root = root_of(tgt and tgt.Character)
-			if not (root and ((x1.VoidProtection == false) or (root.Position.Y > workspace.FallenPartsDestroyHeight + 50))) then
+			if not (root and ((x1.VoidProtection == false) or (root.Position.Y > v4.FallenPartsDestroyHeight + 50))) then
 				return
 			end
 			track = root
@@ -581,25 +737,31 @@ return function(context)
 		local original_can_collide = p.CanCollide
 		local original_anchored = p.Anchored
 		local original_properties = p.CustomPhysicalProperties
-		if not x1.PreserveCollisions then
+		-- A part claimed while the script is disabled has to land in the same state
+		-- as the ones already held, or it would hang frozen in mid-air with its
+		-- collision stripped until the next enable. x4.apply_disabled re-applies
+		-- all three of these to every part when the flag flips.
+		if not (x1.PreserveCollisions or x1.Disabled) then
 			p.CanCollide = false
 		end
 		p.Anchored = false
-		p.CustomPhysicalProperties = LIGHT_PHYSICS
+		if not x1.Disabled then
+			p.CustomPhysicalProperties = LIGHT_PHYSICS
+		end
 		
 		local a = Instance.new("Attachment")
 		a.Name = "GRV_ATT"
 		
 		local lv = Instance.new("LinearVelocity")
 		lv.Name = "GRV_LV"
-		lv.MaxForce = x1.k4
+		lv.MaxForce = x1.Disabled and 0 or x1.k4
 		lv.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
 		lv.RelativeTo = Enum.ActuatorRelativeTo.World
 		lv.Attachment0 = a
-		
+
 		local av = Instance.new("AngularVelocity")
 		av.Name = "GRV_AV"
-		av.MaxTorque = math.huge
+		av.MaxTorque = x1.Disabled and 0 or math.huge
 		av.RelativeTo = Enum.ActuatorRelativeTo.World
 		av.AngularVelocity = Vector3.zero
 		av.Attachment0 = a
@@ -627,7 +789,7 @@ return function(context)
 
 	-- Hoisted out of x4.f2 so releasing a few thousand parts does not allocate a
 	-- few thousand closures on the way out.
-	local function f2_restore(p, d, drop_release)
+	function f2_restore(p, d, drop_release)
 		if d then
 			p.CanCollide = d.original_can_collide
 			p.Anchored = d.original_anchored
@@ -659,11 +821,16 @@ return function(context)
 			idx = table.find(x6.active_array, p)
 		end
 		if idx then
-			local last = #x6.active_array
+			local arr = x6.active_array
+			local last = #arr
 			if idx ~= last then
-				x6.active_array[idx] = x6.active_array[last]
+				arr[idx] = arr[last]
 			end
-			table.remove(x6.active_array, last)
+			-- the element being dropped is always the last one by this point, so
+			-- table.remove's shift machinery and return value are pure overhead.
+			-- Releasing a few thousand parts at once is where it showed up as a
+			-- visible hitch; this matches what the sweep loop already does.
+			arr[last] = nil
 			x6.n = math.max(0, x6.n - 1)
 		end
 	end
@@ -672,64 +839,118 @@ return function(context)
 		pcall(function()
 			settings().Physics.AllowSleep = false
 		end)
+
+		-- These used to be six fresh anonymous closures allocated every half
+		-- second, plus one more per remote player, purely so pcall had something
+		-- to call. Naming them once turns that per-tick allocation into upvalue
+		-- reads and lets pcall take its arguments directly.
+		local function suppress_player(p)
+			p.MaximumSimulationRadius = 0
+			if sethiddenproperty then
+				sethiddenproperty(p, "SimulationRadius", 0)
+			end
+		end
+		local function wake_self()
+			if sethiddenproperty then
+				sethiddenproperty(v8, "NetworkIsSleeping", false)
+			end
+		end
+		local function make_scriptable()
+			if setscriptable then
+				setscriptable(v8, "SimulationRadius", true)
+				setscriptable(v8, "MaximumSimulationRadius", true)
+			end
+		end
+		local function raise_max_radius()
+			v8.MaximumSimulationRadius = 9e9
+		end
+		local function raise_sim_radius()
+			if sethiddenproperty then
+				sethiddenproperty(v8, "SimulationRadius", 9e9)
+				sethiddenproperty(v8, "MaximumSimulationRadius", 9e9)
+			elseif setsimulationradius then
+				setsimulationradius(9e9)
+			end
+		end
+		local function focus_replication()
+			v8.ReplicationFocus = x6.b or nil
+		end
+
 		local last_upd = 0
 		table.insert(
 			x6.c,
-			v3.Heartbeat:Connect(function(dt)
+			v3.Heartbeat:Connect(function()
 				local now = time()
 				if now - last_upd > 0.5 then
 					last_upd = now
-					for _, p in ipairs(v2:GetPlayers()) do
-						if p ~= v8 then
-							pcall(function()
-								p.MaximumSimulationRadius = 0
-								if sethiddenproperty then
-									sethiddenproperty(p, "SimulationRadius", 0)
-								end
-							end)
+					-- Only while the engine is actually running. This writes to *other*
+					-- players, and x4.f5 does not drain x6.c (it cannot -- the hotkey
+					-- listeners live there too, so draining it would make the script
+					-- unrestartable), so without this gate "Stop" left every other
+					-- player pinned at SimulationRadius 0 for the rest of the session.
+					if x6.o then
+						for _, p in ipairs(v2:GetPlayers()) do
+							if p ~= v8 then
+								pcall(suppress_player, p)
+							end
 						end
 					end
-					pcall(function()
-						if sethiddenproperty then
-							sethiddenproperty(v8, "NetworkIsSleeping", false)
-						end
-					end)
-					pcall(function()
-						if setscriptable then
-							setscriptable(v8, "SimulationRadius", true)
-							setscriptable(v8, "MaximumSimulationRadius", true)
-						end
-					end)
-
-					pcall(function()
-						v8.MaximumSimulationRadius = 9e9
-					end)
-
-					pcall(function()
-						if sethiddenproperty then
-							sethiddenproperty(v8, "SimulationRadius", 9e9)
-							sethiddenproperty(v8, "MaximumSimulationRadius", 9e9)
-						elseif setsimulationradius then
-							setsimulationradius(9e9)
-						end
-					end)
-
-					pcall(function()
-						if x6.b then
-							v8.ReplicationFocus = x6.b
-						else
-							v8.ReplicationFocus = nil
-						end
-					end)
+					pcall(wake_self)
+					pcall(make_scriptable)
+					pcall(raise_max_radius)
+					pcall(raise_sim_radius)
+					pcall(focus_replication)
+				end
+			end)
+		)
+		-- Targets hold live Player objects and nothing ever pruned them. A player who
+		-- leaves stays in the list: the HUD keeps reading DisplayName off a destroyed
+		-- instance and reports ACTIVE forever, and f3_body tracks Targets[1] -- whose
+		-- root is now nil -- so it returns before the AnchorSelf and mouse-drag
+		-- fallbacks and the core parks with no explanation. Worse on rejoin, since
+		-- Roblox issues a *new* Player object: table.find misses, the row draws
+		-- unselected, and clicking it appends alongside the phantom, so the panel
+		-- reads "Multi-Target (2)" for one person.
+		table.insert(
+			x6.c,
+			v2.PlayerRemoving:Connect(function(pl)
+				local tg = x1.Targets
+				if type(tg) ~= "table" then
+					return
+				end
+				local idx = table.find(tg, pl)
+				while idx do
+					table.remove(tg, idx)
+					idx = table.find(tg, pl)
+				end
+				x1.TgtActive = #tg > 0
+				local ui = context.x5
+				if ui and ui.up then
+					pcall(ui.up)
 				end
 			end)
 		)
 		local anti_fling_cache = setmetatable({}, {__mode = "k"})
+		-- The DescendantAdded hook lives here, keyed weakly by character, instead
+		-- of in x6.c. x6.c is a strong list only emptied on full teardown, so
+		-- every respawn added an entry whose closure pinned that character's part
+		-- array -- which is exactly why the weak cache above could never actually
+		-- collect anything. A long session leaked one connection and one array
+		-- per respawn. Held weakly, both go away with the character (Destroy
+		-- severs the signal on its own).
+		local anti_fling_conns = setmetatable({}, {__mode = "k"})
+		local function connect_parts(char, parts)
+			return char.DescendantAdded:Connect(function(desc)
+				if desc:IsA("BasePart") then
+					parts[#parts + 1] = desc
+				end
+			end)
+		end
 		local af_tick = 0
 		table.insert(
 			x6.c,
 			v3.Stepped:Connect(function()
-				if not x1.AntiFling or x1.PreserveCollisions then
+				if not x6.o or not x1.AntiFling or x1.PreserveCollisions then
 					return
 				end
 				-- 20 Hz is plenty. The server is what re-enables collisions, and it
@@ -740,36 +961,35 @@ return function(context)
 					return
 				end
 				for _, p in ipairs(v2:GetPlayers()) do
-					if p ~= v8 and p.Character then
-						local parts = anti_fling_cache[p.Character]
+					-- p.Character was re-read five times per player per tick, each
+					-- one an engine crossing. Now read once.
+					local char = p ~= v8 and p.Character or nil
+					if char then
+						local parts = anti_fling_cache[char]
 						if not parts then
 							parts = {}
-							for _, part in ipairs(p.Character:GetDescendants()) do
+							for _, part in ipairs(char:GetDescendants()) do
 								if part:IsA("BasePart") then
-									table.insert(parts, part)
+									parts[#parts + 1] = part
 								end
 							end
-							anti_fling_cache[p.Character] = parts
-							pcall(function()
-								local conn = p.Character.DescendantAdded:Connect(function(desc)
-									if desc:IsA("BasePart") then
-										table.insert(parts, desc)
-									end
-								end)
-								table.insert(x6.c, conn)
-							end)
+							anti_fling_cache[char] = parts
+							local ok, conn = pcall(connect_parts, char, parts)
+							if ok then
+								anti_fling_conns[char] = conn
+							end
 						end
 						for i = #parts, 1, -1 do
 							local part = parts[i]
 							if part and part.Parent then
-									if part.CanCollide then
-										part.CanCollide = false
-									end
-								else
-									table.remove(parts, i)
+								if part.CanCollide then
+									part.CanCollide = false
 								end
+							else
+								table.remove(parts, i)
 							end
 						end
+					end
 				end
 			end)
 		)
@@ -790,12 +1010,16 @@ return function(context)
 		x6.b.CanCollide = false
 		x6.b.Material = "Neon"
 		x6.b.Position = pos
-		x6.b.Transparency = x9.c7
+		-- Disabled survives a restart through the settings file, so the core has to
+		-- come up already hidden in that case rather than showing a visible marker
+		-- for something that is not driving anything.
+		x6.b.Transparency = x1.Disabled and 1 or x9.c7
 		local bg = Instance.new("BillboardGui", x6.b)
 		bg.Name = "Visual"
 		bg.Adornee = x6.b
 		bg.Size = UDim2.new(0, 20, 0, 20)
 		bg.AlwaysOnTop = true
+		bg.Enabled = not x1.Disabled
 		local img = Instance.new("ImageLabel", bg)
 		img.BackgroundTransparency = 1
 		img.Size = UDim2.new(1, 0, 1, 0)
@@ -826,7 +1050,14 @@ return function(context)
 		)
 		x6.o = true
 		x7.n("Sys", "Started", 3)
-		x5.st()
+		-- Refresh the panel if it is open; do not resurrect it if the user closed it.
+		-- x5.st() rebuilds from scratch whenever x5.g is nil, and the panel's X button
+		-- nils it (UI.lua sg.Destroying) -- so pressing Recenter after closing the
+		-- panel used to rebuild the whole thing, and every rebuild strands another
+		-- five service-level connections in x6.c that only full teardown clears.
+		if x5.g then
+			x5.st()
+		end
 		table.insert(
 			x6.run_connections,
 			v3.Heartbeat:Connect(function(real_dt)
@@ -840,21 +1071,117 @@ return function(context)
 	-- Release every claimed part but leave the core where it is. The action dock
 	-- has always called this; it just never existed until now.
 	function x4.clean_physics()
-		local released = #x6.active_array
-		while #x6.active_array > 0 do
-			x4.f2(x6.active_array[#x6.active_array], true, #x6.active_array)
+		-- The old loop took the array length three times per part (the while
+		-- test, the index, and the argument), and # is a binary search in Luau.
+		-- A plain descending index removes ~15k probes on a 5000 part release.
+		-- f2 always drops the element at the index it is handed, which is the
+		-- current last, so walking downward stays in step with the shrinking array.
+		local arr = x6.active_array
+		local released = #arr
+		for k = released, 1, -1 do
+			x4.f2(arr[k], true, k)
 		end
 		table.clear(x6.claim_queue)
 		x7.n("Sys", released .. " parts released", 2)
 	end
 
+	-- Disabling is clean_physics without giving up the claim: the constraints stay
+	-- on the part so enabling picks up instantly, but nothing drives it and it gets
+	-- its collision back, so it falls and lands like a released part in the
+	-- meantime. Enabling reverses both halves. Hoisted out of the loop below so a
+	-- 5000 part toggle does not allocate a closure per part for pcall.
+	local function apply_disabled_part(p, d, disabled)
+		if d.lv then
+			d.lv.MaxForce = disabled and 0 or x1.k4
+		end
+		if d.av then
+			d.av.MaxTorque = disabled and 0 or math.huge
+		end
+		p.CanCollide = (disabled or x1.PreserveCollisions) and d.original_can_collide or false
+		-- LIGHT_PHYSICS is what lets the constraints throw a part around; at 0.001
+		-- density a disabled part would be shoved across the map by the first thing
+		-- that touched it instead of resting where it landed. Anchored is left alone
+		-- because x7.e refuses to claim an anchored part in the first place.
+		-- Not an `and/or` chain: original_properties is nil on any part that never
+		-- overrode its material defaults, and nil is falsy, so that would hand every
+		-- such part LIGHT_PHYSICS back on the disable branch.
+		if disabled then
+			p.CustomPhysicalProperties = d.original_properties
+		else
+			p.CustomPhysicalProperties = LIGHT_PHYSICS
+			-- Parts fall while disabled, so every cached smoothing term now
+			-- describes a position they have long since left. d.last_target_pos in
+			-- particular is differentiated against the live target, and dividing a
+			-- whole fall's worth of displacement by one frame injects thousands of
+			-- studs/s -- the same re-seat fling f3_body's target-velocity clamp
+			-- exists to stop. Clearing them makes enabling a fresh lift-off.
+			d.vl = nil
+			d.trans_vl = nil
+			d.last_target_pos = nil
+			d.sys_last_t = nil
+			d.parked = nil
+			d.integral = Vector3.zero
+			-- The cached terms above are Lua-side; these are the live properties the
+			-- engine is still holding. f3 returns early while disabled, so nothing
+			-- overwrites them, and MaxForce goes back to x1.k4 (math.huge) here --
+			-- before the sweep next reaches this part, which is only once every
+			-- x1.k7 frames. Left armed, the part is driven at its pre-disable
+			-- velocity at infinite force for those frames: exactly the fling the
+			-- comment above is about.
+			if d.lv then
+				d.lv.VectorVelocity = ZERO_VECTOR
+			end
+			if d.av then
+				d.av.AngularVelocity = ZERO_VECTOR
+			end
+		end
+	end
+
+	-- The one entry point for the flag: the L hotkey, the UI toggle, the mobile
+	-- action dock and the AI tool all come through here, so none of them can leave
+	-- the parts half-switched. The core visuals are handled whether or not the
+	-- panel is open.
+	function x4.apply_disabled(disabled)
+		disabled = disabled and true or false
+		x1.Disabled = disabled
+		if disabled then
+			-- A shape-owned instance is part of the shape running. Platform's pad in
+			-- particular would otherwise be left as a solid slab hanging in the air
+			-- with nothing updating it. px rebuilds it on the first enabled frame.
+			cleanup_shape(x1.k6)
+		end
+		if x6.b then
+			x6.b.Transparency = disabled and 1 or x9.c7
+			local visual = x6.b:FindFirstChild("Visual")
+			if visual then
+				visual.Enabled = not disabled
+			end
+		end
+		-- the dense array again, rather than iterating the weak part table
+		local arr = x6.active_array
+		local data = x6.a
+		for k = #arr, 1, -1 do
+			local p = arr[k]
+			local d = p and data[p]
+			if d then
+				pcall(apply_disabled_part, p, d, disabled)
+			end
+		end
+	end
+
 	function x4.f5()
+		-- Before the core folder goes, so a shape-owned instance living inside it is
+		-- released deliberately rather than only incidentally.
+		cleanup_shape(x1.k6)
 		if x6.b then
 			x6.b.Parent:Destroy()
 			x6.b = nil
 		end
-		while #x6.active_array > 0 do
-			x4.f2(x6.active_array[#x6.active_array], false, #x6.active_array)
+		-- same descending walk as clean_physics: three length probes per part
+		-- became none, which is what made stopping with a large claim hitch.
+		local arr = x6.active_array
+		for k = #arr, 1, -1 do
+			x4.f2(arr[k], false, k)
 		end
 		for _, connection in ipairs(x6.run_connections or {}) do
 			connection:Disconnect()
@@ -862,56 +1189,263 @@ return function(context)
 		table.clear(x6.run_connections or {})
 		table.clear(x6.claim_queue)
 		x6.o = false
-		x5.st()
+		-- Target markers are BillboardGuis parented onto other players' heads, and the
+		-- only code that removed one lived inside f3_body's once-a-second block --
+		-- which stops running the moment the engine stops. So stopping, pausing or
+		-- disabling left the red marker floating over whoever was targeted.
+		for _, pl in ipairs(v2:GetPlayers()) do
+			local ch = pl.Character
+			local head = ch and ch:FindFirstChild("Head")
+			local marker = head and head:FindFirstChild("GravityTargetMarker")
+			if marker then
+				pcall(function()
+					marker:Destroy()
+				end)
+			end
+		end
+		-- Sculptor selections are per-run: the SelectionBoxes are parented to world
+		-- parts, so leaving them adorned after "Stop" leaves cyan boxes in the map.
+		if x6.sculptor_clear then
+			pcall(x6.sculptor_clear)
+		end
+		if x6.sculptor_selected then
+			table.clear(x6.sculptor_selected)
+		end
+		-- Same as f4: refresh an open panel, never rebuild a closed one.
+		if x5.g then
+			x5.st()
+		end
 		x7.n("Sys", "Stopped", 2)
 	end
 
+	-- Switching shape from the mode list and from a hotkey have to leave the
+	-- system in exactly the same state, so both come through here. The model work
+	-- lives in System because System owns x1 and x6; the panel is told afterwards
+	-- through the two optional UI hooks, which is also why a hotkey press updates
+	-- the dropdown label even though the dropdown was never opened.
+	function x4.switch_shape(name)
+		if not name or not x2[name] then
+			return false
+		end
+		local mod = get_shape(name)
+		if not mod then
+			x7.n("Sys", "Could not load " .. tostring(name), 3)
+			return false
+		end
+		-- Shapes still being tuned announce themselves. A module flag rather than
+		-- a name list here, following M.Drop (System.lua:376), so a shape carries
+		-- its own status and nothing central has to be edited to promote one.
+		if mod.Testing then
+			x7.n("Testing", name .. " is still in testing.", 4)
+		end
+		x1.k6 = name
+		x6.transition_time = time()
+		x6.transition_dur = 1.5
+		-- f3_body clears the rest of the per-part scratch when it notices k6
+		-- moved; trans_vl is the one it cannot derive, because it needs the
+		-- velocity from before the switch to ease out of.
+		for _, d in pairs(x6.a) do
+			d.trans_vl = d.vl or Vector3.zero
+			d.v1, d.v2, d.v3, d.v4, d.v5, d.v6, d.v7, d.v8, d.v9 = nil, nil, nil, nil, nil, nil, nil, nil, nil
+			d.integral = Vector3.zero
+		end
+		if context.save_settings then
+			context.save_settings()
+		end
+		local ui = context.x5
+		if ui then
+			if ui.sync_shape then
+				pcall(ui.sync_shape, name)
+			end
+			if ui.up then
+				pcall(ui.up)
+			end
+		end
+		return true
+	end
+
+	-- Every hotkey the script owns. One list so binding, unbinding, the conflict
+	-- check and the Keybinds window all read the same source; the order here is
+	-- the order the window lists them in.
+	local CORE_ACTIONS = {
+		{ id = "Recenter", label = "Recenter Core", desc = "Move the gravity core to your cursor." },
+		{ id = "Reset", label = "Reset System", desc = "Release every part and remove the core." },
+		{ id = "Pause", label = "Pause Physics", desc = "Freeze held parts where they are." },
+		{ id = "Disable", label = "Disable Gravity", desc = "Let parts fall without giving up the claim." },
+	}
+	x8.core_actions = CORE_ACTIONS
+
+	local core_handlers = {
+		Recenter = function()
+			x4.f4(v9.Hit.p)
+		end,
+		Reset = function()
+			x4.f5()
+		end,
+		Pause = function()
+			x1.Paused = not x1.Paused
+			x7.n("Sys", x1.Paused and "Paused" or "Resumed", 2)
+		end,
+		Disable = function()
+			-- this used to be gated on the UI toggle existing, which meant the
+			-- hotkey silently did nothing whenever the panel was closed
+			x4.apply_disabled(not x1.Disabled)
+			x7.n("Sys", "Script " .. (x1.Disabled and "Disabled" or "Enabled"), 2)
+			-- Repaint, or the panel's "Disable Gravity" toggle keeps the state it was
+			-- built with: UI_elements M.t holds its value in a private local and
+			-- nothing refreshes it, so after a hotkey press the toggle read the
+			-- opposite of the truth and the next click on it was a no-op that only
+			-- changed its own colour. Deliberately here and not inside
+			-- apply_disabled -- the panel toggle calls that itself, and rebuilding the
+			-- panel from inside a toggle's own handler would destroy it mid-callback.
+			local ui = context.x5
+			if ui and ui.up then
+				pcall(ui.up)
+			end
+		end,
+	}
+
+	-- Keybinds are stored as key *names* so they survive the JSON round trip.
+	-- Enum.KeyCode[name] throws on anything that is not a member, so a settings
+	-- file edited by hand cannot take the script down with it.
+	local function key_from_name(name)
+		if type(name) ~= "string" or name == "" then
+			return nil
+		end
+		local ok, code = pcall(function()
+			return Enum.KeyCode[name]
+		end)
+		if ok and typeof(code) == "EnumItem" and code ~= Enum.KeyCode.Unknown then
+			return code
+		end
+		return nil
+	end
+	x8.key_from_name = key_from_name
+
+	-- Kept so the old two-action dispatch still works if anything reaches for it.
 	function x8.h(n, s, o)
 		if s ~= Enum.UserInputState.Begin then
 			return Enum.ContextActionResult.Pass
 		end
 		if n == "C" then
-			x4.f4(v9.Hit.p)
+			core_handlers.Recenter()
 			return Enum.ContextActionResult.Sink
 		elseif n == "R" then
-			x4.f5()
+			core_handlers.Reset()
 			return Enum.ContextActionResult.Sink
 		end
 		return Enum.ContextActionResult.Pass
 	end
 
+	local bound_actions = {}
+
+	function x8.unbind_all()
+		for i = #bound_actions, 1, -1 do
+			pcall(function()
+				v7:UnbindAction(bound_actions[i])
+			end)
+			bound_actions[i] = nil
+		end
+	end
+
+	local function bind(action_name, key_code, fn)
+		local ok = pcall(function()
+			v7:BindAction(action_name, function(_, state)
+				if state ~= Enum.UserInputState.Begin then
+					return Enum.ContextActionResult.Pass
+				end
+				fn()
+				return Enum.ContextActionResult.Sink
+			end, false, key_code)
+		end)
+		if ok then
+			bound_actions[#bound_actions + 1] = action_name
+		end
+	end
+
+	-- Rebuilds every binding from x1.Keybinds. Called on startup and after any
+	-- change in the Keybinds window, so there is never a partial state to reason
+	-- about: everything the script owns comes off, then goes back on.
+	function x8.rebind_all()
+		x8.unbind_all()
+		local kb = x1.Keybinds
+		if type(kb) ~= "table" then
+			return
+		end
+		-- ContextActionService resolves a duplicate key to whichever action bound
+		-- it last, which would make a hand-edited collision depend on pairs()
+		-- order. Claiming keys in a fixed order instead -- core actions first,
+		-- then shapes alphabetically -- makes the outcome the same every launch.
+		local claimed = {}
+		for _, entry in ipairs(CORE_ACTIONS) do
+			local key_name = kb[entry.id]
+			local code = key_from_name(key_name)
+			if code and not claimed[key_name] then
+				claimed[key_name] = true
+				bind("Gravity_" .. entry.id, code, core_handlers[entry.id])
+			end
+		end
+		local shapes = kb.Shapes
+		if type(shapes) == "table" then
+			local names = {}
+			for shape_name in pairs(shapes) do
+				names[#names + 1] = shape_name
+			end
+			table.sort(names)
+			for _, shape_name in ipairs(names) do
+				local key_name = shapes[shape_name]
+				local code = key_from_name(key_name)
+				-- A binding for a shape that is no longer installed would sink a
+				-- key into a permanent failure notice, so skip it rather than
+				-- bind it. The entry stays in the file in case the shape returns.
+				if code and not claimed[key_name] and x2[shape_name] then
+					claimed[key_name] = true
+					bind("Gravity_Shape_" .. shape_name, code, function()
+						if x1.k6 == shape_name then
+							return
+						end
+						x4.switch_shape(shape_name)
+					end)
+				end
+			end
+		end
+	end
+
+	-- What already owns a key, as a label for the rejection notice. exclude_id is
+	-- the row asking, so re-picking the key it already holds is not a conflict:
+	-- a core action passes its id, a shape row passes "shape:<name>".
+	function x8.find_conflict(key_name, exclude_id)
+		if type(key_name) ~= "string" or key_name == "" then
+			return nil
+		end
+		local kb = x1.Keybinds
+		if type(kb) ~= "table" then
+			return nil
+		end
+		for _, entry in ipairs(CORE_ACTIONS) do
+			if entry.id ~= exclude_id and kb[entry.id] == key_name then
+				return entry.label
+			end
+		end
+		local shapes = kb.Shapes
+		if type(shapes) == "table" then
+			for shape_name, bound in pairs(shapes) do
+				-- Only shapes that are actually installed, matching rebind_all. A
+				-- saved binding can name a shape that has since been folded away
+				-- (main.lua:322 names Deflect), and x1.Keybinds is restored wholesale,
+				-- so reporting the phantom as a conflict made its key impossible to
+				-- reassign -- rebind_all refuses to bind it, and the Keybinds window
+				-- lists rows from pairs(x2), so the row is not there to clear either.
+				if x2[shape_name] and ("shape:" .. shape_name) ~= exclude_id and bound == key_name then
+					return shape_name
+				end
+			end
+		end
+		return nil
+	end
+
 	function x8.i()
-		v7:BindAction("C", x8.h, false, Enum.KeyCode.E)
-		v7:BindAction("R", x8.h, false, Enum.KeyCode.Q)
-		v7:BindAction("P", function(_, s)
-			if s == Enum.UserInputState.Begin then
-				x1.Paused = not x1.Paused
-				x7.n("Sys", x1.Paused and "Paused" or "Resumed", 2)
-			end
-		end, false, Enum.KeyCode.P)
-		v7:BindAction("Disable", function(_, s)
-			if s == Enum.UserInputState.Begin then
-				x1.Disabled = not x1.Disabled
-				local v = x1.Disabled
-				x7.n("Sys", "Script " .. (v and "Disabled" or "Enabled"), 2)
-				-- this used to be gated on the UI toggle existing, which meant the
-				-- hotkey silently did nothing whenever the panel was closed
-				if x6.b then
-					x6.b.Transparency = v and 1 or x9.c7
-					if x6.b:FindFirstChild("Visual") then
-						x6.b.Visual.Enabled = not v
-					end
-				end
-				for _, d in pairs(x6.a) do
-					if d.lv then
-						d.lv.MaxForce = v and 0 or x1.k4
-					end
-					if d.av then
-						d.av.MaxTorque = v and 0 or math.huge
-					end
-				end
-			end
-		end, false, Enum.KeyCode.L)
+		x8.rebind_all()
 		table.insert(
 			x6.c,
 			v1.InputBegan:Connect(function(i, p)
@@ -933,10 +1467,17 @@ return function(context)
 			end)
 		)
 
-		local sculptor_binder = load_module("System_sculptor.lua")(context, x7)
+		local sculptor_binder = load_module(SUB_DIR .. "System_sculptor.lua")(context, x7)
 		sculptor_binder()
 
-		x7.n("Rdy", "Press 'E'", 5)
+		-- Naming the real key, since it is rebindable now. An unbound Recenter
+		-- has nothing to tell the user to press.
+		local recenter_key = x1.Keybinds and x1.Keybinds.Recenter
+		if type(recenter_key) == "string" and recenter_key ~= "" then
+			x7.n("Rdy", "Press '" .. recenter_key .. "'", 5)
+		else
+			x7.n("Rdy", "Bind a Recenter key in Keybinds", 5)
+		end
 	end
 
 	return { x4 = x4, x8 = x8 }
