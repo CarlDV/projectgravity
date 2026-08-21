@@ -1,14 +1,16 @@
 return function(context, x7)
-	local v1, v4, v8, v9 = context.v1, context.v4, context.v8, context.v9
+	local v1, v4, v8 = context.v1, context.v4, context.v8
 	local x1, x6, x2 = context.x1, context.x6, context.x2
 	local get_shape = context.get_shape
 
 	x6.pc_selected = x6.pc_selected or setmetatable({}, { __mode = "k" })
 	x6.pc_highlights = x6.pc_highlights or setmetatable({}, { __mode = "k" })
+	x6.pc_offsets = x6.pc_offsets or setmetatable({}, { __mode = "k" })
 	x6.pc_mods = x6.pc_mods or {}
 
 	local RIDE_PHYSICS = PhysicalProperties.new(0.7, 0.5, 0.3, 1, 1)
 	local LIGHT_PHYSICS = PhysicalProperties.new(0.001, 0, 0, 0, 0)
+	local HL_COLOR = Color3.fromRGB(255, 170, 0)
 
 	local function pc_clear_highlights()
 		if x6.pc_highlights then
@@ -24,9 +26,14 @@ return function(context, x7)
 		if x6.pc_selected then
 			table.clear(x6.pc_selected)
 		end
+		if x6.pc_offsets then
+			table.clear(x6.pc_offsets)
+		end
 		if x6.pc_mods then
 			table.clear(x6.pc_mods)
 		end
+		x6.pc_dragging = false
+		x6.pc_drag_target = nil
 	end
 	x6.pc_clear = pc_clear_highlights
 
@@ -36,10 +43,10 @@ return function(context, x7)
 		end
 		local highlight = Instance.new("SelectionBox")
 		highlight.Adornee = part
-		highlight.Color3 = Color3.fromRGB(255, 170, 0)
+		highlight.Color3 = HL_COLOR
 		highlight.LineThickness = 0.05
 		highlight.SurfaceTransparency = 0.8
-		highlight.SurfaceColor3 = Color3.fromRGB(255, 170, 0)
+		highlight.SurfaceColor3 = HL_COLOR
 		highlight.Parent = part
 		x6.pc_highlights[part] = highlight
 	end
@@ -59,6 +66,7 @@ return function(context, x7)
 				pc_remove_highlight(p)
 			end
 			table.clear(x6.pc_selected)
+			table.clear(x6.pc_offsets)
 		end
 		if part and x6.a and x6.a[part] then
 			x6.pc_selected[part] = true
@@ -68,6 +76,7 @@ return function(context, x7)
 
 	local function pc_deselect(part)
 		x6.pc_selected[part] = nil
+		x6.pc_offsets[part] = nil
 		pc_remove_highlight(part)
 	end
 
@@ -207,52 +216,128 @@ return function(context, x7)
 	end
 	x6.pc_assign = pc_assign
 
-	local function get_touch_target(input)
+	local function get_touch_target(pos)
 		local cam = v4 and v4.CurrentCamera
 		if not cam then
 			return nil
 		end
-		local ray = cam:ViewportPointToRay(input.Position.X, input.Position.Y)
-		local rp = RaycastParams.new()
-		rp.FilterType = Enum.RaycastFilterType.Exclude
-		rp.FilterDescendantsInstances = { (v8 and v8.Character) or nil }
-		local result = workspace:Raycast(ray.Origin, ray.Direction * 1000, rp)
-		return result and result.Instance
+		local ray = cam:ViewportPointToRay(pos.X, pos.Y)
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Include
+		local cand = {}
+		if x6.a then
+			for p, _ in pairs(x6.a) do
+				table.insert(cand, p)
+			end
+		end
+		params.FilterDescendantsInstances = cand
+		local res = v4:Raycast(ray.Origin, ray.Direction * 1000, params)
+		return res and res.Instance or nil
+	end
+
+	local function get_touch_world_pos(pos, distance)
+		local cam = v4 and v4.CurrentCamera
+		if not cam then
+			return nil
+		end
+		local ray = cam:ViewportPointToRay(pos.X, pos.Y)
+		return ray.Origin + (ray.Direction * (distance or 50))
 	end
 
 	return function()
-		if v1 and v1.InputBegan and x6.c then
-			table.insert(
-				x6.c,
-				v1.InputBegan:Connect(function(input, processed)
-					if processed then
-						return
-					end
+		if not v1 or not v1.InputBegan or not x6.c then
+			return
+		end
 
-					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-						local target
-						if input.UserInputType == Enum.UserInputType.Touch then
-							target = get_touch_target(input)
-						else
-							target = v9 and v9.Target
-						end
+		table.insert(
+			x6.c,
+			v1.InputBegan:Connect(function(input, processed)
+				if processed then
+					return
+				end
 
-						local shift_held = v1:IsKeyDown(Enum.KeyCode.LeftShift)
-							or v1:IsKeyDown(Enum.KeyCode.RightShift)
-							or (x1.PartCtlMultiSelect == true)
+				if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+					local target = get_touch_target(input.Position)
+					local multi = x1.PartCtlMultiSelect == true
 
-						if target and x6.a and x6.a[target] then
-							if x6.pc_selected[target] then
-								if shift_held then
-									pc_deselect(target)
-								end
+					if target and x6.a and x6.a[target] then
+						if x6.pc_selected[target] then
+							if multi then
+								pc_deselect(target)
 							else
-								pc_select(target, shift_held)
+								x6.pc_dragging = true
+								local cam = v4 and v4.CurrentCamera
+								x6.pc_drag_distance = cam and (cam.CFrame.Position - target.Position).Magnitude or 50
+								x6.pc_drag_target = target.Position
+								for part, _ in pairs(x6.pc_selected) do
+									x6.pc_offsets[part] = part.Position - target.Position
+									local d = x6.a[part]
+									if d then
+										d.pc_mode = d.pc_mode or "manual"
+										d.pc_target = part.Position
+									end
+								end
+							end
+						else
+							pc_select(target, multi)
+							if not multi then
+								x6.pc_dragging = true
+								local cam = v4 and v4.CurrentCamera
+								x6.pc_drag_distance = cam and (cam.CFrame.Position - target.Position).Magnitude or 50
+								x6.pc_drag_target = target.Position
+								x6.pc_offsets[target] = Vector3.zero
+								local d = x6.a[target]
+								if d then
+									d.pc_mode = d.pc_mode or "manual"
+									d.pc_target = target.Position
+								end
 							end
 						end
 					end
-				end)
-			)
-		end
+				end
+			end)
+		)
+
+		table.insert(
+			x6.c,
+			v1.InputChanged:Connect(function(input, processed)
+				if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
+					if x6.pc_dragging then
+						local new_pos = get_touch_world_pos(input.Position, x6.pc_drag_distance or 50)
+						if new_pos then
+							x6.pc_drag_target = new_pos
+							for part, _ in pairs(x6.pc_selected) do
+								local d = x6.a and x6.a[part]
+								if d then
+									local off = x6.pc_offsets[part] or Vector3.zero
+									d.pc_target = new_pos + off
+									d.pc_mode = d.pc_mode or "manual"
+								end
+							end
+						end
+					end
+				end
+			end)
+		)
+
+		table.insert(
+			x6.c,
+			v1.InputEnded:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+					if x6.pc_dragging then
+						x6.pc_dragging = false
+						x6.pc_drag_target = nil
+						for part, _ in pairs(x6.pc_selected) do
+							local d = x6.a and x6.a[part]
+							if d and d.pc_target then
+								if not d.pc_mode or d.pc_mode == "manual" then
+									d.pc_mode = x1.PartCtlMode or "pin"
+								end
+							end
+						end
+					end
+				end
+			end)
+		)
 	end
 end

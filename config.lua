@@ -112,6 +112,10 @@ return {
 			k11 = 200, k12 = 18, k13 = 14, k14 = 12, k15 = 3,
 			k16 = 0.3, k17 = 0.4, k18 = 2, k19 = true, k20 = false, k21 = false,
 		},
+		["Raigo"] = {
+			k11 = 8, k12 = 250, k13 = 80, k14 = 0.7, k15 = 12,
+			k16 = 8, k17 = 12, k18 = true, k19 = true, k20 = true,
+		},
 		["Quantum Core"] = { k11 = 100, k12 = 30, k13 = 40, k14 = 50, k15 = 0, k16 = 0, k17 = 0, k23 = false },
 		["Galactic Web"] = { k11 = 400, k12 = 10, k13 = 5, k14 = 0, k15 = 0, k16 = 0, k17 = 0, k23 = false, k24 = 200 },
 		-- k14/k15/k16 carry Div = 10, so the value here is what the shape reads and

@@ -862,6 +862,18 @@ return function(context)
 		pct.TextSize = 14
 		pct.TextXAlignment = 0
 
+		local pc_close = Instance.new("TextButton", pch)
+		pc_close.BackgroundTransparency = 1
+		pc_close.Position = UDim2.new(1, -40, 0, 10)
+		pc_close.Size = UDim2.new(0, 30, 0, 30)
+		pc_close.Text = "×"
+		pc_close.TextColor3 = Color3.fromRGB(180, 180, 180)
+		pc_close.Font = Enum.Font.GothamBold
+		pc_close.TextSize = 18
+		pc_close.MouseButton1Click:Connect(function()
+			toggle_window(pcm, false)
+		end)
+
 		local pcc = Instance.new("ScrollingFrame", pcm)
 		pcc.BackgroundTransparency = 1
 		pcc.Position = UDim2.new(0, 0, 0, 50)

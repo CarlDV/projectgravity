@@ -5,10 +5,12 @@ return function(context, x7)
 
 	x6.pc_selected = x6.pc_selected or setmetatable({}, { __mode = "k" })
 	x6.pc_highlights = x6.pc_highlights or setmetatable({}, { __mode = "k" })
+	x6.pc_offsets = x6.pc_offsets or setmetatable({}, { __mode = "k" })
 	x6.pc_mods = x6.pc_mods or {}
 
 	local RIDE_PHYSICS = PhysicalProperties.new(0.7, 0.5, 0.3, 1, 1)
 	local LIGHT_PHYSICS = PhysicalProperties.new(0.001, 0, 0, 0, 0)
+	local HL_COLOR = Color3.fromRGB(255, 170, 0)
 
 	local function pc_clear_highlights()
 		if x6.pc_highlights then
@@ -24,9 +26,21 @@ return function(context, x7)
 		if x6.pc_selected then
 			table.clear(x6.pc_selected)
 		end
+		if x6.pc_offsets then
+			table.clear(x6.pc_offsets)
+		end
 		if x6.pc_mods then
 			table.clear(x6.pc_mods)
 		end
+		if x6.pc_box and x6.pc_box.Parent then
+			pcall(function()
+				x6.pc_box:Destroy()
+			end)
+			x6.pc_box = nil
+		end
+		x6.pc_dragging = false
+		x6.pc_drag_target = nil
+		x6.pc_box_start = nil
 	end
 	x6.pc_clear = pc_clear_highlights
 
@@ -36,10 +50,10 @@ return function(context, x7)
 		end
 		local highlight = Instance.new("SelectionBox")
 		highlight.Adornee = part
-		highlight.Color3 = Color3.fromRGB(255, 170, 0)
+		highlight.Color3 = HL_COLOR
 		highlight.LineThickness = 0.05
 		highlight.SurfaceTransparency = 0.8
-		highlight.SurfaceColor3 = Color3.fromRGB(255, 170, 0)
+		highlight.SurfaceColor3 = HL_COLOR
 		highlight.Parent = part
 		x6.pc_highlights[part] = highlight
 	end
@@ -59,6 +73,7 @@ return function(context, x7)
 				pc_remove_highlight(p)
 			end
 			table.clear(x6.pc_selected)
+			table.clear(x6.pc_offsets)
 		end
 		if part and x6.a and x6.a[part] then
 			x6.pc_selected[part] = true
@@ -68,6 +83,7 @@ return function(context, x7)
 
 	local function pc_deselect(part)
 		x6.pc_selected[part] = nil
+		x6.pc_offsets[part] = nil
 		pc_remove_highlight(part)
 	end
 
@@ -207,33 +223,161 @@ return function(context, x7)
 	end
 	x6.pc_assign = pc_assign
 
+	local function get_mouse_world_pos(distance)
+		local cam = v4 and v4.CurrentCamera
+		if not cam then
+			return nil
+		end
+		local mp = v1:GetMouseLocation()
+		local ray = cam:ViewportPointToRay(mp.X, mp.Y)
+		return ray.Origin + (ray.Direction * (distance or 50))
+	end
+
 	return function()
-		if v1 and v1.InputBegan and x6.c then
-			table.insert(
-				x6.c,
-				v1.InputBegan:Connect(function(input, processed)
-					if processed then
-						return
-					end
+		if not v1 or not v1.InputBegan or not x6.c then
+			return
+		end
 
-					if input.UserInputType == Enum.UserInputType.MouseButton1 then
-						local target = v9 and v9.Target
-						local shift_held = v1:IsKeyDown(Enum.KeyCode.LeftShift)
-							or v1:IsKeyDown(Enum.KeyCode.RightShift)
-							or (x1.PartCtlMultiSelect == true)
+		table.insert(
+			x6.c,
+			v1.InputBegan:Connect(function(input, processed)
+				if processed then
+					return
+				end
 
-						if target and x6.a and x6.a[target] then
-							if x6.pc_selected[target] then
-								if shift_held then
-									pc_deselect(target)
-								end
+				if input.UserInputType == Enum.UserInputType.MouseButton1 then
+					local target = v9 and v9.Target
+					local shift_held = v1:IsKeyDown(Enum.KeyCode.LeftShift)
+						or v1:IsKeyDown(Enum.KeyCode.RightShift)
+						or (x1.PartCtlMultiSelect == true)
+
+					if target and x6.a and x6.a[target] then
+						if x6.pc_selected[target] then
+							if shift_held then
+								pc_deselect(target)
 							else
-								pc_select(target, shift_held)
+								x6.pc_dragging = true
+								local cam = v4 and v4.CurrentCamera
+								x6.pc_drag_distance = cam and (cam.CFrame.Position - target.Position).Magnitude or 50
+								x6.pc_drag_target = target.Position
+								for part, _ in pairs(x6.pc_selected) do
+									x6.pc_offsets[part] = part.Position - target.Position
+									local d = x6.a[part]
+									if d then
+										d.pc_mode = d.pc_mode or "manual"
+										d.pc_target = part.Position
+									end
+								end
+							end
+						else
+							pc_select(target, shift_held)
+							if not shift_held then
+								x6.pc_dragging = true
+								local cam = v4 and v4.CurrentCamera
+								x6.pc_drag_distance = cam and (cam.CFrame.Position - target.Position).Magnitude or 50
+								x6.pc_drag_target = target.Position
+								x6.pc_offsets[target] = Vector3.zero
+								local d = x6.a[target]
+								if d then
+									d.pc_mode = d.pc_mode or "manual"
+									d.pc_target = target.Position
+								end
+							end
+						end
+					else
+						if not shift_held then
+							pc_clear_highlights()
+						end
+						x6.pc_box_start = v1:GetMouseLocation()
+						if x6.sg and (not x6.pc_box or not x6.pc_box.Parent) then
+							x6.pc_box = Instance.new("Frame", x6.sg)
+							x6.pc_box.BackgroundColor3 = HL_COLOR
+							x6.pc_box.BackgroundTransparency = 0.7
+							x6.pc_box.BorderSizePixel = 2
+							x6.pc_box.BorderColor3 = HL_COLOR
+							x6.pc_box.ZIndex = 50
+						end
+					end
+				end
+			end)
+		)
+
+		table.insert(
+			x6.c,
+			v1.InputChanged:Connect(function(input, processed)
+				if input.UserInputType == Enum.UserInputType.MouseMovement then
+					if x6.pc_dragging then
+						local new_pos = get_mouse_world_pos(x6.pc_drag_distance or 50)
+						if new_pos then
+							x6.pc_drag_target = new_pos
+							for part, _ in pairs(x6.pc_selected) do
+								local d = x6.a and x6.a[part]
+								if d then
+									local off = x6.pc_offsets[part] or Vector3.zero
+									d.pc_target = new_pos + off
+									d.pc_mode = d.pc_mode or "manual"
+								end
+							end
+						end
+					elseif x6.pc_box_start and x6.pc_box then
+						local current = v1:GetMouseLocation()
+						local minX = math.min(x6.pc_box_start.X, current.X)
+						local minY = math.min(x6.pc_box_start.Y, current.Y)
+						local maxX = math.max(x6.pc_box_start.X, current.X)
+						local maxY = math.max(x6.pc_box_start.Y, current.Y)
+						x6.pc_box.Position = UDim2.new(0, minX, 0, minY)
+						x6.pc_box.Size = UDim2.new(0, maxX - minX, 0, maxY - minY)
+						x6.pc_box.Visible = true
+					end
+				end
+			end)
+		)
+
+		table.insert(
+			x6.c,
+			v1.InputEnded:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 then
+					if x6.pc_dragging then
+						x6.pc_dragging = false
+						x6.pc_drag_target = nil
+						for part, _ in pairs(x6.pc_selected) do
+							local d = x6.a and x6.a[part]
+							if d and d.pc_target then
+								if not d.pc_mode or d.pc_mode == "manual" then
+									d.pc_mode = x1.PartCtlMode or "pin"
+								end
 							end
 						end
 					end
-				end)
-			)
-		end
+					if x6.pc_box_start and x6.pc_box then
+						local current = v1:GetMouseLocation()
+						local minX = math.min(x6.pc_box_start.X, current.X)
+						local minY = math.min(x6.pc_box_start.Y, current.Y)
+						local maxX = math.max(x6.pc_box_start.X, current.X)
+						local maxY = math.max(x6.pc_box_start.Y, current.Y)
+
+						local cam = v4 and v4.CurrentCamera
+						if cam and x6.a then
+							for part, _ in pairs(x6.a) do
+								local screenPos, onScreen = cam:WorldToViewportPoint(part.Position)
+								if
+									onScreen
+									and screenPos.X >= minX
+									and screenPos.X <= maxX
+									and screenPos.Y >= minY
+									and screenPos.Y <= maxY
+								then
+									x6.pc_selected[part] = true
+									pc_add_highlight(part)
+								end
+							end
+						end
+
+						x6.pc_box.Visible = false
+						x6.pc_box_start = nil
+					end
+				end
+			end)
+		)
 	end
 end

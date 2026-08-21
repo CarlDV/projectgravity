@@ -641,6 +641,7 @@ return function(context)
 		local pch = Instance.new("Frame", pcm)
 		pch.BackgroundTransparency = 1
 		pch.Size = UDim2.new(1, 0, 0, 40)
+		make_draggable(pcm, pch)
 		local pct = Instance.new("TextLabel", pch)
 		pct.BackgroundTransparency = 1
 		pct.Position = UDim2.new(0, 15, 0, 0)
