@@ -202,10 +202,10 @@ if isfolder and makefolder and listfiles and readfile then
 									if type(ctrl) == "table" and ctrl.Key then
 										local default_val = ctrl.Default
 										if default_val == nil then
-											-- Min is a *display* bound, so it needs the divide to
-											-- become a stored value. Default does not: it is already
-											-- in stored units, which is why UI.lua:1223 multiplies it
-											-- by Div to get the display value. Dividing both made the
+-- Min is a *display* bound, so it needs the divide to
+										-- become a stored value. Default does not: it is already
+										-- in stored units, which is why UI.lua:1287-1289 multiplies it
+										-- by Div to get the display value. Dividing both made the
 											-- two paths disagree by Div squared, so a local shape
 											-- with Div = 10 and Default = 1.2 was seeded 0.12,
 											-- displayed as 1.2, clamped up to Min and written back
@@ -526,6 +526,9 @@ local x6 = {
 	sculptor_box = nil,
 	sculptor_highlights = setmetatable({}, {__mode = "k"}),
 	sculptor_preset_ui = nil,
+	pc_selected = setmetatable({}, {__mode = "k"}),
+	pc_highlights = setmetatable({}, {__mode = "k"}),
+	pc_mods = {},
 	transition_time = 0,
 	transition_dur = 2,
 	f1_connections = {},
@@ -664,8 +667,19 @@ local function destroy()
 		end
 		table.clear(x6.sculptor_highlights)
 	end
+	if x6.pc_clear then
+		pcall(x6.pc_clear)
+	elseif x6.pc_highlights then
+		for _, hl in pairs(x6.pc_highlights) do
+			pcall(function() hl:Destroy() end)
+		end
+		table.clear(x6.pc_highlights)
+	end
 	if x6.sculptor_selected then
 		table.clear(x6.sculptor_selected)
+	end
+	if x6.pc_selected then
+		table.clear(x6.pc_selected)
 	end
 	if x6.sculptor_box then
 		pcall(function() x6.sculptor_box:Destroy() end)

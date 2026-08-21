@@ -222,7 +222,8 @@ return function(context)
 				et = 1
 			end
 			local force_smooth = x1["Force Smooth (Lags)"]
-			if force_smooth then
+			local max_fid = x1.MaxFidelity
+			if force_smooth or max_fid then
 				dt = 1
 				et = 1
 			end
@@ -305,6 +306,14 @@ return function(context)
 			if cur_shape_mod and cur_shape_mod.px then
 				cur_shape_mod.px(ft, cur_shape_cfg, x6, x9, x1)
 			end
+			local pc_mods = x6.pc_mods
+			if pc_mods then
+				for mod, _ in pairs(pc_mods) do
+					if mod.px then
+						pcall(mod.px, ft, mod.pc_cfg_ref or cur_shape_cfg, x6, x9, x1)
+					end
+				end
+			end
 			if x1.k6 ~= shape_name then
 				shape_name = x1.k6
 				cur_shape_mod = get_shape(shape_name)
@@ -358,7 +367,7 @@ return function(context)
 				smoothing = 1
 			end
 			local sm_alpha = smoothing >= 1 and 1 or (1 - math.exp(-dt_mult * -math.log(math.max(0.001, 1 - smoothing))))
-			if force_smooth then
+			if force_smooth or max_fid then
 				sm_alpha = 1
 			end
 
@@ -408,7 +417,7 @@ return function(context)
 			local is_point_impact = shape_name == "Point Impact"
 			local is_light_shape = shape_name == "Light Light no Mi"
 			local is_cursed_red = shape_name == "Cursed Technique Red"
-			local always_process = (is_drop_shape or is_self_bounded_shape) and true or false
+			local always_process = (is_drop_shape or is_self_bounded_shape or max_fid) and true or false
 			local base_limit = is_light_shape and 1000 or ((max_speed and not cur_no_damp) and max_speed or 3300)
 			local check_no3 = (not is_drop_shape) and (not aggressive_claim) and ghp ~= nil
 			local do_damping = damping > 0 and not cur_no_damp and not force_smooth
@@ -462,7 +471,7 @@ return function(context)
 					continue
 				end
 				i = i + 1
-				if i % et ~= update_bucket then
+				if d.pc_mode == nil and i % et ~= update_bucket then
 					continue
 				end
 				if check_no3 then
@@ -482,7 +491,7 @@ return function(context)
 				local p_pos = p.Position
 				local tc = active_c - p_pos
 				local distance_sq = tc:Dot(tc)
-				if distance_sq > k1_sq and not always_process then
+				if distance_sq > k1_sq and not (always_process or d.pc_mode) then
 					-- Skipping the part leaves its LinearVelocity alone, and with MaxForce
 					-- at k4 the constraint keeps applying it: anything that overshoots the
 					-- radius coasts outward for good, and it can never come back because
@@ -501,10 +510,19 @@ return function(context)
 				if d.parked then
 					d.parked = nil
 				end
-				if distance_sq > c7_sq or always_process or is_cursed_red then
+				if distance_sq > c7_sq or always_process or d.pc_mode or is_cursed_red then
 					local target_pos_delta = ANTI_SLEEP
 					local pure_target_pos = nil
-					if shape_f2 then
+					local pc = d.pc_mode
+					if d.pc_mode == "pin" or d.pc_mode == "manual" then
+						local tgt = d.pc_target or p_pos
+						local gain = (d.pc_phys and d.pc_phys.k10) or x1.k10
+						pure_target_pos = tgt
+						target_pos_delta = (tgt - p_pos) * (gain * x9.c1)
+					elseif pc == "shape" and d.pc_mod and d.pc_mod.f2 then
+						target_pos_delta, pure_target_pos =
+							d.pc_mod.f2(p, active_c, d, ft, d.pc_cfg or cur_shape_cfg, x1, x6, x9)
+					elseif shape_f2 then
 						target_pos_delta, pure_target_pos = shape_f2(p, active_c, d, ft, cur_shape_cfg, x1, x6, x9)
 					end
 					
@@ -568,11 +586,13 @@ return function(context)
 						d.sys_last_t = nil
 					end
 					
-					if do_damping then
-						tv = tv - (p.AssemblyLinearVelocity * damping)
+					if do_damping or (d.pc_phys and d.pc_phys.Damping) then
+						local cur_damp = (d.pc_phys and d.pc_phys.Damping) or damping
+						tv = tv - (p.AssemblyLinearVelocity * cur_damp)
 					end
 
-					local vl = d.vl and d.vl:Lerp(tv, sm_alpha) or tv
+					local cur_sm = (d.pc_phys and d.pc_phys.k8 and (1 - math.exp(-dt_mult * -math.log(math.max(0.001, 1 - d.pc_phys.k8))))) or sm_alpha
+					local vl = d.vl and d.vl:Lerp(tv, cur_sm) or tv
 					if in_transition and d.trans_vl then
 						if trans_ease < 1 then
 							vl = d.trans_vl:Lerp(vl, trans_ease)
@@ -587,7 +607,7 @@ return function(context)
 						-- one sqrt instead of Magnitude's plus Unit's
 						vl = id_sq > 0 and (impact_delta * (10000 / math.sqrt(id_sq))) or ZERO_VECTOR
 					else
-						local limit = base_limit
+						local limit = (d.pc_phys and d.pc_phys.MaxSpeed) or base_limit
 						if pure_target_pos then limit = math.max(limit, 15300) end
 						if liftoff_limit then limit = math.min(limit, liftoff_limit) end
 						local vl_sq = vl:Dot(vl)
@@ -1107,7 +1127,7 @@ return function(context)
 		if d.av then
 			d.av.MaxTorque = disabled and 0 or math.huge
 		end
-		p.CanCollide = (disabled or x1.PreserveCollisions) and d.original_can_collide or false
+		p.CanCollide = (disabled or x1.PreserveCollisions or d.pc_ride) and d.original_can_collide or false
 		-- LIGHT_PHYSICS is what lets the constraints throw a part around; at 0.001
 		-- density a disabled part would be shoved across the map by the first thing
 		-- that touched it instead of resting where it landed. Anchored is left alone
@@ -1117,6 +1137,8 @@ return function(context)
 		-- such part LIGHT_PHYSICS back on the disable branch.
 		if disabled then
 			p.CustomPhysicalProperties = d.original_properties
+		elseif d.pc_ride then
+			p.CustomPhysicalProperties = d.original_properties or PhysicalProperties.new(0.7, 0.5, 0.3, 1, 1)
 		else
 			p.CustomPhysicalProperties = LIGHT_PHYSICS
 			-- Parts fall while disabled, so every cached smoothing term now
@@ -1218,8 +1240,14 @@ return function(context)
 		if x6.sculptor_clear then
 			pcall(x6.sculptor_clear)
 		end
+		if x6.pc_clear then
+			pcall(x6.pc_clear)
+		end
 		if x6.sculptor_selected then
 			table.clear(x6.sculptor_selected)
+		end
+		if x6.pc_selected then
+			table.clear(x6.pc_selected)
 		end
 		-- Same as f4: refresh an open panel, never rebuild a closed one.
 		if x5.g then
@@ -1338,6 +1366,14 @@ return function(context)
 		local sculptor_builder = load_module(SUB_DIR .. "System_sculptor.lua")
 		if sculptor_builder then
 			local binder = sculptor_builder(context, x7)
+			if binder then
+				binder()
+			end
+		end
+
+		local partctl_builder = load_module(SUB_DIR .. "System_partctl.lua")
+		if partctl_builder then
+			local binder = partctl_builder(context, x7)
 			if binder then
 				binder()
 			end

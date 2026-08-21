@@ -834,6 +834,156 @@ return function(context)
 			populate_keybinds(ksearch.Text)
 		end)
 
+		local pcm = Instance.new("CanvasGroup", sg)
+		pcm.Name = "PartControl"
+		pcm.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+		pcm.Position = UDim2.new(0, 360, 0.5, -200)
+		pcm.Size = UDim2.new(0, 280, 0, 420)
+		pcm.Visible = false
+		pcm.GroupTransparency = 1
+		pcm.Active = true
+		Instance.new("UICorner", pcm).CornerRadius = UDim.new(0, 10)
+		local pcms = Instance.new("UIStroke", pcm)
+		pcms.Color = Color3.fromRGB(40, 40, 45)
+		pcms.Thickness = 1
+		register_window(pcm, 0.8)
+
+		local pch = Instance.new("Frame", pcm)
+		pch.BackgroundTransparency = 1
+		pch.Size = UDim2.new(1, 0, 0, 50)
+		make_draggable(pcm, pch)
+		local pct = Instance.new("TextLabel", pch)
+		pct.BackgroundTransparency = 1
+		pct.Position = UDim2.new(0, 20, 0, 0)
+		pct.Size = UDim2.new(0.6, 0, 1, 0)
+		pct.Text = "PART CONTROL"
+		pct.TextColor3 = Color3.fromRGB(255, 255, 255)
+		pct.Font = Enum.Font.GothamBold
+		pct.TextSize = 14
+		pct.TextXAlignment = 0
+
+		local pcc = Instance.new("ScrollingFrame", pcm)
+		pcc.BackgroundTransparency = 1
+		pcc.Position = UDim2.new(0, 0, 0, 50)
+		pcc.Size = UDim2.new(1, 0, 1, -60)
+		pcc.ScrollBarThickness = 0
+		pcc.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		pcc.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+		local function populate_partctl()
+			pcc:ClearAllChildren()
+			local pccl = Instance.new("UIListLayout", pcc)
+			pccl.Padding = UDim.new(0, 8)
+			pccl.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			local pcp = Instance.new("UIPadding", pcc)
+			pcp.PaddingLeft = UDim.new(0, 20)
+			pcp.PaddingRight = UDim.new(0, 20)
+
+			local sel_n = 0
+			if x6.pc_selected then
+				for _ in pairs(x6.pc_selected) do
+					sel_n = sel_n + 1
+				end
+			end
+
+			local count_lbl = Instance.new("TextLabel", pcc)
+			count_lbl.BackgroundTransparency = 1
+			count_lbl.Size = UDim2.new(1, 0, 0, 20)
+			count_lbl.Text = "Selected: " .. tostring(sel_n) .. " parts"
+			count_lbl.TextColor3 = Color3.fromRGB(255, 170, 0)
+			count_lbl.Font = Enum.Font.GothamBold
+			count_lbl.TextSize = 12
+			count_lbl.TextXAlignment = 0
+
+			local clr_btn = eb(pcc, "Clear Selection", function()
+				if x6.pc_clear then
+					x6.pc_clear()
+				end
+				populate_partctl()
+			end)
+			clr_btn.Size = UDim2.new(1, 0, 0, 30)
+
+			eh(pcc, "Mode")
+
+			local norm_btn = eb(pcc, "Normal (Clear Override)", function()
+				x1.PartCtlMode = "normal"
+				if x6.pc_assign then
+					x6.pc_assign(nil)
+				end
+				save_settings()
+			end)
+			norm_btn.Size = UDim2.new(1, 0, 0, 28)
+
+			local pin_btn = eb(pcc, "Pin (Hold Position)", function()
+				x1.PartCtlMode = "pin"
+				if x6.pc_assign then
+					x6.pc_assign("pin", { ride = x1.PartCtlRide })
+				end
+				save_settings()
+			end)
+			pin_btn.Size = UDim2.new(1, 0, 0, 28)
+
+			local man_btn = eb(pcc, "Manual Target", function()
+				x1.PartCtlMode = "manual"
+				if x6.pc_assign then
+					x6.pc_assign("manual", { ride = x1.PartCtlRide })
+				end
+				save_settings()
+			end)
+			man_btn.Size = UDim2.new(1, 0, 0, 28)
+
+			local sorted_shapes = {}
+			for sn, _ in pairs(x2) do
+				if sn ~= "Sculptor" then
+					table.insert(sorted_shapes, sn)
+				end
+			end
+			table.sort(sorted_shapes)
+
+			local cur_idx = 1
+			for idx, sn in ipairs(sorted_shapes) do
+				if sn == x1.PartCtlShape then
+					cur_idx = idx
+					break
+				end
+			end
+
+			local pick_btn = eb(pcc, "Target Shape: " .. tostring(x1.PartCtlShape or "Black Hole"), function()
+				cur_idx = (cur_idx % #sorted_shapes) + 1
+				x1.PartCtlShape = sorted_shapes[cur_idx]
+				if x1.PartCtlMode == "shape" and x6.pc_assign then
+					x6.pc_assign("shape", { shape = x1.PartCtlShape, ride = x1.PartCtlRide })
+				end
+				save_settings()
+				populate_partctl()
+			end)
+			pick_btn.Size = UDim2.new(1, 0, 0, 28)
+
+			local shp_btn = eb(pcc, "Assign Shape Mode", function()
+				x1.PartCtlMode = "shape"
+				if x6.pc_assign then
+					x6.pc_assign("shape", { shape = x1.PartCtlShape or "Black Hole", ride = x1.PartCtlRide })
+				end
+				save_settings()
+			end)
+			shp_btn.Size = UDim2.new(1, 0, 0, 28)
+
+			et(pcc, "Rideable", x1.PartCtlRide == true, function(v)
+				x1.PartCtlRide = v
+				if x6.pc_assign and x1.PartCtlMode and x1.PartCtlMode ~= "normal" then
+					x6.pc_assign(x1.PartCtlMode, { shape = x1.PartCtlShape, ride = v })
+				end
+				save_settings()
+			end, "Makes selected parts solid and standable.")
+
+			et(pcc, "Multi-Select (Touch/Click)", x1.PartCtlMultiSelect == true, function(v)
+				x1.PartCtlMultiSelect = v
+				save_settings()
+			end, "Adds to selection on click/touch without holding Shift.")
+		end
+		populate_partctl()
+		x5.refresh_partctl = populate_partctl
+
 		local kb_btn = eb(c, "Keybinds", function()
 			local opening = not km.Visible
 			toggle_window(km, opening)
@@ -847,6 +997,15 @@ return function(context)
 			toggle_window(am, not am.Visible)
 		end)
 		ab.Size = UDim2.new(1, 0, 0, 36)
+
+		local pcb = eb(c, "Part Control", function()
+			local opening = not pcm.Visible
+			toggle_window(pcm, opening)
+			if opening and x5.refresh_partctl then
+				x5.refresh_partctl()
+			end
+		end)
+		pcb.Size = UDim2.new(1, 0, 0, 36)
 
 		local ai_btn = eb(c, "PROJECT GRAVITY AI", function()
 			if ai_chat_module and ai_chat_module.toggle then
@@ -970,6 +1129,10 @@ return function(context)
 				end)
 				et(gsc, "Force Smooth (Lags)", x1["Force Smooth (Lags)"], function(v)
 					x1["Force Smooth (Lags)"] = v
+					save_settings()
+				end)
+				et(gsc, "Max Fidelity (No Skipping)", x1.MaxFidelity, function(v)
+					x1.MaxFidelity = v
 					save_settings()
 				end)
 				et(gsc, "Realistic Liftoff", x1["Realistic Liftoff"], function(v)
