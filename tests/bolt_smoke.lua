@@ -6,6 +6,11 @@ Color3.fromRGB = Color3.new
 if not math.clamp then
 	math.clamp = function(x, lo, hi) return x < lo and lo or (x > hi and hi or x) end
 end
+-- Luau builtin, and this harness loads the shape against plain Lua's table
+-- library rather than robloxenv's. Same polyfill as robloxenv.lua:24.
+if not table.clear then
+	table.clear = function(t) for k in pairs(t) do t[k] = nil end end
+end
 
 local fails, checks = 0, 0
 local function check(cond, msg)
@@ -265,11 +270,26 @@ do
 	local c_off = cfg({ k19 = true, k20 = false })
 	local _, tp = S.f2(part(), cen, { id = 5 }, 1.0, c_off, x1, x6, x9)
 	check(finite(tp), "bolt is live with Hold To Fire off")
-	check(x6.pre["Goro Goro no Mi"].conns == nil, "no listeners connected when not needed")
+	-- The listeners are connected unconditionally now and gated on a live flag on
+	-- the state table. They used to be created only while the toggle was on, and
+	-- since f2 can never re-make them, turning it off mid-hold left st.holding
+	-- latched true for good and the bolt never stopped firing.
+	check(x6.pre["Goro Goro no Mi"].hold_enabled == false,
+		"Hold To Fire off disarms the listeners")
+
+	local x6m = mk_x6()
+	x6m.f = 8
+	local c_on = cfg({ k19 = true, k20 = true })
+	S.f2(part(), cen, { id = 5 }, 1.0, c_on, x1, x6m, x9)
+	local stm = x6m.pre["Goro Goro no Mi"]
+	stm.holding = true
+	check(stm.hold_enabled == true, "Hold To Fire on arms the listeners")
+	S.f2(part(), cen, { id = 5 }, 1.1, cfg({ k19 = true, k20 = false }), x1, x6m, x9)
+	check(stm.holding == false and stm.tap_locked == false,
+		"turning Hold To Fire off releases a latched hold instead of firing forever")
 
 	local x6h = mk_x6()
 	x6h.f = 8
-	local c_on = cfg({ k19 = true, k20 = true })
 	local far, allsame = 0, {}
 	for id = 1, 200 do
 		local vel, p2 = S.f2(part(), cen, { id = id }, 1.0, c_on, x1, x6h, x9)

@@ -46,9 +46,23 @@ return {
 		-- add to a selection.
 		SculptorMultiSelect = false,
 		PartCtlMultiSelect = false,
+		-- Part Control listens on left click, and unlike the Sculptor it is not a
+		-- shape, so it has no `x1.k6 == "Sculptor"` to gate itself on. Unarmed it
+		-- would hijack every click on a held part and draw a selection rectangle
+		-- over every core drag. Armed while the panel is open, or permanently by
+		-- this toggle for people who want the panel out of the way.
+		PartCtlEnabled = false,
 		PartCtlMode = "pin",
 		PartCtlShape = "Black Hole",
 		PartCtlRide = false,
+		-- nil means "inherit the global setting", which is what the System loop's
+		-- `d.pc_phys and ...` guards test for. Stored as -1 rather than nil because
+		-- the settings file round-trip drops nils, and the panel needs to be able to
+		-- show "inherit" as a distinct state from a real value.
+		PartCtlPull = -1,
+		PartCtlDamping = -1,
+		PartCtlSmoothing = -1,
+		PartCtlMaxSpeed = -1,
 		Perf_DisableShadows = false,
 		Perf_DisablePostFX = false,
 		Perf_PotatoMaterials = false,
@@ -56,7 +70,12 @@ return {
 		SlingshotManual = false,
 		AggressiveClaim = false,
 		["Force Smooth (Lags)"] = false,
+		-- Force Smooth plus always_process: no update bucketing, no radius cull.
+		-- A superset, so it implies Force Smooth rather than sitting beside it.
 		MaxFidelity = false,
+		-- Off by default: the core marker staying visible while paused is the
+		-- behaviour people are used to, and some of them park it deliberately.
+		HideCoreOnPause = false,
 		["Realistic Liftoff"] = false,
 		Paused = false,
 		Damping = 0.5,

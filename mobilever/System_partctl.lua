@@ -12,30 +12,14 @@ return function(context, x7)
 	local LIGHT_PHYSICS = PhysicalProperties.new(0.001, 0, 0, 0, 0)
 	local HL_COLOR = Color3.fromRGB(255, 170, 0)
 
-	local function pc_clear_highlights()
-		if x6.pc_highlights then
-			for part, highlight in pairs(x6.pc_highlights) do
-				if highlight and highlight.Parent then
-					pcall(function()
-						highlight:Destroy()
-					end)
-				end
-			end
-			table.clear(x6.pc_highlights)
+	-- The panel shows a live selection count and tints the active mode, so every
+	-- path that changes either has to say so. One hook rather than a signal per
+	-- field: the UI only ever wants "something changed, re-read x6".
+	local function pc_changed()
+		if x6.pc_on_change then
+			pcall(x6.pc_on_change)
 		end
-		if x6.pc_selected then
-			table.clear(x6.pc_selected)
-		end
-		if x6.pc_offsets then
-			table.clear(x6.pc_offsets)
-		end
-		if x6.pc_mods then
-			table.clear(x6.pc_mods)
-		end
-		x6.pc_dragging = false
-		x6.pc_drag_target = nil
 	end
-	x6.pc_clear = pc_clear_highlights
 
 	local function pc_add_highlight(part)
 		if x6.pc_highlights[part] then
@@ -60,24 +44,31 @@ return function(context, x7)
 		end
 	end
 
-	local function pc_select(part, add_to_selection)
-		if not add_to_selection then
-			for p, _ in pairs(x6.pc_selected) do
-				pc_remove_highlight(p)
-			end
-			table.clear(x6.pc_selected)
-			table.clear(x6.pc_offsets)
+	-- One owner for the refcount, called from both pc_assign and pc_release. It
+	-- used to be inlined in both, so clearing a mode ran it twice for the same
+	-- part: pc_assign decremented before dispatching, then pc_release decremented
+	-- again, and cleanup fired while other parts were still driving the module.
+	local function pc_unref_mod(d)
+		local mod = d.pc_mod
+		if not mod then
+			return
 		end
-		if part and x6.a and x6.a[part] then
-			x6.pc_selected[part] = true
-			pc_add_highlight(part)
+		local n = x6.pc_mods[mod]
+		if not n then
+			return
 		end
-	end
-
-	local function pc_deselect(part)
-		x6.pc_selected[part] = nil
-		x6.pc_offsets[part] = nil
-		pc_remove_highlight(part)
+		n = n - 1
+		if n > 0 then
+			x6.pc_mods[mod] = n
+			return
+		end
+		x6.pc_mods[mod] = nil
+		-- Held only so the px pre-pass can find the assignment's own config; a
+		-- live reference to a config table outlives the last part without this.
+		mod.pc_cfg_ref = nil
+		if mod.cleanup then
+			pcall(mod.cleanup, x6, x1)
+		end
 	end
 
 	local function pc_release(part)
@@ -85,21 +76,13 @@ return function(context, x7)
 		if not d then
 			return
 		end
-		if d.pc_mod then
-			local mod = d.pc_mod
-			if x6.pc_mods[mod] then
-				x6.pc_mods[mod] = x6.pc_mods[mod] - 1
-				if x6.pc_mods[mod] <= 0 then
-					x6.pc_mods[mod] = nil
-					if mod.cleanup then
-						pcall(mod.cleanup, x6, x1)
-					end
-				end
-			end
-		end
+		pc_unref_mod(d)
 		if d.pc_ride then
+			-- Hand the part back to the same rule f2/apply_disabled_part uses, so a
+			-- part whose original state was collidable and PreserveCollisions is on
+			-- does not come out of ride mode permanently pass-through.
 			pcall(function()
-				part.CanCollide = false
+				part.CanCollide = (x1.PreserveCollisions and d.original_can_collide) or false
 				part.CustomPhysicalProperties = LIGHT_PHYSICS
 			end)
 		end
@@ -113,8 +96,123 @@ return function(context, x7)
 	end
 	x6.pc_release = pc_release
 
+	-- Deselecting is not releasing: a pinned part stays pinned when the user taps
+	-- elsewhere, which is the whole point of pinning it. pc_clear used to
+	-- table.clear(pc_mods) instead, which dropped every refcount without calling
+	-- a single cleanup and left the parts with pc_mode still set -- permanently
+	-- exempt from the update bucket and the radius cull, driving a module whose
+	-- px was no longer being called, and unreachable because the selection they
+	-- would have been released through was gone.
+	local function pc_clear_highlights()
+		if x6.pc_highlights then
+			for part, highlight in pairs(x6.pc_highlights) do
+				if highlight and highlight.Parent then
+					pcall(function()
+						highlight:Destroy()
+					end)
+				end
+			end
+			table.clear(x6.pc_highlights)
+		end
+		if x6.pc_selected then
+			table.clear(x6.pc_selected)
+		end
+		if x6.pc_offsets then
+			table.clear(x6.pc_offsets)
+		end
+		x6.pc_dragging = false
+		x6.pc_drag_target = nil
+		x6.pc_drag_distance = nil
+		pc_changed()
+	end
+	x6.pc_clear = pc_clear_highlights
+
+	-- Walks x6.a rather than the selection, because the parts that most need
+	-- releasing are the ones no longer selected. Used by the panel's Release All,
+	-- by a shape switch (the module a part is assigned to is torn down with it)
+	-- and by teardown.
+	local function pc_release_all()
+		if not x6.a then
+			return 0
+		end
+		local n = 0
+		local arr = x6.active_array
+		if arr then
+			for i = #arr, 1, -1 do
+				local p = arr[i]
+				local d = p and x6.a[p]
+				if d and d.pc_mode then
+					pc_release(p)
+					n = n + 1
+				end
+			end
+		end
+		-- active_array is the fast path but it is not authoritative: a part can be
+		-- in x6.a without having made it into the dense array yet.
+		for p, d in pairs(x6.a) do
+			if d.pc_mode then
+				pc_release(p)
+				n = n + 1
+			end
+		end
+		if x6.pc_mods then
+			table.clear(x6.pc_mods)
+		end
+		if n > 0 then
+			pc_changed()
+		end
+		return n
+	end
+	x6.pc_release_all = pc_release_all
+
+	local function pc_select(part, add_to_selection)
+		if not add_to_selection then
+			for p, _ in pairs(x6.pc_selected) do
+				pc_remove_highlight(p)
+			end
+			table.clear(x6.pc_selected)
+			table.clear(x6.pc_offsets)
+		end
+		if part and x6.a and x6.a[part] then
+			x6.pc_selected[part] = true
+			pc_add_highlight(part)
+		end
+		pc_changed()
+	end
+	x6.pc_select = pc_select
+
+	local function pc_deselect(part)
+		x6.pc_selected[part] = nil
+		x6.pc_offsets[part] = nil
+		pc_remove_highlight(part)
+		pc_changed()
+	end
+	x6.pc_deselect = pc_deselect
+
+	local function pc_count()
+		local n = 0
+		if x6.pc_selected then
+			for _ in pairs(x6.pc_selected) do
+				n = n + 1
+			end
+		end
+		return n
+	end
+	x6.pc_count = pc_count
+
+	-- The three modes the per-part loop in System.lua can actually dispatch.
+	local VALID_MODES = { pin = true, manual = true, shape = true }
+
 	local function pc_assign(mode, opts)
 		opts = opts or {}
+		-- Anything else is a release. "normal" is the panel's name for "no override"
+		-- and used to be storable as a literal pc_mode: the loop has no branch for
+		-- it, so the part fell through to the global shape but kept a non-nil
+		-- pc_mode, which left it exempt from the update bucket and the radius cull
+		-- for good.
+		if mode ~= nil and not VALID_MODES[mode] then
+			mode = nil
+		end
 		local mod = nil
 		local shape_cfg = nil
 
@@ -134,9 +232,12 @@ return function(context, x7)
 						local def = ctrl.Default
 						if def == nil then
 							def = ctrl.Min or 0
-						end
-						if ctrl.Div then
-							def = def / ctrl.Div
+							-- Min is a display bound, Default is already stored units --
+							-- the same asymmetry main.lua:204 documents. Dividing both
+							-- would disagree with the panel by Div squared.
+							if ctrl.Div then
+								def = def / ctrl.Div
+							end
 						end
 						shape_cfg[ctrl.Key] = def
 					end
@@ -150,22 +251,14 @@ return function(context, x7)
 			local d = x6.a and x6.a[part]
 			if d then
 				pc_add_highlight(part)
-				if d.pc_mod and (mode ~= "shape" or d.pc_mod ~= mod) then
-					local old_mod = d.pc_mod
-					if x6.pc_mods[old_mod] then
-						x6.pc_mods[old_mod] = x6.pc_mods[old_mod] - 1
-						if x6.pc_mods[old_mod] <= 0 then
-							x6.pc_mods[old_mod] = nil
-							if old_mod.cleanup then
-								pcall(old_mod.cleanup, x6, x1)
-							end
-						end
-					end
-				end
-
 				if mode == nil then
+					-- pc_release owns the unref on this path.
 					pc_release(part)
 				else
+					if d.pc_mod and (mode ~= "shape" or d.pc_mod ~= mod) then
+						pc_unref_mod(d)
+						d.pc_mod = nil
+					end
 					d.pc_mode = mode
 					if mode == "pin" then
 						d.pc_target = opts.target or part.Position
@@ -185,7 +278,9 @@ return function(context, x7)
 					end
 
 					if opts.phys ~= nil then
-						d.pc_phys = opts.phys
+						-- false clears the override rather than storing a boolean the
+						-- System loop would then index.
+						d.pc_phys = (opts.phys ~= false) and opts.phys or nil
 					end
 
 					if opts.ride ~= nil then
@@ -200,8 +295,9 @@ return function(context, x7)
 							end)
 						else
 							pcall(function()
-								if part.CanCollide ~= false then
-									part.CanCollide = false
+								local want = (x1.PreserveCollisions and d.original_can_collide) or false
+								if part.CanCollide ~= want then
+									part.CanCollide = want
 								end
 								part.CustomPhysicalProperties = LIGHT_PHYSICS
 							end)
@@ -212,9 +308,84 @@ return function(context, x7)
 			end
 		end
 
+		if count > 0 then
+			pc_changed()
+		end
 		return count
 	end
 	x6.pc_assign = pc_assign
+
+	-- Applies a physics override to the current selection without disturbing the
+	-- mode. Values are nil to inherit the global setting; an all-nil table is
+	-- stored as nil so the System loop's `d.pc_phys and ...` guards short out.
+	local function pc_set_phys(phys)
+		local live = nil
+		if type(phys) == "table" then
+			for _, v in pairs(phys) do
+				if v ~= nil then
+					live = phys
+					break
+				end
+			end
+		end
+		local count = 0
+		for part, _ in pairs(x6.pc_selected) do
+			local d = x6.a and x6.a[part]
+			if d then
+				d.pc_phys = live
+				count = count + 1
+			end
+		end
+		if count > 0 then
+			pc_changed()
+		end
+		return count
+	end
+	x6.pc_set_phys = pc_set_phys
+
+	-- A drag ends by latching the part where it was dropped. It used to promote
+	-- to x1.PartCtlMode, which is a *panel* setting and carries two values the
+	-- per-part loop cannot honour: "normal" is not a mode at all (the part fell
+	-- through to the global shape but kept a non-nil pc_mode, so it stayed exempt
+	-- from bucketing and the radius cull for good), and "shape" needs a resolved
+	-- module that a drag never attaches.
+	local function pc_latch_drag()
+		local mode = x1.PartCtlMode
+		if mode == "shape" then
+			local n = pc_assign("shape", { shape = x1.PartCtlShape, ride = x1.PartCtlRide })
+			if n > 0 then
+				return
+			end
+			-- Unresolvable shape: fall through to pin rather than leave the parts
+			-- mid-drag with no owner.
+		end
+		for part, _ in pairs(x6.pc_selected) do
+			local d = x6.a and x6.a[part]
+			if d and d.pc_target and (not d.pc_mode or d.pc_mode == "manual") then
+				d.pc_mode = (mode == "manual") and "manual" or "pin"
+			end
+		end
+		pc_changed()
+	end
+	x6.pc_latch_drag = pc_latch_drag
+
+	-- Part Control is not a shape, so it cannot gate itself on x1.k6 the way
+	-- System_sculptor does (it returns early unless x1.k6 == "Sculptor"). Left
+	-- ungated these handlers fired on every left click for every shape, forever:
+	-- clicking any held part yanked it into manual mode and pinned it where you
+	-- dropped it, and because the core ball is anchored and lives outside x6.a,
+	-- every core drag fell through to the else branch and painted a selection
+	-- rectangle across the screen. Armed while the panel is open, or permanently
+	-- by the toggle.
+	--
+	-- Only InputBegan is gated. InputChanged and InputEnded are no-ops unless
+	-- pc_dragging or pc_box_start is already set, and those can only be set by a
+	-- gated InputBegan -- so a gesture that starts armed always finishes, even if
+	-- the panel is closed halfway through it.
+	local function pc_armed()
+		return (x6.pc_active or x1.PartCtlEnabled) and true or false
+	end
+	x6.pc_armed = pc_armed
 
 	local function get_touch_target(pos)
 		local cam = v4 and v4.CurrentCamera
@@ -252,7 +423,7 @@ return function(context, x7)
 		table.insert(
 			x6.c,
 			v1.InputBegan:Connect(function(input, processed)
-				if processed then
+				if processed or not pc_armed() then
 					return
 				end
 
@@ -327,14 +498,7 @@ return function(context, x7)
 					if x6.pc_dragging then
 						x6.pc_dragging = false
 						x6.pc_drag_target = nil
-						for part, _ in pairs(x6.pc_selected) do
-							local d = x6.a and x6.a[part]
-							if d and d.pc_target then
-								if not d.pc_mode or d.pc_mode == "manual" then
-									d.pc_mode = x1.PartCtlMode or "pin"
-								end
-							end
-						end
+						pc_latch_drag()
 					end
 				end
 			end)

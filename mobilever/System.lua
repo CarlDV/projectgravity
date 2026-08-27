@@ -180,6 +180,13 @@ return function(context)
 			if x6.last_shape ~= x1.k6 then
 				cleanup_shape(x6.last_shape)
 				x6.last_shape = x1.k6
+				-- Part Control assignments are torn down with the switch: a part
+				-- assigned to a shape holds that module and its x6.pre state, both of
+				-- which the switch invalidates. Releasing first also clears pc_mode,
+				-- which the per-part reset below does not reach.
+				if x6.pc_release_all then
+					pcall(x6.pc_release_all)
+				end
 				for _, d in pairs(x6.a) do
 					d.v1 = nil
 					d.v2 = nil
@@ -221,9 +228,14 @@ return function(context)
 			if x1.k6 == "Light Light no Mi" then
 				et = 1
 			end
-			local force_smooth = x1["Force Smooth (Lags)"]
-			local max_fid = x1.MaxFidelity
-			if force_smooth or max_fid then
+			-- Max Fidelity is Force Smooth plus "never skip a part": same dt/et/alpha
+			-- collapse, and always_process on top. Folding it into force_smooth here
+			-- is what makes it a genuine superset -- written as its own separate
+			-- condition it collapsed the timestep but left do_damping on, so the
+			-- stronger-sounding toggle was not actually the stronger one.
+			local max_fid = x1.MaxFidelity and true or false
+			local force_smooth = x1["Force Smooth (Lags)"] or max_fid
+			if force_smooth then
 				dt = 1
 				et = 1
 			end
@@ -367,7 +379,8 @@ return function(context)
 				smoothing = 1
 			end
 			local sm_alpha = smoothing >= 1 and 1 or (1 - math.exp(-dt_mult * -math.log(math.max(0.001, 1 - smoothing))))
-			if force_smooth or max_fid then
+			-- force_smooth already folds in max_fid (line 224).
+			if force_smooth then
 				sm_alpha = 1
 			end
 
@@ -514,7 +527,7 @@ return function(context)
 					local target_pos_delta = ANTI_SLEEP
 					local pure_target_pos = nil
 					local pc = d.pc_mode
-					if d.pc_mode == "pin" or d.pc_mode == "manual" then
+					if pc == "pin" or pc == "manual" then
 						local tgt = d.pc_target or p_pos
 						local gain = (d.pc_phys and d.pc_phys.k10) or x1.k10
 						pure_target_pos = tgt
@@ -591,7 +604,19 @@ return function(context)
 						tv = tv - (p.AssemblyLinearVelocity * cur_damp)
 					end
 
-					local cur_sm = (d.pc_phys and d.pc_phys.k8 and (1 - math.exp(-dt_mult * -math.log(math.max(0.001, 1 - d.pc_phys.k8))))) or sm_alpha
+					-- Mirrors the global sm_alpha derivation above, including its
+					-- `>= 1 means snap` case: without that branch a per-part
+					-- smoothing of 1 fell into math.log(math.max(0.001, 0)) and
+					-- produced a finite alpha instead of following the target exactly.
+					local cur_sm = sm_alpha
+					local pc_sm = d.pc_phys and d.pc_phys.k8
+					if pc_sm then
+						if pc_sm >= 1 or force_smooth then
+							cur_sm = 1
+						else
+							cur_sm = 1 - math.exp(-dt_mult * -math.log(math.max(0.001, 1 - pc_sm)))
+						end
+					end
 					local vl = d.vl and d.vl:Lerp(tv, cur_sm) or tv
 					if in_transition and d.trans_vl then
 						if trans_ease < 1 then
@@ -607,8 +632,14 @@ return function(context)
 						-- one sqrt instead of Magnitude's plus Unit's
 						vl = id_sq > 0 and (impact_delta * (10000 / math.sqrt(id_sq))) or ZERO_VECTOR
 					else
-						local limit = (d.pc_phys and d.pc_phys.MaxSpeed) or base_limit
-						if pure_target_pos then limit = math.max(limit, 15300) end
+						-- An explicit per-part cap is a cap. The 15300 floor exists so a
+						-- shape that hands back an exact position is not fought by the
+						-- global speed limit, but pin and manual always hand one back, so
+						-- applying it unconditionally made the per-part Max Speed slider
+						-- do nothing in the two modes it is most useful in.
+						local pc_limit = d.pc_phys and d.pc_phys.MaxSpeed
+						local limit = pc_limit or base_limit
+						if pure_target_pos and not pc_limit then limit = math.max(limit, 15300) end
 						if liftoff_limit then limit = math.min(limit, liftoff_limit) end
 						local vl_sq = vl:Dot(vl)
 						if vl_sq > limit * limit then
@@ -1025,6 +1056,25 @@ return function(context)
 		)
 	end
 
+	-- Whether the core ball is shown, in one place. Three call sites used to
+	-- decide it independently (creation, apply_disabled, and nothing at all for
+	-- pause), which is why adding a second reason to hide it needed a single
+	-- owner. Hidden means invisible, not inert: the part stays anchored where it
+	-- is and a tap still finds it, so dragging the core around while it is hidden
+	-- keeps working exactly as it already did while Disabled.
+	local function refresh_core_visual()
+		if not x6.b then
+			return
+		end
+		local hidden = x1.Disabled or (x1.HideCoreOnPause and x1.Paused) or false
+		x6.b.Transparency = hidden and 1 or x9.c7
+		local visual = x6.b:FindFirstChild("Visual")
+		if visual then
+			visual.Enabled = not hidden
+		end
+	end
+	x4.refresh_core_visual = refresh_core_visual
+
 	function x4.f4(pos)
 		if x6.b then
 			v6:Create(x6.b, TweenInfo.new(x9.c7), { Position = pos }):Play()
@@ -1040,21 +1090,21 @@ return function(context)
 		x6.b.CanCollide = false
 		x6.b.Material = "Neon"
 		x6.b.Position = pos
-		-- Disabled survives a restart through the settings file, so the core has to
-		-- come up already hidden in that case rather than showing a visible marker
-		-- for something that is not driving anything.
-		x6.b.Transparency = x1.Disabled and 1 or x9.c7
 		local bg = Instance.new("BillboardGui", x6.b)
 		bg.Name = "Visual"
 		bg.Adornee = x6.b
 		bg.Size = UDim2.new(0, 20, 0, 20)
 		bg.AlwaysOnTop = true
-		bg.Enabled = not x1.Disabled
 		local img = Instance.new("ImageLabel", bg)
 		img.BackgroundTransparency = 1
 		img.Size = UDim2.new(1, 0, 1, 0)
 		img.Image = "rbxassetid://3570695787"
 		img.ImageColor3 = x1.k3
+		-- Disabled survives a restart through the settings file, so the core has to
+		-- come up already hidden in that case rather than showing a visible marker
+		-- for something that is not driving anything. After the BillboardGui exists,
+		-- so the one call covers both the part and the sprite.
+		refresh_core_visual()
 		v6
 			:Create(
 				x6.b,
@@ -1183,11 +1233,7 @@ return function(context)
 			cleanup_shape(x1.k6)
 		end
 		if x6.b then
-			x6.b.Transparency = disabled and 1 or x9.c7
-			local visual = x6.b:FindFirstChild("Visual")
-			if visual then
-				visual.Enabled = not disabled
-			end
+			refresh_core_visual()
 		end
 		-- the dense array again, rather than iterating the weak part table
 		local arr = x6.active_array
@@ -1249,6 +1295,7 @@ return function(context)
 		if x6.pc_selected then
 			table.clear(x6.pc_selected)
 		end
+		x6.pc_active = false
 		-- Same as f4: refresh an open panel, never rebuild a closed one.
 		if x5.g then
 			x5.st()
@@ -1323,6 +1370,9 @@ return function(context)
 		bind("P", function(_, s)
 			if s == Enum.UserInputState.Begin then
 				x1.Paused = not x1.Paused
+				-- Hide Core While Paused is toggled here as well as in the panel,
+				-- so this is the call site that actually matters.
+				refresh_core_visual()
 				x7.n("Sys", x1.Paused and "Paused" or "Resumed", 2)
 			end
 		end, kb.Pause, Enum.KeyCode.P)

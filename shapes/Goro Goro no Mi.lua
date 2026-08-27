@@ -84,7 +84,10 @@ end
 
 function M.f2(p, cen, d, t, c, x1, x6, x9)
 	local nodes = math.clamp(math.floor(c.k12 or 18), 4, 64)
-	local amp = c.k13 or 14
+	-- Clamped to their own sliders' bounds, like nodes and flicker already were. A
+	-- config file is not bound by the panel's Min/Max, and a negative amp mirrors
+	-- the noise instead of removing it.
+	local amp = math.clamp(c.k13 or 14, 0, 100)
 	local flicker = math.clamp(c.k14 or 12, 1, 60)
 
 	local st = x6.pre and x6.pre["Goro Goro no Mi"]
@@ -95,13 +98,24 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 		end
 	end
 
-	if c.k20 and not st.conns then
+	-- Read by the input handlers, which are made once and outlive a toggle change,
+	-- so the live value has to reach them through the state table. Without this,
+	-- turning Hold To Fire off mid-hold left st.holding latched true forever and
+	-- the bolt never stopped.
+	local hold_mode = c.k20 and true or false
+	st.hold_enabled = hold_mode
+	if not hold_mode then
+		st.holding = false
+		st.tap_locked = false
+	end
+
+	if not st.conns then
 		st.conns = {}
 		local ok = pcall(function()
 			local uis = game:GetService("UserInputService")
 			st.touch_mode = uis.TouchEnabled and not uis.KeyboardEnabled
 			st.conns[#st.conns + 1] = uis.InputBegan:Connect(function(inp, gpe)
-				if gpe then return end
+				if gpe or not st.hold_enabled then return end
 				if inp.UserInputType == Enum.UserInputType.MouseButton1 then
 					st.holding = true
 				elseif inp.UserInputType == Enum.UserInputType.Touch then
@@ -113,6 +127,8 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 				end
 			end)
 			st.conns[#st.conns + 1] = uis.InputEnded:Connect(function(inp)
+				-- Not gated on hold_enabled: a release always has to clear the flag,
+				-- or turning the toggle off between press and release strands it.
 				if inp.UserInputType == Enum.UserInputType.MouseButton1 then
 					st.holding = false
 				elseif inp.UserInputType == Enum.UserInputType.Touch and not st.touch_mode then
@@ -143,13 +159,15 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 	local aim = st.aim
 
 	local firing = true
-	if c.k20 then
+	if hold_mode then
 		firing = st.holding or st.tap_locked or x1.IsLaunching or false
 	end
 
 	if not firing then
 		local id0 = d.id or 1
-		local rad = 6 + (c.k18 or 2)
+		-- Same clamp as thick below, since this reads the same control and the
+		-- idle cloud collapses to a point at 0 otherwise.
+		local rad = 6 + math.clamp(c.k18 or 2, 0, 20)
 		local cloud = cen + Vector3.new(
 			(2 * h(seed, id0, 11) - 1) * rad,
 			(2 * h(seed, id0, 12) - 1) * rad,
@@ -167,7 +185,7 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 	local branches = math.clamp(math.floor(c.k15 or 3), 0, 12)
 	local share = math.clamp(c.k16 or 0.3, 0, 0.8)
 	local bfrac = math.clamp(c.k17 or 0.4, 0.1, 1.0)
-	local thick = c.k18 or 2
+	local thick = math.clamp(c.k18 or 2, 0, 20)
 
 	local id = d.id or 1
 	local f1 = (id * PHI1) % 1
@@ -223,6 +241,14 @@ function M.cleanup(x6, x1)
 				conn:Disconnect()
 			end)
 		end
+		-- Emptied as well as disconnected: cleanup can run while the same state
+		-- table is still reachable (Part Control unrefs a module without dropping
+		-- x6.pre), and a second pass would then Disconnect dead connections.
+		table.clear(st.conns)
+		st.conns = nil
+		st.hold_enabled = false
+		st.holding = false
+		st.tap_locked = false
 	end
 	x6.pre["Goro Goro no Mi"] = nil
 end

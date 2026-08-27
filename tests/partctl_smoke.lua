@@ -142,10 +142,175 @@ do
 	x6.pc_clear()
 	check(next(x6.pc_selected) == nil, "pc_clear empties the selection")
 	check(next(x6.pc_highlights) == nil, "pc_clear empties the highlights")
-	check(next(x6.pc_mods) == nil, "pc_clear empties the module registry")
+	-- Deselecting is not releasing: a pinned part stays pinned when the user
+	-- clicks elsewhere. pc_clear used to table.clear(pc_mods) instead, which
+	-- stranded the parts it had been driving with pc_mode still set, permanently
+	-- exempt from the update bucket and the radius cull, and with no selection
+	-- left to release them through.
+	check(d1.pc_mode == "pin", "pc_clear leaves the override in place")
 	local ok = pcall(x6.pc_clear)
 	check(ok, "pc_clear is idempotent")
+
+	check(x6.pc_release_all() == 1, "pc_release_all reports what it released")
+	check(d1.pc_mode == nil, "pc_release_all reaches a part that is no longer selected")
+	check(next(x6.pc_mods) == nil, "pc_release_all empties the module registry")
+	check(x6.pc_release_all() == 0, "pc_release_all is idempotent")
 end
+
+print("partctl · release refcounting")
+do
+	local x6 = mk_x6()
+	local ctx = mk_ctx(x6)
+	local cleanups = 0
+	local shared = { name = "Shared", f2 = function() end, cleanup = function() cleanups = cleanups + 1 end }
+	ctx.get_shape = function(name)
+		if name == "Missing" then return nil end
+		return shared
+	end
+	builder(ctx, { e = function() return false end })()
+
+	local parts = {}
+	for i = 1, 4 do
+		local p, d = claimed()
+		x6.a[p] = d
+		x6.pc_selected[p] = true
+		parts[i] = { p = p, d = d }
+	end
+	check(x6.pc_assign("shape", { shape = "Shared" }) == 4, "four parts take the shape")
+	check(x6.pc_mods[shared] == 4, ("the refcount counts every part (%s)"):format(tostring(x6.pc_mods[shared])))
+
+	-- pc_assign used to decrement before dispatching and pc_release decrement
+	-- again, so clearing ran the refcount down twice per part: cleanup fired after
+	-- the second of four parts, while the other two were still assigned.
+	x6.pc_selected[parts[1].p] = nil
+	x6.pc_selected[parts[2].p] = nil
+	x6.pc_selected[parts[3].p] = nil
+	check(x6.pc_assign(nil) == 1, "clearing one part reports one part")
+	check(cleanups == 0, ("cleanup does not fire while three parts still hold it (%d)"):format(cleanups))
+	check(x6.pc_mods[shared] == 3, ("one release decrements once (%s)"):format(tostring(x6.pc_mods[shared])))
+
+	x6.pc_release(parts[1].p)
+	x6.pc_release(parts[2].p)
+	check(cleanups == 0, "still held by the last part")
+	x6.pc_release(parts[3].p)
+	check(cleanups == 1, ("cleanup fires exactly once, on the last release (%d)"):format(cleanups))
+	check(x6.pc_mods[shared] == nil, "the registry entry is gone")
+	check(shared.pc_cfg_ref == nil, "the cached config reference is dropped with it")
+end
+
+print("partctl · drag latch")
+do
+	local x6 = mk_x6()
+	local ctx = mk_ctx(x6)
+	builder(ctx, { e = function() return false end })()
+
+	-- x1.PartCtlMode is a panel setting, and two of its four values are not modes
+	-- the per-part loop can dispatch. Latching a drag straight onto it left the
+	-- part with a non-nil pc_mode -- so exempt from the update bucket and the
+	-- radius cull -- and nothing driving it.
+	local function dragged(mode, shape)
+		local p, d = claimed()
+		x6.a[p] = d
+		table.clear(x6.pc_selected)
+		x6.pc_selected[p] = true
+		-- What the input handler leaves behind when a drag starts.
+		d.pc_mode = "manual"
+		d.pc_target = Vector3.new(1, 2, 3)
+		ctx.x1.PartCtlMode = mode
+		ctx.x1.PartCtlShape = shape
+		x6.pc_latch_drag()
+		return d
+	end
+
+	local d = dragged("normal", "Black Hole")
+	check(d.pc_mode == "pin", ("normal latches to pin, not %s"):format(tostring(d.pc_mode)))
+
+	d = dragged("pin", "Black Hole")
+	check(d.pc_mode == "pin", "pin latches to pin")
+
+	d = dragged("manual", "Black Hole")
+	check(d.pc_mode == "manual", "manual stays manual, so the target keeps following")
+
+	d = dragged("shape", "Black Hole")
+	check(d.pc_mode == "shape", "shape mode latches to shape")
+	check(d.pc_mod ~= nil, "and always with a resolved module behind it")
+
+	-- An unresolvable shape must not leave the part mid-drag with no owner.
+	d = dragged("shape", "Missing")
+	check(d.pc_mode == "pin", ("an unresolvable shape falls back to pin, not %s"):format(tostring(d.pc_mode)))
+
+	-- pc_assign is the same entry point the panel uses, and it used to store any
+	-- string it was handed.
+	local p2, d2 = claimed()
+	x6.a[p2] = d2
+	table.clear(x6.pc_selected)
+	x6.pc_selected[p2] = true
+	x6.pc_assign("normal")
+	check(d2.pc_mode == nil, '"normal" is a release, not a storable mode')
+	x6.pc_assign("nonsense")
+	check(d2.pc_mode == nil, "an unknown mode is a release too")
+end
+
+print("partctl · physics override")
+do
+	local x6 = mk_x6()
+	local ctx = mk_ctx(x6)
+	builder(ctx, { e = function() return false end })()
+
+	local p1, d1 = claimed()
+	x6.a[p1] = d1
+	x6.pc_selected[p1] = true
+
+	check(x6.pc_set_phys({ k10 = 40, Damping = nil, k8 = nil, MaxSpeed = nil }) == 1,
+		"pc_set_phys reports the count it touched")
+	check(d1.pc_phys ~= nil and d1.pc_phys.k10 == 40, "a live field is stored")
+
+	-- An all-nil table has to land as nil, or the System loop's
+	-- `d.pc_phys and d.pc_phys.k10` guard is true with nothing behind it.
+	x6.pc_set_phys({ k10 = nil, Damping = nil, k8 = nil, MaxSpeed = nil })
+	check(d1.pc_phys == nil, "an all-inherit table is stored as nil, not an empty table")
+
+	x6.pc_set_phys({ k10 = 40 })
+	x6.pc_set_phys(nil)
+	check(d1.pc_phys == nil, "passing nil clears the override")
+
+	x6.pc_set_phys({ k10 = 40 })
+	x6.pc_release(p1)
+	check(d1.pc_phys == nil, "releasing a part drops its physics override")
+end
+
+print("partctl · change hook")
+do
+	local x6 = mk_x6()
+	local ctx = mk_ctx(x6)
+	builder(ctx, { e = function() return false end })()
+
+	local fired = 0
+	x6.pc_on_change = function() fired = fired + 1 end
+
+	local p1, d1 = claimed()
+	x6.a[p1] = d1
+	x6.pc_select(p1, false)
+	check(fired > 0, "selecting notifies the panel")
+	check(x6.pc_count() == 1, "pc_count reports the selection size")
+
+	local before = fired
+	x6.pc_assign("pin")
+	check(fired > before, "assigning notifies the panel")
+
+	before = fired
+	x6.pc_deselect(p1)
+	check(fired > before, "deselecting notifies the panel")
+	check(x6.pc_count() == 0, "pc_count follows the deselect")
+
+	-- A throwing listener must not take the input handler down with it.
+	x6.pc_on_change = function() error("boom") end
+	local ok = pcall(function()
+		x6.pc_select(p1, false)
+	end)
+	check(ok, "a failing change hook does not propagate")
+end
+
 
 print("partctl · assigned shape config")
 do
@@ -189,6 +354,42 @@ do
 
 	x6.pc_assign("pin", { ride = false })
 	check(p1.CanCollide == false, "clearing ride returns the part to pass-through")
+end
+
+print("partctl · arming")
+do
+	local x6 = mk_x6()
+	local ctx = mk_ctx(x6)
+	builder(ctx, { e = function() return false end })()
+
+	-- Unlike the Sculptor, Part Control is not a shape and has no x1.k6 to gate
+	-- on. Ungated it fired on every left click for every shape: any held part you
+	-- clicked was yanked into manual mode and pinned where you let go, and the
+	-- core ball -- anchored, and outside x6.a -- fell through to the box-select
+	-- branch, so dragging the core painted a rectangle over the screen.
+	check(type(x6.pc_armed) == "function", "pc_armed is published")
+	check(x6.pc_armed() == false, "nothing is armed by default")
+
+	x6.pc_active = true
+	check(x6.pc_armed() == true, "an open panel arms it")
+	x6.pc_active = false
+	check(x6.pc_armed() == false, "closing the panel disarms it")
+
+	ctx.x1.PartCtlEnabled = true
+	check(x6.pc_armed() == true, "the stay-armed toggle arms it with the panel shut")
+	ctx.x1.PartCtlEnabled = false
+	check(x6.pc_armed() == false, "and clearing the toggle disarms it again")
+
+	-- The gate is on input only. The panel's own buttons have to keep working
+	-- regardless, or Release All Overrides could not reach a part that was
+	-- assigned while armed.
+	local p1, d1 = claimed()
+	x6.a[p1] = d1
+	x6.pc_selected[p1] = true
+	check(x6.pc_armed() == false, "still unarmed")
+	check(x6.pc_assign("pin") == 1, "pc_assign ignores the gate")
+	check(d1.pc_mode == "pin", "and takes effect")
+	check(x6.pc_release_all() == 1, "pc_release_all ignores the gate")
 end
 
 print(("\n%d checks, %d failures"):format(checks, fails))

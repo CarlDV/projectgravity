@@ -31,8 +31,17 @@ for _, path in ipairs({ "System.lua", "mobilever/System.lua" }) do
 	check(src:find("local max_fid%s*=%s*x1%.MaxFidelity") ~= nil,
 		path .. ": declares `local max_fid = x1.MaxFidelity`")
 
-	check(src:find("if%s+force_smooth%s+or%s+max_fid%s+then") ~= nil,
-		path .. ": the dt/et pin reads max_fid alongside force_smooth")
+	-- Max Fidelity has to be a superset of Force Smooth, not a sibling. Written as
+	-- two independent conditions it pinned dt/et and sm_alpha but left do_damping
+	-- armed, so the stronger-sounding toggle was the weaker one. Folding max_fid
+	-- into force_smooth at the declaration is what makes every later
+	-- `not force_smooth` cover it.
+	check(src:find('local%s+force_smooth%s*=%s*x1%["Force Smooth %(Lags%)"%]%s+or%s+max_fid') ~= nil,
+		path .. ": force_smooth folds in max_fid at the declaration")
+	check(src:find("do_damping%s*=[^\n]*not%s+force_smooth") ~= nil,
+		path .. ": do_damping is gated on force_smooth, so max_fid drops damping too")
+	check(src:find("if%s+force_smooth%s+or%s+max_fid%s+then") == nil,
+		path .. ": no leftover `force_smooth or max_fid` branch beside the declaration")
 
 	check(src:find("local%s+always_process%s*=[^\n]*max_fid") ~= nil,
 		path .. ": always_process includes max_fid")

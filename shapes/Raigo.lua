@@ -66,7 +66,10 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 	local dur_blast = math.clamp(c.k14 or 0.7, 0.15, 3.0)
 	local h_hover = math.clamp(c.k15 or 12, 3, 50)
 	local num_arcs = math.clamp(math.floor(c.k16 or 8), 2, 24)
-	local amp_arc = c.k17 or 12
+	-- Clamped like every other control here, and to its own slider's bounds. A
+	-- negative jaggedness mirrors the noise rather than removing it, and a config
+	-- file is not bound by the panel's Min/Max.
+	local amp_arc = math.clamp(c.k17 or 12, 0, 50)
 	local auto_ret = c.k18 ~= false
 	local click_act = c.k19 ~= false
 	local neon_on = c.k20 ~= false
@@ -90,13 +93,18 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 		end
 	end
 
-	if click_act and not st.conns then
+	-- Read by the input handler, which outlives a toggle change: the connections
+	-- are made once and cannot be re-made, so the live value has to reach them
+	-- through the state table rather than through the closure.
+	st.click_enabled = click_act
+
+	if not st.conns then
 		st.conns = {}
 		local ok = pcall(function()
 			local uis = game:GetService("UserInputService")
 			local cam = workspace.CurrentCamera
 			st.conns[#st.conns + 1] = uis.InputBegan:Connect(function(inp, gpe)
-				if gpe then return end
+				if gpe or not st.click_enabled then return end
 				local hit = nil
 				if inp.UserInputType == Enum.UserInputType.MouseButton1 then
 					hit = get_cursor_world_hit(cam, uis, 1000)
@@ -116,16 +124,23 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 		end
 	end
 
-	if x1.IsLaunching and (st.phase == "HOVER" or st.phase == "RETURN") then
+	-- FORCE LAUNCH is a latch, not a pulse: the button's own label flips on it and
+	-- Twin Core Beam and Slingshot read it as a held state. Consuming it here
+	-- (x1.IsLaunching = false) fired Raigo once and then desynced the button, which
+	-- still read "RESET SYSTEM", and stole the flag from every other reader. Edge
+	-- detection belongs in this shape's own state.
+	local launching = x1.IsLaunching and true or false
+	if launching and not st.last_launch and (st.phase == "HOVER" or st.phase == "RETURN") then
 		local cam = workspace.CurrentCamera
 		local uis = game:GetService("UserInputService")
-		local hit = get_cursor_world_hit(cam, uis, 800) or (cen + (cam and cam.CFrame.LookVector or Vector3.new(0, 0, 1)) * 150)
+		local hit = get_cursor_world_hit(cam, uis, 800)
+			or (cen + (cam and cam.CFrame.LookVector or Vector3.new(0, 0, 1)) * 150)
 		st.phase = "LAUNCH"
 		st.start_pos = st.orb_pos
 		st.dest_pos = hit
 		st.t_launch = t
-		x1.IsLaunching = false
 	end
+	st.last_launch = launching
 
 	local cur_f = x6.f or 0
 	if st.last_f ~= cur_f then
@@ -252,10 +267,14 @@ function M.f2(p, cen, d, t, c, x1, x6, x9)
 		end
 
 		if st.phase == "LAUNCH" then
-			local vel_dir = (st.dest_pos - st.start_pos).Unit
-			local trail_len = math.clamp(v_flight * 0.08, 5, 40)
-			local trail_drag = (id % 5) / 4 * trail_len
-			if frac > 0.65 then
+			-- dest and start coincide when the orb is clicked where it already is.
+			-- Vector3.zero.Unit is NaN in Roblox, and a NaN offset propagates into
+			-- p.Position through the constraint, so the part is gone for good.
+			local travel = (st.dest_pos or st.orb_pos) - st.start_pos
+			if travel.Magnitude > 1e-3 and frac > 0.65 then
+				local vel_dir = travel.Unit
+				local trail_len = math.clamp(v_flight * 0.08, 5, 40)
+				local trail_drag = (id % 5) / 4 * trail_len
 				final_pos = final_pos - vel_dir * trail_drag
 			end
 		end
@@ -286,6 +305,12 @@ function M.cleanup(x6, x1)
 				conn:Disconnect()
 			end)
 		end
+		-- Emptied as well as disconnected: cleanup can run while the same state
+		-- table is still reachable (Part Control unrefs a module without dropping
+		-- x6.pre), and a second pass would then Disconnect dead connections.
+		table.clear(st.conns)
+		st.conns = nil
+		st.click_enabled = false
 	end
 	x6.pre["Raigo"] = nil
 end
